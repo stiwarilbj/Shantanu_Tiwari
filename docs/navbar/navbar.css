@@ -10,7 +10,7 @@
 }
 
 .site-nav {
-  --nav-height: clamp(70px, 8.25vw, 84px);
+  --nav-height: clamp(3.5rem, calc(3.125rem + 2.5vw), 5.25rem);
   --nav-link-padding: clamp(0.375rem, calc(1.8vw - 0.25rem), 0.9rem);
   --dropdown-surface: linear-gradient(120deg, #f3faff, #eeeffe);
   --dropdown-shadow: 0 16px 30px -14px rgb(29 61 117 / 38%), 0 4px 12px -6px rgb(29 61 117 / 18%);
@@ -27,7 +27,7 @@
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
-  font-size: clamp(0.8125rem, calc(0.5625rem + 0.7vw), 1rem);
+  font-size: clamp(0.75rem, calc(0.6875rem + 0.35vw), 1rem);
   font-weight: 600;
 }
 
@@ -40,7 +40,7 @@
 .wordmark {
   padding-inline: 0.3rem;
   margin-inline-start: -0.3rem;
-  font-size: clamp(1.3rem, calc(0.9rem + 1.2vw), 1.625rem);
+  font-size: clamp(1.125rem, calc(0.9375rem + 0.8vw), 1.625rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -62,10 +62,12 @@
   position: relative;
   display: flex;
   flex: 1;
+  min-inline-size: 0;
 }
 
 .category-link {
   flex: 1;
+  min-inline-size: 0;
   justify-content: center;
   gap: clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem);
   padding-inline: var(--nav-link-padding);
@@ -154,10 +156,8 @@
 
 @media (width < 35rem), (hover: none) {
   .site-nav {
-    --nav-height: 70px;
     flex-wrap: wrap;
     gap: 0 0.5rem;
-    font-size: 1rem;
   }
 
   .wordmark, .menu-toggle {
@@ -179,6 +179,7 @@
     flex: 1 0 100%;
     flex-direction: column;
     align-items: stretch;
+    font-size: clamp(0.875rem, calc(0.8125rem + 0.3vw), 1rem);
   }
 
   .site-nav[data-ready] .nav-links {
@@ -204,7 +205,7 @@
 
   .category-link {
     justify-content: space-between;
-    min-block-size: 3rem;
+    min-block-size: clamp(2.75rem, calc(2.5rem + 1.25vw), 3rem);
     padding-inline: var(--gutter);
   }
 
