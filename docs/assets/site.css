@@ -72,7 +72,6 @@ button {
   padding-inline: var(--gutter);
   background:
     radial-gradient(ellipse at 54% -36%, rgb(219 248 255 / 66%), transparent 69%),
-    repeating-linear-gradient(to bottom, rgb(255 255 255 / 9%) 0 1px, transparent 1px 4px),
     linear-gradient(112deg, #bdecf8, #c1e8fd 48%, #d2e4fe);
   font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: 1.125rem;
