@@ -1,4 +1,34 @@
 const navigation = document.querySelector(".site-nav");
+const siteRoot = new URL("../", document.currentScript.src);
+const sections = [
+  ["experiments", "Experiments"],
+  ["learning", "Learning"],
+  ["games", "Games"],
+  ["old-projects", "Old Projects"],
+];
+
+const sectionLinks = sections.map(([slug, name]) => `
+      <li class="nav-item">
+        <a class="category-link" href="${slug}/" aria-controls="${slug}-filler">
+          ${name} <span class="chevron" aria-hidden="true"></span>
+        </a>
+        <a class="filler-link" id="${slug}-filler" href="${slug}/filler/" aria-label="Filler for ${name}" hidden>Filler</a>
+      </li>`).join("");
+
+navigation.insertAdjacentHTML("beforeend", `
+    <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
+      Menu <span class="chevron" aria-hidden="true"></span>
+    </button>
+    <ul class="nav-links" id="nav-links">${sectionLinks}
+    </ul>`);
+
+const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
+for (const link of navigation.querySelectorAll(".category-link, .filler-link")) {
+  const destination = new URL(link.getAttribute("href"), siteRoot);
+  link.href = destination.href;
+  if (destination.pathname === currentPath) link.setAttribute("aria-current", "page");
+}
+
 const menu = navigation.querySelector(".menu-toggle");
 const compactLayout = window.matchMedia("(max-width: 1023px), (hover: none)");
 const withoutHover = window.matchMedia("(hover: none)");

@@ -9,7 +9,6 @@
   --ink: #1b242d;
   --page-blue: #eaf6ff;
   --focus: #1453a4;
-  --nav-height: 92px;
   --gutter: clamp(1rem, 3.5vw, 3.5rem);
   --tile-gap: clamp(1rem, 2vw, 1.5rem);
   --art-blend: clamp(90px, 16vw, 150px);
@@ -34,14 +33,7 @@ a {
   text-decoration: none;
 }
 
-button {
-  border: 0;
-  background: none;
-  font: inherit;
-  cursor: pointer;
-}
-
-:where(.site-nav, button, .tile) {
+.tile {
   -webkit-user-select: none;
   user-select: none;
 }
@@ -49,110 +41,6 @@ button {
 :where(a, button):focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: -5px;
-}
-
-[hidden] {
-  display: none !important;
-}
-
-.site-nav {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  min-block-size: var(--nav-height);
-  padding-inline: var(--gutter);
-  background:
-    radial-gradient(ellipse at 54% -36%, rgb(219 248 255 / 66%), transparent 69%),
-    linear-gradient(112deg, #c3e4ff, #c1e8fd 48%, #d2e4fe);
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.wordmark, .category-link, .menu-toggle, .filler-link {
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-}
-
-.wordmark {
-  padding-inline: 0.3rem;
-  margin-inline-start: -0.3rem;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.nav-links {
-  display: flex;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.nav-item {
-  position: relative;
-  display: flex;
-}
-
-.category-link {
-  gap: 0.75rem;
-  padding-inline: 0.9rem;
-}
-
-.menu-toggle {
-  display: none;
-  gap: 0.65rem;
-  padding-inline: 0.55rem;
-}
-
-.chevron {
-  display: block;
-  inline-size: 0.58em;
-  block-size: 0.58em;
-  margin-block-start: -0.28em;
-  border: solid #1659a8;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-
-.category-link:not([aria-expanded]) .chevron {
-  display: none;
-}
-
-[aria-expanded="true"] .chevron {
-  margin-block-start: 0.25em;
-  transform: rotate(225deg);
-}
-
-.filler-link {
-  position: absolute;
-  inset-block-start: 100%;
-  inset-inline-end: 0;
-  min-inline-size: 100%;
-  min-block-size: 2.75rem;
-  padding-inline: 0.9rem;
-  border-radius: 0 0 0.75rem 0.75rem;
-  background-color: #e8f6ff;
-  box-shadow: 0 12px 28px rgb(22 67 121 / 16%);
-}
-
-.site-nav :is(a, button):hover,
-.site-nav :is(a, button):active,
-.site-nav [aria-expanded="true"] {
-  background-color: rgb(255 255 255 / 32%);
-}
-
-.site-nav .filler-link:hover,
-.site-nav .filler-link:active {
-  background-color: #f7fcff;
-}
-
-.site-nav [aria-current="page"]:not(.wordmark) {
-  text-decoration: underline;
-  text-underline-offset: 0.25em;
-  text-decoration-thickness: 1px;
 }
 
 .content {
@@ -175,7 +63,6 @@ button {
   z-index: -1;
   inset: 0 0 calc(0px - var(--art-blend));
   background: center / cover no-repeat url("01-screenshot-insight.png");
-  opacity: 0.88;
   pointer-events: none;
   content: "";
 }
@@ -301,74 +188,6 @@ h2 {
   color: #31465d;
   font-size: clamp(0.875rem, 1.15vw, 1rem);
   line-height: 1.4;
-}
-
-.placeholder {
-  padding-block: clamp(2.5rem, 5.5vw, 5.5rem);
-}
-
-.placeholder p {
-  margin-block-start: 0.75rem;
-}
-
-@media (max-width: 1023px), (hover: none) {
-  :root {
-    --nav-height: 76px;
-  }
-
-  .site-nav {
-    flex-wrap: wrap;
-    gap: 0 0.5rem;
-  }
-
-  .wordmark, .menu-toggle {
-    min-block-size: var(--nav-height);
-  }
-
-  .site-nav[data-ready] .menu-toggle {
-    display: flex;
-  }
-
-  .nav-links {
-    flex: 1 0 100%;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .site-nav[data-ready] .nav-links {
-    position: absolute;
-    inset: 100% 0 auto;
-    max-block-size: calc(100vh - var(--nav-height));
-    max-block-size: calc(100dvh - var(--nav-height));
-    overflow-y: auto;
-    background-color: #e4f4ff;
-    box-shadow: 0 15px 36px rgb(22 67 121 / 17%);
-  }
-
-  .site-nav[data-ready] .menu-toggle[aria-expanded="false"] + .nav-links {
-    display: none;
-  }
-
-  .nav-item {
-    flex-wrap: wrap;
-  }
-
-  .category-link {
-    flex: 1;
-    justify-content: space-between;
-    min-block-size: 3rem;
-    padding-inline: var(--gutter);
-  }
-
-  .filler-link {
-    position: static;
-    flex: 1 0 100%;
-    min-block-size: 2.75rem;
-    padding-inline: calc(var(--gutter) + 1rem);
-    border-radius: 0;
-    background-color: #f0f9ff;
-    box-shadow: none;
-  }
 }
 
 @media (max-width: 560px) {
