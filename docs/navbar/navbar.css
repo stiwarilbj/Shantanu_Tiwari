@@ -20,7 +20,7 @@
   justify-content: space-between;
   gap: clamp(0.5rem, 1.5vw, 1rem);
   min-block-size: var(--nav-height);
-  padding-inline: var(--gutter);
+  padding-inline-start: var(--gutter);
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
@@ -44,13 +44,12 @@
 
 .nav-menu {
   display: flex;
-  flex: 0 1 40rem;
+  flex: 0 1 min(75vw, 44rem);
 }
 
 .nav-links {
   display: flex;
   flex: 1;
-  justify-content: space-between;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -59,9 +58,12 @@
 .nav-item {
   position: relative;
   display: flex;
+  flex: 1;
 }
 
 .category-link {
+  flex: 1;
+  justify-content: center;
   gap: clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem);
   padding-inline: var(--nav-link-padding);
 }
@@ -133,7 +135,6 @@
 
   .site-nav[data-ready] .nav-menu {
     flex: initial;
-    margin-inline-end: calc(0px - var(--gutter));
   }
 
   .site-nav[data-ready] .menu-toggle {
@@ -164,11 +165,11 @@
   }
 
   .nav-item {
+    flex: initial;
     flex-wrap: wrap;
   }
 
   .category-link {
-    flex: 1;
     justify-content: space-between;
     min-block-size: 3rem;
     padding-inline: var(--gutter);
