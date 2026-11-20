@@ -24,7 +24,6 @@
   justify-content: space-between;
   gap: clamp(0.5rem, 1.5vw, 1rem);
   min-block-size: var(--nav-height);
-  padding-inline-start: var(--gutter);
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
@@ -39,8 +38,7 @@
 }
 
 .wordmark {
-  padding-inline: 0.3rem;
-  margin-inline-start: -0.3rem;
+  padding-inline: var(--gutter) clamp(0.625rem, 1.2vw, 1rem);
   font-size: clamp(1.125rem, calc(0.9375rem + 0.8vw), 1.625rem);
   font-weight: 700;
   letter-spacing: -0.02em;
