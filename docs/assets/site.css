@@ -157,7 +157,7 @@ h2 {
 }
 
 .explore {
-  padding-block: calc(var(--art-blend) + 1.25rem) 2.5rem;
+  padding-block: calc(var(--art-blend) + 1.25rem) clamp(6rem, 11vw, 10rem);
 }
 
 .explore-art {
