@@ -63,6 +63,7 @@ a {
   z-index: -1;
   inset: 0 0 calc(0px - var(--art-blend));
   background: center / cover no-repeat url("01-screenshot-insight.png");
+  opacity: 0.95;
   pointer-events: none;
   content: "";
 }
