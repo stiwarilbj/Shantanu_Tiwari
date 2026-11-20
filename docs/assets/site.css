@@ -1,0 +1,414 @@
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("space-grotesk.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Inter;
+  src: url("inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --ink: #1b242d;
+  --page-blue: #eaf6ff;
+  --focus: #1453a4;
+  --nav-height: 124px;
+  --gutter: clamp(1rem, 3.5vw, 3.5rem);
+  --tile-gap: clamp(1rem, 2.4vw, 2rem);
+  --art-blend: clamp(90px, 16vw, 150px);
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--page-blue);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body, h1, h2, p {
+  margin: 0;
+}
+
+a, button {
+  color: inherit;
+}
+
+a {
+  text-decoration: none;
+}
+
+button {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+:where(.site-nav, button, .tile) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:where(a, button):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -5px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.site-nav {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-block-size: var(--nav-height);
+  padding-inline: var(--gutter);
+  background:
+    radial-gradient(ellipse at 54% -36%, rgb(219 248 255 / 66%), transparent 69%),
+    repeating-linear-gradient(to bottom, rgb(255 255 255 / 9%) 0 1px, transparent 1px 4px),
+    linear-gradient(112deg, #bdecf8, #c1e8fd 48%, #d2e4fe);
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.wordmark, .category-link, .menu-toggle, .category-toggle, .filler-link {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.wordmark {
+  padding-inline: 0.3rem;
+  margin-inline-start: -0.3rem;
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.055em;
+}
+
+.nav-links {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+}
+
+.category-link {
+  padding-inline: 0.65rem 0.15rem;
+}
+
+.category-toggle {
+  justify-content: center;
+  min-inline-size: 44px;
+  padding: 0;
+}
+
+.menu-toggle {
+  display: none;
+  gap: 0.65rem;
+  padding-inline: 0.55rem;
+}
+
+.chevron {
+  display: block;
+  inline-size: 0.58em;
+  block-size: 0.58em;
+  margin-block-start: -0.28em;
+  border: solid #1659a8;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+[aria-expanded="true"] .chevron {
+  margin-block-start: 0.25em;
+  transform: rotate(225deg);
+}
+
+.filler-link {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  min-inline-size: 9.5rem;
+  min-block-size: 3.5rem;
+  padding-inline: 1.1rem;
+  border-radius: 0 0 1rem 1rem;
+  background-color: #e8f6ff;
+  box-shadow: 0 12px 28px rgb(22 67 121 / 16%);
+}
+
+.site-nav :is(a, button):hover,
+.site-nav :is(a, button):active,
+.site-nav [aria-expanded="true"] {
+  background-color: rgb(255 255 255 / 32%);
+}
+
+.site-nav .filler-link:hover,
+.site-nav .filler-link:active {
+  background-color: #f7fcff;
+}
+
+.site-nav [aria-current="page"]:not(.wordmark) {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 1px;
+}
+
+.content {
+  inline-size: 100%;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.lab, .explore {
+  position: relative;
+  isolation: isolate;
+}
+
+.lab {
+  background-color: var(--page-blue);
+}
+
+.lab::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 calc(0px - var(--art-blend));
+  background: center / cover no-repeat url("01-screenshot-insight.png");
+  opacity: 0.88;
+  pointer-events: none;
+  content: "";
+}
+
+.hero {
+  padding-block: clamp(4rem, 8vw, 8rem) clamp(3.5rem, 7vw, 7rem);
+}
+
+h1, h2, .tile-title {
+  text-wrap: balance;
+  letter-spacing: -0.05em;
+}
+
+h1 {
+  font-size: clamp(3.15rem, 7.4vw, 7.25rem);
+  font-weight: 750;
+  line-height: 1;
+}
+
+.hero p {
+  max-inline-size: 34rem;
+  margin-block-start: 1.35rem;
+  font-size: clamp(1.125rem, 2.15vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+h2 {
+  margin-block-end: clamp(1.05rem, 2.45vw, 2rem);
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.showcase {
+  padding-block-end: clamp(8rem, 22vw, 220px);
+}
+
+.project-tiles, .explore-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tile-gap);
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border: 1px solid rgb(255 255 255 / 86%);
+  border-radius: 1.45rem;
+  background: linear-gradient(145deg, rgb(250 253 255 / 94%), rgb(222 242 255 / 87%));
+  box-shadow: 0 14px 36px rgb(38 93 149 / 14%), inset 0 1px 0 white;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 19px 40px rgb(38 93 149 / 22%), inset 0 1px 0 white;
+}
+
+.tile:active {
+  transform: translateY(0);
+}
+
+.project-tile {
+  flex: 1 1 10.75rem;
+  min-block-size: clamp(6.5rem, 13vw, 11rem);
+  padding: clamp(0.9rem, 2.2vw, 2rem);
+}
+
+.tile-title {
+  display: block;
+  font-size: clamp(1.25rem, 2.35vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tile-arrow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: clamp(2rem, 4vw, 3.1rem);
+  aspect-ratio: 1;
+  border: 1px solid rgb(255 255 255 / 82%);
+  border-radius: 50%;
+  color: #194d8b;
+  background-color: #e9f6ff;
+  font-size: clamp(1.125rem, 1.9vw, 1.5rem);
+}
+
+.explore {
+  padding-block: calc(var(--art-blend) + 1.25rem) 2.5rem;
+}
+
+.explore-art {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(transparent, black var(--art-blend));
+  mask-image: linear-gradient(transparent, black var(--art-blend));
+}
+
+.explore-art::before {
+  position: absolute;
+  inset: -50% 0 0;
+  background: center bottom / cover no-repeat url("02-ocr-glass.png");
+  content: "";
+}
+
+.explore-tile {
+  flex: 1 1 calc((100% - var(--tile-gap)) / 2);
+  min-block-size: clamp(8rem, 15vw, 12rem);
+  padding: clamp(1.2rem, 3vw, 2.75rem);
+}
+
+.explore-tile .tile-title {
+  font-size: clamp(1.5rem, 3vw, 2.55rem);
+}
+
+.tile-description {
+  display: block;
+  margin-block-start: 0.6rem;
+  color: #31465d;
+  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  line-height: 1.4;
+}
+
+.placeholder {
+  padding-block: clamp(3rem, 7vw, 7rem);
+}
+
+.placeholder p {
+  margin-block-start: 1rem;
+  font-size: 1.25rem;
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --nav-height: 108px;
+  }
+
+  .site-nav {
+    flex-wrap: wrap;
+    gap: 0 0.5rem;
+  }
+
+  .wordmark, .menu-toggle {
+    min-block-size: var(--nav-height);
+  }
+
+  .site-nav[data-ready] .menu-toggle {
+    display: flex;
+  }
+
+  .nav-links {
+    flex: 1 0 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .site-nav[data-ready] .nav-links {
+    position: absolute;
+    inset: 100% 0 auto;
+    max-block-size: calc(100vh - var(--nav-height));
+    max-block-size: calc(100dvh - var(--nav-height));
+    overflow-y: auto;
+    background-color: #e4f4ff;
+    box-shadow: 0 15px 36px rgb(22 67 121 / 17%);
+  }
+
+  .site-nav[data-ready] .menu-toggle[aria-expanded="false"] + .nav-links {
+    display: none;
+  }
+
+  .nav-item {
+    flex-wrap: wrap;
+  }
+
+  .category-link {
+    flex: 1;
+    min-block-size: 4rem;
+    padding-inline: var(--gutter);
+  }
+
+  .category-toggle {
+    min-inline-size: max(3.5rem, calc(var(--gutter) * 2));
+  }
+
+  .filler-link {
+    position: static;
+    flex: 1 0 100%;
+    min-block-size: 3.25rem;
+    padding-inline: calc(var(--gutter) + 1rem);
+    border-radius: 0;
+    background-color: #f0f9ff;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .explore-tile {
+    flex-basis: 100%;
+  }
+
+  .lab::before {
+    background-position: 61% center;
+  }
+}
+
+@media (max-width: 360px) {
+  .site-nav {
+    gap: 0 0.25rem;
+    padding-inline: 0.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+}
