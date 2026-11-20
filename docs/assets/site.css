@@ -239,16 +239,11 @@ h2 {
   border-radius: 1.125rem;
   background: linear-gradient(145deg, rgb(250 253 255 / 94%), rgb(222 242 255 / 87%));
   box-shadow: 0 14px 36px rgb(38 93 149 / 14%), inset 0 1px 0 white;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: box-shadow 180ms ease;
 }
 
 .tile:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 19px 40px rgb(38 93 149 / 22%), inset 0 1px 0 white;
-}
-
-.tile:active {
-  transform: translateY(0);
+  box-shadow: 0 14px 36px rgb(38 93 149 / 20%), inset 0 1px 0 white;
 }
 
 .project-tile {
