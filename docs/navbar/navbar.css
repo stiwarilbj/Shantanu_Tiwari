@@ -28,7 +28,7 @@
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
-  font-size: clamp(0.75rem, calc(0.6875rem + 0.35vw), 1rem);
+  font-size: clamp(0.75rem, calc(0.5625rem + 0.49vw), 1rem);
   font-weight: 600;
 }
 
@@ -40,7 +40,7 @@
 
 .wordmark {
   padding-inline: var(--gutter) clamp(0.625rem, 1.2vw, 1rem);
-  font-size: clamp(1.125rem, calc(0.9375rem + 0.8vw), 1.625rem);
+  font-size: clamp(1rem, calc(0.75rem + 1vw), 1.625rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -115,7 +115,7 @@
   border-radius: 0 0 1rem 1rem;
   background-color: var(--dropdown-surface);
   box-shadow: var(--dropdown-shadow);
-  font-size: 0.9375em;
+  font-size: max(0.75rem, 0.9375em);
 }
 
 .filler-link:is(:hover, :focus-visible, :active) {
@@ -161,7 +161,6 @@
     flex: 1 0 100%;
     flex-direction: column;
     align-items: stretch;
-    font-size: clamp(0.875rem, calc(0.8125rem + 0.3vw), 1rem);
   }
 
   .site-nav[data-ready] .nav-links {
