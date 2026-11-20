@@ -10,7 +10,7 @@
 }
 
 .site-nav {
-  --nav-height: clamp(3.5rem, calc(3.125rem + 2.5vw), 5.25rem);
+  --nav-height: clamp(3.5rem, calc(2.75rem + 2vw), 4.5rem);
   --nav-link-padding: clamp(0.375rem, calc(1.8vw - 0.25rem), 0.9rem);
   --dropdown-surface: #e7f0fe;
   --dropdown-hover: #dce9fc;
