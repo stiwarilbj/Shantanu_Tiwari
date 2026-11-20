@@ -21,8 +21,8 @@
   min-block-size: var(--nav-height);
   padding-inline: var(--gutter);
   background:
-    radial-gradient(ellipse at 54% -36%, rgb(219 248 255 / 66%), transparent 69%),
-    linear-gradient(112deg, #c3e4ff, #c1e8fd 48%, #d2e4fe);
+    radial-gradient(ellipse at 54% -30%, rgb(240 245 255 / 82%), transparent 72%),
+    linear-gradient(112deg, #cce6ff, #d3e6ff 48%, #dfe7ff);
   font-size: 1.125rem;
   font-weight: 600;
 }
