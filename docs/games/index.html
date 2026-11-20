@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Games | Project Lab</title>
-  <link rel="stylesheet" href="../assets/site.css">
+  <link rel="stylesheet" href="../assets/site.css?v=2">
   <link rel="icon" href="data:,">
-  <script src="../assets/nav.js" defer></script>
+  <script src="../assets/nav.js?v=2" defer></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Main navigation">
@@ -16,32 +16,28 @@
     </button>
     <ul class="nav-links" id="nav-links">
       <li class="nav-item">
-        <a class="category-link" href="../experiments/">Experiments</a>
-        <button class="category-toggle" type="button" aria-label="Experiments submenu" aria-controls="experiments-filler" aria-expanded="false" hidden>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <a class="filler-link" id="experiments-filler" href="../experiments/filler/" hidden>Filler</a>
+        <a class="category-link" href="../experiments/" aria-controls="experiments-filler">
+          Experiments <span class="chevron" aria-hidden="true"></span>
+        </a>
+        <a class="filler-link" id="experiments-filler" aria-label="Filler for Experiments" href="../experiments/filler/" hidden>Filler</a>
       </li>
       <li class="nav-item">
-        <a class="category-link" href="../learning/">Learning</a>
-        <button class="category-toggle" type="button" aria-label="Learning submenu" aria-controls="learning-filler" aria-expanded="false" hidden>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <a class="filler-link" id="learning-filler" href="../learning/filler/" hidden>Filler</a>
+        <a class="category-link" href="../learning/" aria-controls="learning-filler">
+          Learning <span class="chevron" aria-hidden="true"></span>
+        </a>
+        <a class="filler-link" id="learning-filler" aria-label="Filler for Learning" href="../learning/filler/" hidden>Filler</a>
       </li>
       <li class="nav-item">
-        <a class="category-link" href="../games/" aria-current="page">Games</a>
-        <button class="category-toggle" type="button" aria-label="Games submenu" aria-controls="games-filler" aria-expanded="false" hidden>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <a class="filler-link" id="games-filler" href="../games/filler/" hidden>Filler</a>
+        <a class="category-link" href="../games/" aria-current="page" aria-controls="games-filler">
+          Games <span class="chevron" aria-hidden="true"></span>
+        </a>
+        <a class="filler-link" id="games-filler" aria-label="Filler for Games" href="../games/filler/" hidden>Filler</a>
       </li>
       <li class="nav-item">
-        <a class="category-link" href="../old-projects/">Old Projects</a>
-        <button class="category-toggle" type="button" aria-label="Old Projects submenu" aria-controls="old-projects-filler" aria-expanded="false" hidden>
-          <span class="chevron" aria-hidden="true"></span>
-        </button>
-        <a class="filler-link" id="old-projects-filler" href="../old-projects/filler/" hidden>Filler</a>
+        <a class="category-link" href="../old-projects/" aria-controls="old-projects-filler">
+          Old Projects <span class="chevron" aria-hidden="true"></span>
+        </a>
+        <a class="filler-link" id="old-projects-filler" aria-label="Filler for Old Projects" href="../old-projects/filler/" hidden>Filler</a>
       </li>
     </ul>
   </nav>
