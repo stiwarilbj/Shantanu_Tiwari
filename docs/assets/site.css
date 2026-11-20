@@ -99,7 +99,7 @@ h2 {
 }
 
 .showcase {
-  padding-block-end: clamp(8rem, 22vw, 220px);
+  padding-block-end: clamp(6.5rem, 18vw, 180px);
 }
 
 .project-tiles, .explore-tiles {
