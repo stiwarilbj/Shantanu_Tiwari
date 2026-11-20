@@ -85,6 +85,7 @@ h1 {
   font-size: clamp(2.5rem, calc(1.25rem + 6.5vw), 7rem);
   font-weight: 750;
   line-height: 1;
+  word-spacing: 0.1em;
 }
 
 .hero p {
