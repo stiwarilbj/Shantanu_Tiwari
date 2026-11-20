@@ -12,7 +12,8 @@
 .site-nav {
   --nav-height: clamp(3.5rem, calc(3.125rem + 2.5vw), 5.25rem);
   --nav-link-padding: clamp(0.375rem, calc(1.8vw - 0.25rem), 0.9rem);
-  --dropdown-surface: linear-gradient(120deg, #f3faff, #eeeffe);
+  --dropdown-surface: #e7f0fe;
+  --dropdown-hover: #dce9fc;
   --dropdown-shadow: 0 16px 30px -14px rgb(29 61 117 / 38%), 0 4px 12px -6px rgb(29 61 117 / 18%);
   position: relative;
   z-index: 2;
@@ -109,29 +110,17 @@
   position: absolute;
   inset-block-start: 100%;
   inset-inline-end: 0;
-  isolation: isolate;
   min-inline-size: 100%;
   min-block-size: 3.25rem;
   padding-inline: clamp(0.75rem, 1.6vw, 1.125rem);
   border-radius: 0 0 1rem 1rem;
-  background: var(--dropdown-surface);
+  background-color: var(--dropdown-surface);
   box-shadow: var(--dropdown-shadow);
-  color: #294365;
   font-size: 0.9375em;
 }
 
-.filler-link::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0.375rem;
-  border-radius: 0.65rem;
-  background: rgb(213 227 252 / 48%);
-  pointer-events: none;
-  content: "";
-}
-
-.filler-link:is(:hover, :focus-visible, :active)::before {
-  background: #dbe8fc;
+.filler-link:is(:hover, :focus-visible, :active) {
+  background-color: var(--dropdown-hover);
 }
 
 .site-nav :is(.wordmark, .category-link, .menu-toggle):is(:hover, :active) {
@@ -139,8 +128,7 @@
 }
 
 .site-nav :is(.category-link, .menu-toggle)[aria-expanded="true"] {
-  background: linear-gradient(180deg, rgb(255 255 255 / 13%), rgb(255 255 255 / 62%));
-  color: #243f67;
+  background: linear-gradient(transparent, var(--dropdown-surface));
 }
 
 .site-nav [aria-current="page"]:not(.wordmark) {
@@ -185,7 +173,7 @@
     padding-block: 0.375rem 0.5rem;
     overflow-y: auto;
     border-radius: 0 0 1rem 1rem;
-    background: var(--dropdown-surface);
+    background-color: var(--dropdown-surface);
     box-shadow: var(--dropdown-shadow);
   }
 
@@ -210,8 +198,12 @@
     justify-content: space-between;
   }
 
-  .nav-links .category-link:is(:hover, :active, [aria-expanded="true"]) {
-    background: rgb(219 233 253 / 58%);
+  .nav-links .category-link[aria-expanded="true"] {
+    background: none;
+  }
+
+  .nav-links .category-link:is(:hover, :focus-visible, :active) {
+    background-color: var(--dropdown-hover);
   }
 
   .filler-link {
@@ -221,11 +213,7 @@
     min-block-size: 2.75rem;
     padding-inline: calc(var(--gutter) + 1rem);
     border-radius: 0;
-    background: none;
+    background-color: transparent;
     box-shadow: none;
-  }
-
-  .filler-link::before {
-    inset: 0.125rem var(--gutter) 0.25rem;
   }
 }
