@@ -16,11 +16,13 @@ const sectionLinks = sections.map(([slug, name]) => `
       </li>`).join("");
 
 navigation.insertAdjacentHTML("beforeend", `
-    <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
-      Menu <span class="chevron" aria-hidden="true"></span>
-    </button>
-    <ul class="nav-links" id="nav-links">${sectionLinks}
-    </ul>`);
+    <div class="nav-menu">
+      <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
+        Menu <span class="chevron" aria-hidden="true"></span>
+      </button>
+      <ul class="nav-links" id="nav-links">${sectionLinks}
+      </ul>
+    </div>`);
 
 const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
 for (const link of navigation.querySelectorAll(".category-link, .filler-link")) {
@@ -30,7 +32,8 @@ for (const link of navigation.querySelectorAll(".category-link, .filler-link")) 
 }
 
 const menu = navigation.querySelector(".menu-toggle");
-const compactLayout = window.matchMedia("(max-width: 1023px), (hover: none)");
+const menuGroup = navigation.querySelector(".nav-menu");
+const compactLayout = window.matchMedia("(width < 35rem), (hover: none)");
 const withoutHover = window.matchMedia("(hover: none)");
 const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) => ({
   item,
@@ -39,6 +42,7 @@ const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) =
 }));
 const hoverDelay = 120;
 let hoverTimer;
+let menuOpenedOnHover = false;
 let openCategory = null;
 
 function setExpanded(control, expanded) {
@@ -47,6 +51,15 @@ function setExpanded(control, expanded) {
 
 function cancelHover() {
   window.clearTimeout(hoverTimer);
+  hoverTimer = undefined;
+}
+
+function afterHover(control, open) {
+  cancelHover();
+  hoverTimer = window.setTimeout(() => {
+    hoverTimer = undefined;
+    if (control.matches(":hover")) open();
+  }, hoverDelay);
 }
 
 function closeSubmenu() {
@@ -70,6 +83,7 @@ function showSubmenu(category) {
 function closeMenu() {
   closeSubmenu();
   setExpanded(menu, false);
+  menuOpenedOnHover = false;
 }
 
 function syncHoverMode() {
@@ -85,11 +99,30 @@ function syncHoverMode() {
 }
 
 menu.addEventListener("click", () => {
+  cancelHover();
   if (menu.getAttribute("aria-expanded") === "true") {
     closeMenu();
   } else {
     setExpanded(menu, true);
   }
+});
+
+function waitForMenuHover(event) {
+  if (event.pointerType === "touch" || withoutHover.matches || menu.getAttribute("aria-expanded") === "true") return;
+
+  afterHover(menu, () => {
+    menuOpenedOnHover = true;
+    setExpanded(menu, true);
+  });
+}
+
+menu.addEventListener("pointerenter", waitForMenuHover);
+menu.addEventListener("pointermove", (event) => {
+  if (hoverTimer !== undefined) waitForMenuHover(event);
+});
+menu.addEventListener("pointerleave", cancelHover);
+menuGroup.addEventListener("pointerleave", () => {
+  if (menuOpenedOnHover && !menuGroup.contains(document.activeElement)) closeMenu();
 });
 
 for (const category of categories) {
@@ -98,12 +131,9 @@ for (const category of categories) {
   function waitForHover(event) {
     if (event.pointerType === "touch" || withoutHover.matches || openCategory === category) return;
 
-    cancelHover();
-    hoverTimer = window.setTimeout(() => {
-      if (link.matches(":hover") && !openCategory?.filler.matches(":focus")) {
-        showSubmenu(category);
-      }
-    }, hoverDelay);
+    afterHover(link, () => {
+      if (!openCategory?.filler.matches(":focus")) showSubmenu(category);
+    });
   }
 
   link.addEventListener("pointerenter", waitForHover);
