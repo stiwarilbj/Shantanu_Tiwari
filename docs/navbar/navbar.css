@@ -100,7 +100,7 @@
   display: none;
 }
 
-[aria-expanded="true"] .chevron {
+.menu-toggle[aria-expanded="true"] .chevron {
   margin-block-start: 0.25em;
   transform: rotate(225deg);
 }
