@@ -40,8 +40,6 @@ const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) =
   link: item.querySelector(".category-link"),
   filler: item.querySelector(".filler-link"),
 }));
-const hoverDelay = 120;
-let hoverTimer;
 let menuOpenedOnHover = false;
 let openCategory = null;
 
@@ -49,21 +47,7 @@ function setExpanded(control, expanded) {
   control.setAttribute("aria-expanded", String(expanded));
 }
 
-function cancelHover() {
-  window.clearTimeout(hoverTimer);
-  hoverTimer = undefined;
-}
-
-function afterHover(control, open) {
-  cancelHover();
-  hoverTimer = window.setTimeout(() => {
-    hoverTimer = undefined;
-    if (control.matches(":hover")) open();
-  }, hoverDelay);
-}
-
 function closeSubmenu() {
-  cancelHover();
   if (!openCategory) return;
 
   setExpanded(openCategory.link, false);
@@ -98,29 +82,23 @@ function syncHoverMode() {
   }
 }
 
-menu.addEventListener("click", () => {
-  cancelHover();
-  if (menu.getAttribute("aria-expanded") === "true") {
+menu.addEventListener("click", (event) => {
+  if (menuOpenedOnHover && event.detail > 0) {
+    menuOpenedOnHover = false;
+  } else if (menu.getAttribute("aria-expanded") === "true") {
     closeMenu();
   } else {
     setExpanded(menu, true);
   }
 });
 
-function waitForMenuHover(event) {
+menu.addEventListener("pointerenter", (event) => {
   if (event.pointerType === "touch" || withoutHover.matches || menu.getAttribute("aria-expanded") === "true") return;
 
-  afterHover(menu, () => {
-    menuOpenedOnHover = true;
-    setExpanded(menu, true);
-  });
-}
-
-menu.addEventListener("pointerenter", waitForMenuHover);
-menu.addEventListener("pointermove", (event) => {
-  if (hoverTimer !== undefined) waitForMenuHover(event);
+  menuOpenedOnHover = true;
+  setExpanded(menu, true);
 });
-menu.addEventListener("pointerleave", cancelHover);
+
 menuGroup.addEventListener("pointerleave", () => {
   if (menuOpenedOnHover && !menuGroup.contains(document.activeElement)) closeMenu();
 });
@@ -128,17 +106,11 @@ menuGroup.addEventListener("pointerleave", () => {
 for (const category of categories) {
   const { item, link, filler } = category;
 
-  function waitForHover(event) {
-    if (event.pointerType === "touch" || withoutHover.matches || openCategory === category) return;
+  link.addEventListener("pointerenter", (event) => {
+    if (event.pointerType === "touch" || withoutHover.matches || openCategory?.filler.matches(":focus")) return;
 
-    afterHover(link, () => {
-      if (!openCategory?.filler.matches(":focus")) showSubmenu(category);
-    });
-  }
-
-  link.addEventListener("pointerenter", waitForHover);
-  link.addEventListener("pointermove", waitForHover);
-  link.addEventListener("pointerleave", cancelHover);
+    showSubmenu(category);
+  });
 
   item.addEventListener("pointerleave", () => {
     if (openCategory === category && !item.querySelector(":focus-visible")) {
@@ -174,7 +146,6 @@ document.addEventListener("focusin", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
 
-  cancelHover();
   if (openCategory) {
     if (document.activeElement === openCategory.filler) openCategory.link.focus();
     closeSubmenu();
