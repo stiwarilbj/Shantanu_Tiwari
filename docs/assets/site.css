@@ -33,6 +33,10 @@ a {
   text-decoration: none;
 }
 
+a[href], button:enabled {
+  cursor: pointer;
+}
+
 .tile {
   -webkit-user-select: none;
   user-select: none;
