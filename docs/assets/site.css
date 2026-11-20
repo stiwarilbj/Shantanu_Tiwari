@@ -1,11 +1,4 @@
 @font-face {
-  font-family: "Space Grotesk";
-  src: url("space-grotesk.woff2") format("woff2");
-  font-weight: 300 700;
-  font-display: swap;
-}
-
-@font-face {
   font-family: Inter;
   src: url("inter.woff2") format("woff2");
   font-weight: 100 900;
@@ -73,7 +66,6 @@ button {
   background:
     radial-gradient(ellipse at 54% -36%, rgb(219 248 255 / 66%), transparent 69%),
     linear-gradient(112deg, #c3e4ff, #c1e8fd 48%, #d2e4fe);
-  font-family: "Space Grotesk", system-ui, sans-serif;
   font-size: 1.125rem;
   font-weight: 600;
 }
@@ -89,7 +81,7 @@ button {
   margin-inline-start: -0.3rem;
   font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.02em;
 }
 
 .nav-links {
