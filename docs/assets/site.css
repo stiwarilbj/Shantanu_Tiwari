@@ -16,9 +16,9 @@
   --ink: #1b242d;
   --page-blue: #eaf6ff;
   --focus: #1453a4;
-  --nav-height: 124px;
+  --nav-height: 92px;
   --gutter: clamp(1rem, 3.5vw, 3.5rem);
-  --tile-gap: clamp(1rem, 2.4vw, 2rem);
+  --tile-gap: clamp(1rem, 2vw, 1.5rem);
   --art-blend: clamp(90px, 16vw, 150px);
   font-family: Inter, system-ui, sans-serif;
   color: var(--ink);
@@ -75,7 +75,7 @@ button {
     repeating-linear-gradient(to bottom, rgb(255 255 255 / 9%) 0 1px, transparent 1px 4px),
     linear-gradient(112deg, #bdecf8, #c1e8fd 48%, #d2e4fe);
   font-family: "Space Grotesk", system-ui, sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
@@ -88,7 +88,7 @@ button {
 .wordmark {
   padding-inline: 0.3rem;
   margin-inline-start: -0.3rem;
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.055em;
 }
@@ -140,10 +140,10 @@ button {
   position: absolute;
   inset-block-start: 100%;
   inset-inline-end: 0;
-  min-inline-size: 9.5rem;
-  min-block-size: 3.5rem;
-  padding-inline: 1.1rem;
-  border-radius: 0 0 1rem 1rem;
+  min-inline-size: 7.5rem;
+  min-block-size: 2.75rem;
+  padding-inline: 0.9rem;
+  border-radius: 0 0 0.75rem 0.75rem;
   background-color: #e8f6ff;
   box-shadow: 0 12px 28px rgb(22 67 121 / 16%);
 }
@@ -166,7 +166,7 @@ button {
 }
 
 .content {
-  inline-size: 100%;
+  inline-size: min(100%, 80rem);
   margin-inline: auto;
   padding-inline: var(--gutter);
 }
@@ -191,7 +191,7 @@ button {
 }
 
 .hero {
-  padding-block: clamp(4rem, 8vw, 8rem) clamp(3.5rem, 7vw, 7rem);
+  padding-block: clamp(3rem, 6.75vw, 6.5rem) clamp(2.5rem, 5.75vw, 5.5rem);
 }
 
 h1, h2, .tile-title {
@@ -200,23 +200,23 @@ h1, h2, .tile-title {
 }
 
 h1 {
-  font-size: clamp(3.15rem, 7.4vw, 7.25rem);
+  font-size: clamp(2.5rem, 5.75vw, 5.5rem);
   font-weight: 750;
   line-height: 1;
 }
 
 .hero p {
-  max-inline-size: 34rem;
-  margin-block-start: 1.35rem;
-  font-size: clamp(1.125rem, 2.15vw, 1.75rem);
+  max-inline-size: 29rem;
+  margin-block-start: 1rem;
+  font-size: clamp(1rem, 1.55vw, 1.375rem);
   font-weight: 500;
   line-height: 1.45;
   text-wrap: pretty;
 }
 
 h2 {
-  margin-block-end: clamp(1.05rem, 2.45vw, 2rem);
-  font-size: clamp(2rem, 4vw, 3.5rem);
+  margin-block-end: clamp(0.875rem, 1.9vw, 1.5rem);
+  font-size: clamp(1.5rem, 3vw, 2.625rem);
   font-weight: 700;
   line-height: 1.05;
 }
@@ -237,7 +237,7 @@ h2 {
   justify-content: space-between;
   gap: 0.7rem;
   border: 1px solid rgb(255 255 255 / 86%);
-  border-radius: 1.45rem;
+  border-radius: 1.125rem;
   background: linear-gradient(145deg, rgb(250 253 255 / 94%), rgb(222 242 255 / 87%));
   box-shadow: 0 14px 36px rgb(38 93 149 / 14%), inset 0 1px 0 white;
   transition: transform 180ms ease, box-shadow 180ms ease;
@@ -254,13 +254,13 @@ h2 {
 
 .project-tile {
   flex: 1 1 10.75rem;
-  min-block-size: clamp(6.5rem, 13vw, 11rem);
-  padding: clamp(0.9rem, 2.2vw, 2rem);
+  min-block-size: clamp(4.75rem, 10vw, 8rem);
+  padding: clamp(0.75rem, 1.8vw, 1.5rem);
 }
 
 .tile-title {
   display: block;
-  font-size: clamp(1.25rem, 2.35vw, 2rem);
+  font-size: clamp(1rem, 1.8vw, 1.5rem);
   font-weight: 700;
   line-height: 1.1;
 }
@@ -270,13 +270,13 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  inline-size: clamp(2rem, 4vw, 3.1rem);
+  inline-size: clamp(1.625rem, 3vw, 2.375rem);
   aspect-ratio: 1;
   border: 1px solid rgb(255 255 255 / 82%);
   border-radius: 50%;
   color: #194d8b;
   background-color: #e9f6ff;
-  font-size: clamp(1.125rem, 1.9vw, 1.5rem);
+  font-size: clamp(0.9375rem, 1.5vw, 1.25rem);
 }
 
 .explore {
@@ -302,34 +302,33 @@ h2 {
 
 .explore-tile {
   flex: 1 1 calc((100% - var(--tile-gap)) / 2);
-  min-block-size: clamp(8rem, 15vw, 12rem);
-  padding: clamp(1.2rem, 3vw, 2.75rem);
+  min-block-size: clamp(6rem, 11vw, 9rem);
+  padding: clamp(1rem, 2.4vw, 2rem);
 }
 
 .explore-tile .tile-title {
-  font-size: clamp(1.5rem, 3vw, 2.55rem);
+  font-size: clamp(1.25rem, 2.2vw, 1.875rem);
 }
 
 .tile-description {
   display: block;
-  margin-block-start: 0.6rem;
+  margin-block-start: 0.5rem;
   color: #31465d;
-  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  font-size: clamp(0.875rem, 1.15vw, 1rem);
   line-height: 1.4;
 }
 
 .placeholder {
-  padding-block: clamp(3rem, 7vw, 7rem);
+  padding-block: clamp(2.5rem, 5.5vw, 5.5rem);
 }
 
 .placeholder p {
-  margin-block-start: 1rem;
-  font-size: 1.25rem;
+  margin-block-start: 0.75rem;
 }
 
 @media (max-width: 1023px) {
   :root {
-    --nav-height: 108px;
+    --nav-height: 76px;
   }
 
   .site-nav {
@@ -371,18 +370,18 @@ h2 {
 
   .category-link {
     flex: 1;
-    min-block-size: 4rem;
+    min-block-size: 3rem;
     padding-inline: var(--gutter);
   }
 
   .category-toggle {
-    min-inline-size: max(3.5rem, calc(var(--gutter) * 2));
+    min-inline-size: max(3rem, calc(var(--gutter) * 2));
   }
 
   .filler-link {
     position: static;
     flex: 1 0 100%;
-    min-block-size: 3.25rem;
+    min-block-size: 2.75rem;
     padding-inline: calc(var(--gutter) + 1rem);
     border-radius: 0;
     background-color: #f0f9ff;
@@ -397,13 +396,6 @@ h2 {
 
   .lab::before {
     background-position: 61% center;
-  }
-}
-
-@media (max-width: 360px) {
-  .site-nav {
-    gap: 0 0.25rem;
-    padding-inline: 0.65rem;
   }
 }
 
