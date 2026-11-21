@@ -161,7 +161,7 @@ for (const category of categories) {
       panelSwitchTimer = setTimeout(() => {
         panelSwitchTimer = undefined;
         if (link.matches(":hover") && !openCategory?.panel.contains(document.activeElement)) showPanel(category);
-      }, 120);
+      }, 50);
     }
   });
 
