@@ -11,7 +11,7 @@
 
 .site-nav :is(a, button) {
   color: inherit;
-  cursor: pointer;
+  cursor: inherit;
 }
 
 .site-nav a {
@@ -35,6 +35,7 @@
 
 [data-site-navbar] {
   position: sticky;
+  cursor: pointer;
   inset-block-start: 0;
   z-index: 2;
   flex-shrink: 0;
