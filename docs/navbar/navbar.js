@@ -13,13 +13,10 @@ const sectionLinks = sections.map(([slug, name, projects = []]) => `
           <span class="category-label">${name} <span class="chevron" aria-hidden="true"></span></span>
         </a>
         <div class="nav-panel" id="${slug}-panel" hidden>
-          <div class="nav-panel-content">
-            <p class="nav-panel-title" aria-hidden="true">${name}</p>
-            <ul class="nav-panel-links">
-              ${projects.map(([path, title]) => `<li><a href="${slug}/${path}/">${title}</a></li>`).join("")}
-              <li><a href="${slug}/filler/" aria-label="Filler for ${name}">Filler</a></li>
-            </ul>
-          </div>
+          <ul class="nav-panel-links">
+            ${projects.map(([path, title]) => `<li><a href="${slug}/${path}/">${title}</a></li>`).join("")}
+            <li><a href="${slug}/filler/" aria-label="Filler for ${name}">Filler</a></li>
+          </ul>
         </div>
       </li>`).join("");
 
