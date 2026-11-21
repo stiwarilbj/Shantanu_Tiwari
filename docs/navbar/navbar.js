@@ -1,5 +1,5 @@
 const navbarContainer = document.querySelector("[data-site-navbar]");
-navbarContainer.style.setProperty("--nav-height", "clamp(2.75rem, calc(2rem + 2vw), 3.5rem)");
+navbarContainer.style.setProperty("--nav-height", "clamp(2.625rem, calc(1.875rem + 1.75vw), 3.125rem)");
 navbarContainer.style.minBlockSize = "var(--nav-height)";
 
 const navbarUrl = new URL(import.meta.url);
