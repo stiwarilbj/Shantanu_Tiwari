@@ -11,12 +11,28 @@
     <script type="module" src="../../navbar/navbar.js?v=26" blocking="render"></script>
     <style>
         body {
-            background-color: #e6f2ff;
+            background-color: #c2e4f8;
+            isolation: isolate;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background:
+                linear-gradient(180deg, rgb(219 242 255 / 22%), transparent 36%),
+                url("assets/blue-coast.webp") center / cover no-repeat;
+        }
+        @media (orientation: portrait) {
+            body::before {
+                background-position: center, 12% center;
+            }
         }
         .game-container {
             background-color: white;
