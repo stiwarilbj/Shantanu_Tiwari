@@ -6,6 +6,6 @@
 
 ## Site navigation
 
-- Add the shared Project Lab navbar at the top of every new site page. Load `docs/navbar/navbar.css` and `docs/navbar/navbar.js` using paths relative to the page, and give the wordmark a relative link to the homepage.
+- Add `<header data-site-navbar></header>` at the top of every new page. Load the shared `docs/navbar/navbar.css` and `docs/navbar/navbar.js` using paths relative to the page and copy their current version parameters from an existing page.
 - Add each new project or section page to the appropriate section in `docs/navbar/navbar.js` so it appears in the desktop panels and phone menu.
-- Use `data-in-flow` on new pages so the navbar scrolls with the page and expanded panels push content down. Check the links and layout with mouse, keyboard, and touch, and fix any overlap or blocked controls.
+- Keep the navbar markup, sizing, and behavior in `docs/navbar`. The shared navbar stays visible on scroll and reserves space for expanded panels. Check the links and layout with mouse, keyboard, and touch, and fix any overlap or blocked controls.

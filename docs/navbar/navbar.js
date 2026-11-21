@@ -1,4 +1,4 @@
-const navigation = document.querySelector(".site-nav");
+const navbarContainer = document.querySelector("[data-site-navbar]");
 const siteRoot = new URL("../", document.currentScript.src);
 const sections = [
   ["experiments", "Experiments"],
@@ -20,17 +20,21 @@ const sectionLinks = sections.map(([slug, name, projects = []]) => `
         </div>
       </li>`).join("");
 
-navigation.insertAdjacentHTML("beforeend", `
+navbarContainer.innerHTML = `
+  <nav class="site-nav" aria-label="Main navigation">
+    <a class="wordmark" href="./">Project Lab</a>
     <div class="nav-menu">
       <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
         Menu <span class="chevron" aria-hidden="true"></span>
       </button>
       <ul class="nav-links" id="nav-links">${sectionLinks}
       </ul>
-    </div>`);
+    </div>
+  </nav>`;
 
+const navigation = navbarContainer.querySelector(".site-nav");
 const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
-for (const link of navigation.querySelectorAll(".category-link, .nav-panel a")) {
+for (const link of navigation.querySelectorAll("a[href]")) {
   const destination = new URL(link.getAttribute("href"), siteRoot);
   link.href = destination.href;
   if (destination.pathname === currentPath) link.setAttribute("aria-current", "page");
@@ -38,6 +42,7 @@ for (const link of navigation.querySelectorAll(".category-link, .nav-panel a")) 
 
 const menu = navigation.querySelector(".menu-toggle");
 const menuGroup = navigation.querySelector(".nav-menu");
+const compactPanel = menuGroup.querySelector(".nav-links");
 const compactLayout = window.matchMedia("(width < 35rem), (hover: none)");
 const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) => ({
   item,
@@ -171,15 +176,12 @@ syncLayout();
 menu.hidden = false;
 navigation.dataset.ready = "";
 
-if (navigation.hasAttribute("data-in-flow")) {
-  const compactPanel = menuGroup.querySelector(".nav-links");
-  const reservePanelSpace = new ResizeObserver(() => {
-    const visiblePanel = compactLayout.matches ? compactPanel : openCategory?.panel;
-    const height = visiblePanel?.getBoundingClientRect().height ?? 0;
-    navigation.style.setProperty("--nav-panel-height", `${height}px`);
-  });
-  reservePanelSpace.observe(compactPanel, { box: "border-box" });
-  for (const { panel } of categories) {
-    reservePanelSpace.observe(panel, { box: "border-box" });
-  }
+const reservePanelSpace = new ResizeObserver(() => {
+  const visiblePanel = compactLayout.matches ? compactPanel : openCategory?.panel;
+  const height = visiblePanel?.getBoundingClientRect().height ?? 0;
+  navbarContainer.style.setProperty("--nav-panel-height", `${height}px`);
+});
+reservePanelSpace.observe(compactPanel, { box: "border-box" });
+for (const { panel } of categories) {
+  reservePanelSpace.observe(panel, { box: "border-box" });
 }
