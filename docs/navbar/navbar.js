@@ -71,13 +71,20 @@ const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) =
 let menuOpenedOnHover = false;
 let openCategory = null;
 let panelCloseTimer;
+let panelSwitchTimer;
 
 function setExpanded(control, expanded) {
   control.setAttribute("aria-expanded", String(expanded));
 }
 
+function cancelPanelSwitch() {
+  clearTimeout(panelSwitchTimer);
+  panelSwitchTimer = undefined;
+}
+
 function closePanel() {
   clearTimeout(panelCloseTimer);
+  cancelPanelSwitch();
   if (!openCategory) return;
 
   setExpanded(openCategory.link, false);
@@ -147,8 +154,18 @@ for (const category of categories) {
   link.addEventListener("pointermove", (event) => {
     if (event.pointerType === "touch" || compactLayout.matches || openCategory?.panel.contains(document.activeElement)) return;
 
-    showPanel(category);
+    if (!openCategory) {
+      showPanel(category);
+    } else if (openCategory !== category && panelSwitchTimer === undefined) {
+      // Give the pointer time to cross another button on the way to the open panel.
+      panelSwitchTimer = setTimeout(() => {
+        panelSwitchTimer = undefined;
+        if (link.matches(":hover") && !openCategory?.panel.contains(document.activeElement)) showPanel(category);
+      }, 120);
+    }
   });
+
+  link.addEventListener("pointerleave", cancelPanelSwitch);
 
   link.addEventListener("focus", () => {
     if (!compactLayout.matches && link.matches(":focus-visible")) showPanel(category);
