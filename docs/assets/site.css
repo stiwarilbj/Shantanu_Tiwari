@@ -132,6 +132,12 @@ h2 {
   padding: clamp(0.75rem, 1.8vw, 1.5rem);
 }
 
+.learning-project {
+  inline-size: min(90%, 27.5rem);
+  margin-block-start: clamp(2.5rem, 4.5vw, 4rem);
+  text-align: start;
+}
+
 .tile-title {
   display: block;
   font-size: clamp(0.875rem, max(1.625vw, calc(0.828125rem + 0.19vw)), 1.375rem);
