@@ -14,6 +14,7 @@
             background-color: #e6f2ff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
         }
@@ -21,10 +22,14 @@
             background-color: white;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            margin: 50px auto;
-            width: calc(100% - 40px);
-            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.5rem, 1.6vh, 0.875rem);
+            padding: clamp(0.75rem, 2vw, 1.25rem);
+            margin: clamp(0.5rem, 2vh, 1.25rem) auto;
+            width: calc(100% - clamp(1rem, 4vw, 2rem));
+            max-width: 44rem;
+            font-size: 0.875rem;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
@@ -32,7 +37,36 @@
         }
         .header {
             color: #2c3e50;
-            margin-bottom: 25px;
+        }
+        .header h1 {
+            font-size: clamp(1.25rem, calc(1.05rem + 1.3vw), 1.875rem);
+            margin-bottom: 0.25rem;
+        }
+        .header p,
+        .places-list-container > p {
+            margin-bottom: 0;
+        }
+        .game-toolbar,
+        .game-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.375rem;
+        }
+        .game-content,
+        .game-play {
+            display: flex;
+            flex-direction: column;
+            gap: inherit;
+        }
+        .game-container .btn {
+            --bs-btn-font-size: 0.875rem;
+            --bs-btn-padding-y: 0.3125rem;
+            --bs-btn-padding-x: 0.625rem;
+        }
+        .game-container :is(.form-select, .form-control) {
+            font-size: inherit;
+            padding-block: 0.3125rem;
         }
         .btn-primary {
             background-color: #3498db;
@@ -75,20 +109,19 @@
             border-color: #545b62;
         }
         .timer-display {
-            font-size: 2rem;
+            font-size: 1.25rem;
             font-weight: bold;
             color: #e74c3c;
         }
         .score-display {
-            font-size: 1.5rem;
+            font-size: 1.125rem;
             font-weight: bold;
             color: #2ecc71;
         }
         .rules-container, .search-container {
             background-color: #f8f9fa;
             border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 1rem;
             display: none;
         }
         .places-list-container {
@@ -96,8 +129,8 @@
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 5px;
-            padding: 10px;
-            margin-top: 15px;
+            padding: 0.375rem 0.5rem;
+            overflow-wrap: anywhere;
         }
          .search-results-container {
             max-height: 300px;
@@ -120,10 +153,21 @@
             border-bottom: none;
         }
         .settings-card {
+            container-type: inline-size;
             background-color: #f8f9fa;
             border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
+            padding: 0.625rem 0.75rem;
+        }
+        .game-container h4 {
+            font-size: 1rem;
+            margin-bottom: 0.375rem;
+        }
+        .game-container h5 {
+            font-size: 0.9375rem;
+            margin-bottom: 0.25rem;
+        }
+        .settings-card .form-label {
+            margin-bottom: 0.1875rem;
         }
 
         input[type="text"],
@@ -155,24 +199,95 @@
         .form-select {
             cursor: pointer;
         }
+        @container (width < 22rem) {
+            .settings-card .row {
+                --bs-gutter-x: 0.375rem;
+            }
+            .settings-card .col {
+                width: calc(100% / 3);
+            }
+            .settings-card .setting-mode {
+                width: 100%;
+            }
+            .settings-card .form-select {
+                padding-inline: 0.375rem 1rem;
+                background-position: right 0.3125rem center;
+                background-size: 0.625rem auto;
+            }
+        }
+        @media (width < 28rem) {
+            .game-actions .btn {
+                flex: 1 1 45%;
+            }
+        }
+        @media (width < 23rem), (width < 28rem) and (height < 40rem) {
+            .game-container {
+                gap: 0.375rem;
+                margin-block: 0.5rem;
+                padding: 0.5rem;
+                font-size: 0.8125rem;
+                line-height: 1.4;
+            }
+            .game-container .btn {
+                --bs-btn-font-size: 0.8125rem;
+            }
+            .game-toolbar {
+                gap: 0.25rem;
+            }
+            .game-toolbar .btn {
+                --bs-btn-padding-x: 0.25rem;
+            }
+            .settings-card {
+                padding: 0.5rem 0.625rem;
+            }
+            .settings-card .row {
+                --bs-gutter-y: 0.375rem;
+            }
+            .places-list-container {
+                padding-inline: 0.375rem;
+            }
+        }
+        @media (width >= 45rem) and (height <= 36rem) {
+            .game-container {
+                gap: 0.375rem;
+                max-width: 58rem;
+                padding: 0.625rem 0.75rem;
+                margin-block: 0.5rem;
+            }
+            .game-content {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            .settings-card {
+                flex: 2 1 0;
+                min-width: 0;
+            }
+            .game-play {
+                flex: 3 1 0;
+                min-width: 0;
+            }
+            .game-actions .btn {
+                --bs-btn-padding-x: 0.375rem;
+            }
+        }
     </style>
 </head>
 <body>
     <header data-site-navbar></header>
     <main class="container game-container">
-        <a class="btn btn-outline-secondary btn-sm mb-3" href="../">← Learning</a>
         <div class="text-center header">
             <h1><i class="fas fa-globe-americas"></i> Place Naming Game</h1>
-            <p class="lead">Test your geography knowledge by naming as many places as you can!</p>
+            <p>Test your geography knowledge by naming as many places as you can!</p>
         </div>
 
-        <div class="d-flex flex-wrap justify-content-center mb-3">
-            <button id="rulesBtn" type="button" class="btn btn-info panel-toggle me-2 mb-2"
+        <div class="game-toolbar">
+            <a class="btn btn-outline-secondary" href="../">← Learning</a>
+            <button id="rulesBtn" type="button" class="btn btn-info panel-toggle"
                     aria-controls="rulesContainer" aria-expanded="false">
                 <i class="fas fa-book" aria-hidden="true"></i>
                 <span class="panel-toggle-label"><span>Show Rules</span><span>Hide Rules</span></span>
             </button>
-            <button id="showSearchBtn" type="button" class="btn btn-info panel-toggle mb-2"
+            <button id="showSearchBtn" type="button" class="btn btn-info panel-toggle"
                     aria-controls="searchContainer" aria-expanded="false">
                 <i class="fas fa-search" aria-hidden="true"></i>
                 <span class="panel-toggle-label"><span>Show Search</span><span>Hide Search</span></span>
@@ -256,84 +371,86 @@
         </div>
 
 
-        <div class="settings-card">
-            <h4><i class="fas fa-cog"></i> Game Settings</h4>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="letterSelect" class="form-label">Starting Letter</label>
-                    <select id="letterSelect" class="form-select">
-                        <option value="any" selected>Any Letter</option>
-                    </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="countrySelect" class="form-label">Country / Game Mode</label>
-                    <select id="countrySelect" class="form-select">
-                        <option value="placeAndCountry" selected>Place and Country Mode</option>
-                    </select>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="endLetterSelect" class="form-label">Ending Letter</label>
-                    <select id="endLetterSelect" class="form-select">
-                        <option value="any" selected>Any Letter</option>
-                    </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="timeSelect" class="form-label">Time Limit</label>
-                    <select id="timeSelect" class="form-select">
-                        <option value="1" selected>1 Minute</option>
-                        <option value="2">2 Minutes</option>
-                        <option value="3">3 Minutes</option>
-                        <option value="5">5 Minutes</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <div class="d-flex justify-content-between mb-4">
-            <div class="timer-display">
-                <i class="fas fa-clock"></i> Time: <span id="timer">00:00</span>
-            </div>
-            <div class="score-display">
-                <i class="fas fa-star"></i> Score: <span id="score">0</span>
-            </div>
-        </div>
-
-        <div class="input-group mb-3">
-            <input type="text" id="placeInput" class="form-control" placeholder="Enter place, country (e.g., Paris, France)" disabled>
-            <button id="enterBtn" class="btn btn-primary" disabled>
-                <i class="fas fa-check"></i> Enter Place
-            </button>
-        </div>
-
-        <div class="d-flex justify-content-center mb-4">
-            <button id="startBtn" class="btn btn-success me-2">
-                <i class="fas fa-play"></i> Start Game
-            </button>
-            <button id="pauseBtn" class="btn btn-warning me-2" disabled>
-                <i class="fas fa-pause"></i> Pause
-            </button>
-            <button id="resetBtn" class="btn btn-danger me-2">
-                <i class="fas fa-redo"></i> Reset Game
-            </button>
-            <button id="displayBtn" class="btn btn-info">
-                <i class="fas fa-list"></i> Display Places
-            </button>
-        </div>
-
-
-        <div class="row">
-            <div class="col-md-6">
-                <h5><i class="fas fa-check-circle"></i> Guessed Places</h5>
-                <div id="guessedPlaces" class="places-list-container">
-                    <p class="text-muted">No places guessed yet</p>
+        <div class="game-content">
+            <div class="settings-card">
+                <h4><i class="fas fa-cog"></i> Game Settings</h4>
+                <div class="row row-cols-2 g-2">
+                    <div class="col">
+                        <label for="letterSelect" class="form-label">Starting Letter</label>
+                        <select id="letterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label for="endLetterSelect" class="form-label">Ending Letter</label>
+                        <select id="endLetterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label for="timeSelect" class="form-label">Time Limit</label>
+                        <select id="timeSelect" class="form-select">
+                            <option value="1" selected>1 Minute</option>
+                            <option value="2">2 Minutes</option>
+                            <option value="3">3 Minutes</option>
+                            <option value="5">5 Minutes</option>
+                        </select>
+                    </div>
+                    <div class="col setting-mode">
+                        <label for="countrySelect" class="form-label">Country / Game Mode</label>
+                        <select id="countrySelect" class="form-select">
+                            <option value="placeAndCountry" selected>Place and Country Mode</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <h5><i class="fas fa-lightbulb"></i> Example Places</h5>
-                <div id="examplePlaces" class="places-list-container">
-                    <p class="text-muted">Click "Display Places" to see examples</p>
+
+            <div class="game-play">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="timer-display">
+                        <i class="fas fa-clock"></i> Time: <span id="timer">00:00</span>
+                    </div>
+                    <div class="score-display">
+                        <i class="fas fa-star"></i> Score: <span id="score">0</span>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="placeInput" class="form-control" placeholder="Enter place, country (e.g., Paris, France)" disabled>
+                    <button id="enterBtn" class="btn btn-primary" disabled>
+                        <i class="fas fa-check"></i> Enter Place
+                    </button>
+                </div>
+
+                <div class="game-actions">
+                    <button id="startBtn" class="btn btn-success">
+                        <i class="fas fa-play"></i> Start Game
+                    </button>
+                    <button id="pauseBtn" class="btn btn-warning" disabled>
+                        <i class="fas fa-pause"></i> Pause
+                    </button>
+                    <button id="resetBtn" class="btn btn-danger">
+                        <i class="fas fa-redo"></i> Reset Game
+                    </button>
+                    <button id="displayBtn" class="btn btn-info">
+                        <i class="fas fa-list"></i> Display Places
+                    </button>
+                </div>
+
+
+                <div class="row row-cols-2 gx-2">
+                    <div class="col">
+                        <h5><i class="fas fa-check-circle"></i> Guessed Places</h5>
+                        <div id="guessedPlaces" class="places-list-container">
+                            <p class="text-muted">No places guessed yet</p>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <h5><i class="fas fa-lightbulb"></i> Example Places</h5>
+                        <div id="examplePlaces" class="places-list-container">
+                            <p class="text-muted">Click "Display Places" to see examples</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
