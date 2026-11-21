@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place Naming Game</title>
+    <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
+    <link href="vendor/fontawesome/css/solid.min.css" rel="stylesheet">
+    <link rel="icon" href="data:,">
+    <style>
+        body {
+            background-color: #e6f2ff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .game-container {
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 900px;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        .header {
+            color: #2c3e50;
+            margin-bottom: 25px;
+        }
+        .btn-primary {
+            background-color: #3498db;
+            border-color: #3498db;
+        }
+        .btn-primary:hover {
+            background-color: #2980b9;
+            border-color: #2980b9;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+            border-color: #2ecc71;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+            border-color: #27ae60;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+            border-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+            border-color: #c0392b;
+        }
+         .btn-info {
+            background-color: #5dade2;
+            border-color: #5dade2;
+        }
+        .btn-info:hover {
+            background-color: #3498db;
+            border-color: #3498db;
+        }
+         .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+        }
+        .timer-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        .score-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        .rules-container, .search-container {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .places-list-container {
+            max-height: 305px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+        }
+         .search-results-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+            margin-bottom: 0;
+        }
+        .place-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        .place-item:last-child {
+            border-bottom: none;
+        }
+        .settings-card {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            -webkit-user-select: auto;
+            -moz-user-select: auto;
+            -ms-user-select: auto;
+            user-select: auto;
+        }
+
+        #rulesBtn, #showSearchBtn, #searchBtn, #startBtn, #pauseBtn, #resetBtn, #displayBtn, #enterBtn {
+            cursor: grab;
+        }
+        .form-select {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container game-container">
+        <a class="btn btn-outline-secondary btn-sm mb-3" href="../">← Learning</a>
+        <div class="text-center header">
+            <h1><i class="fas fa-globe-americas"></i> Place Naming Game</h1>
+            <p class="lead">Test your geography knowledge by naming as many places as you can!</p>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-center mb-3">
+             <button id="rulesBtn" class="btn btn-info me-2 mb-2">
+                <i class="fas fa-book"></i> Show Rules
+            </button>
+             <button id="showSearchBtn" class="btn btn-info mb-2">
+                <i class="fas fa-search"></i> Show Search
+            </button>
+        </div>
+
+
+        <div id="rulesContainer" class="rules-container">
+            <h4>Game Rules:</h4>
+            <ul>
+                <li>Select a starting letter, ending letter, and/or country to limit your answers</li>
+                <li>To play "Place and Country" mode, select the "Place and Country Mode" option in the Country dropdown, this is the default mode</li>
+                <li>Choose a time limit (1-5 minutes)</li>
+                <li>Click "Start Game" to begin</li>
+                <li>In "Place Only" mode, type place names that match your selected criteria.</li>
+                <li>In "Place and Country" mode, type the place name followed by a comma and then the country name (e.g., "Paris, France") where extra spaces around the comma will be ignored, and you must enter both the place and country to get points</li>
+                <li>Each correct answer adds to your score</li>
+                <li>You can be off by 1 letter or have transposed adjacent letters in your answer (applies to both place and country in "Place and Country" mode)</li>
+                <li>Use the Search feature to find places. For "Include" and "Not Include", you can enter multiple strings separated by commas (e.g., "new, park" or "old, city").
+                    <ul>
+                        <li><strong>Include:</strong> All specified strings must be present in the place name or country.</li>
+                        <li><strong>Not Include:</strong> None of the specified strings should be present in the place name or country.</li>
+                    </ul>
+                </li>
+                <li>Optionally filter search by starting/ending letter, country, and city name length.</li>
+                <li>Use "Display Places" to see 8 random example places based on current game filters.</li>
+                <li>Pause the game if you need to take a break.</li>
+            </ul>
+        </div>
+
+        <div id="searchContainer" class="search-container">
+             <h4><i class="fas fa-search"></i> Search Places</h4>
+             <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="searchStartLetterSelect" class="form-label">Starting Letter</label>
+                    <select id="searchStartLetterSelect" class="form-select">
+                        <option value="any" selected>Any Letter</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="searchEndLetterSelect" class="form-label">Ending Letter</label>
+                    <select id="searchEndLetterSelect" class="form-select">
+                        <option value="any" selected>Any Letter</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="searchCountrySelect" class="form-label">Country</label>
+                    <select id="searchCountrySelect" class="form-select">
+                        <option value="any" selected>Any Country</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="searchIncludeInput" class="form-label">Include</label>
+                    <input type="text" id="searchIncludeInput" class="form-control" placeholder="e.g., new, park">
+                </div>
+                <div class="col-md-6">
+                    <label for="searchExcludeInput" class="form-label">Don't Include</label>
+                    <input type="text" id="searchExcludeInput" class="form-control" placeholder="e.g., old, city">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="searchMinLengthInput" class="form-label">Minimum Characters</label>
+                    <input type="number" id="searchMinLengthInput" class="form-control" placeholder="e.g., 2" min="1" step="1">
+                </div>
+                <div class="col-md-6">
+                    <label for="searchMaxLengthInput" class="form-label">Maximum Characters</label>
+                    <input type="number" id="searchMaxLengthInput" class="form-control" placeholder="e.g., 10" min="1" step="1">
+                </div>
+            </div>
+            <div class="text-center mb-3">
+                 <button id="searchBtn" class="btn btn-secondary">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+            <div id="searchResults" class="search-results-container">
+                <p class="text-muted">Search results will appear here</p>
+            </div>
+        </div>
+
+
+        <div class="settings-card">
+            <h4><i class="fas fa-cog"></i> Game Settings</h4>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="letterSelect" class="form-label">Starting Letter</label>
+                    <select id="letterSelect" class="form-select">
+                        <option value="any" selected>Any Letter</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="countrySelect" class="form-label">Country / Game Mode</label>
+                    <select id="countrySelect" class="form-select">
+                        <option value="placeAndCountry" selected>Place and Country Mode</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="endLetterSelect" class="form-label">Ending Letter</label>
+                    <select id="endLetterSelect" class="form-select">
+                        <option value="any" selected>Any Letter</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="timeSelect" class="form-label">Time Limit</label>
+                    <select id="timeSelect" class="form-select">
+                        <option value="1" selected>1 Minute</option>
+                        <option value="2">2 Minutes</option>
+                        <option value="3">3 Minutes</option>
+                        <option value="5">5 Minutes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mb-4">
+            <div class="timer-display">
+                <i class="fas fa-clock"></i> Time: <span id="timer">00:00</span>
+            </div>
+            <div class="score-display">
+                <i class="fas fa-star"></i> Score: <span id="score">0</span>
+            </div>
+        </div>
+
+        <div class="input-group mb-3">
+            <input type="text" id="placeInput" class="form-control" placeholder="Enter place, country (e.g., Paris, France)" disabled>
+            <button id="enterBtn" class="btn btn-primary" disabled>
+                <i class="fas fa-check"></i> Enter Place
+            </button>
+        </div>
+
+        <div class="d-flex justify-content-center mb-4">
+            <button id="startBtn" class="btn btn-success me-2">
+                <i class="fas fa-play"></i> Start Game
+            </button>
+            <button id="pauseBtn" class="btn btn-warning me-2" disabled>
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button id="resetBtn" class="btn btn-danger me-2">
+                <i class="fas fa-redo"></i> Reset Game
+            </button>
+            <button id="displayBtn" class="btn btn-info">
+                <i class="fas fa-list"></i> Display Places
+            </button>
+        </div>
+
+
+        <div class="row">
+            <div class="col-md-6">
+                <h5><i class="fas fa-check-circle"></i> Guessed Places</h5>
+                <div id="guessedPlaces" class="places-list-container">
+                    <p class="text-muted">No places guessed yet</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h5><i class="fas fa-lightbulb"></i> Example Places</h5>
+                <div id="examplePlaces" class="places-list-container">
+                    <p class="text-muted">Click "Display Places" to see examples</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="PlacesData.js"></script>
+    <script>
+        let timer;
+        let timeLeft = 0;
+        let score = 0;
+        let gameActive = false;
+        let guessedPlaces = [];
+        let allPlaces = [];
+        let countries = new Set();
+        let filteredPlaces = [];
+        let wasGameActiveBeforeHidden = false;
+        let currentGameMode = 'placeAndCountry';
+
+        const rulesBtn = document.getElementById('rulesBtn');
+        const rulesContainer = document.getElementById('rulesContainer');
+        const showSearchBtn = document.getElementById('showSearchBtn');
+        const searchContainer = document.getElementById('searchContainer');
+        const letterSelect = document.getElementById('letterSelect');
+        const endLetterSelect = document.getElementById('endLetterSelect');
+        const countrySelect = document.getElementById('countrySelect');
+        const timeSelect = document.getElementById('timeSelect');
+        const timerDisplay = document.getElementById('timer');
+        const scoreDisplay = document.getElementById('score');
+        const placeInput = document.getElementById('placeInput');
+        const enterBtn = document.getElementById('enterBtn');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const displayBtn = document.getElementById('displayBtn');
+        const guessedPlacesContainer = document.getElementById('guessedPlaces');
+        const examplePlacesContainer = document.getElementById('examplePlaces');
+
+        const searchIncludeInput = document.getElementById('searchIncludeInput');
+        const searchExcludeInput = document.getElementById('searchExcludeInput');
+        const searchMinLengthInput = document.getElementById('searchMinLengthInput');
+        const searchMaxLengthInput = document.getElementById('searchMaxLengthInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const searchResultsContainer = document.getElementById('searchResults');
+        const searchStartLetterSelect = document.getElementById('searchStartLetterSelect');
+        const searchEndLetterSelect = document.getElementById('searchEndLetterSelect');
+        const searchCountrySelect = document.getElementById('searchCountrySelect');
+
+        const forbiddenCharRegex = /[\\\/]/;
+
+        function setupIntegerInputValidation(inputElement) {
+            inputElement.addEventListener('input', function() {
+                let value = this.value;
+                if (value === '') {
+                    this.value = '';
+                    saveSearchFilters();
+                    return;
+                }
+                value = value.replace(/[^\d]/g, '');
+                if (value === '') {
+                    this.value = '';
+                    saveSearchFilters();
+                    return;
+                }
+                let numValue = parseInt(value, 10);
+                if (isNaN(numValue)) {
+                    this.value = '';
+                    saveSearchFilters();
+                    return;
+                }
+                if (numValue < 1) {
+                    numValue = 1;
+                }
+                this.value = numValue;
+                saveSearchFilters();
+            });
+
+            inputElement.addEventListener('keydown', function(event) {
+                if (['.', 'e', 'E', '+', '-'].includes(event.key)) {
+                    event.preventDefault();
+                }
+            });
+        }
+
+        function initGame() {
+            const uniquePlacesMap = new Map();
+            if (typeof citiesData !== 'undefined' && Array.isArray(citiesData)) {
+                citiesData.forEach(placeData => {
+                    if (placeData.city && typeof placeData.city === 'string' && placeData.city.trim() !== '' && !forbiddenCharRegex.test(placeData.city) &&
+                        placeData.country_name && typeof placeData.country_name === 'string' && placeData.country_name.trim() !== '' && !forbiddenCharRegex.test(placeData.country_name)) {
+                        const cityClean = placeData.city.trim();
+                        const countryClean = placeData.country_name.trim();
+                        const key = `${cityClean.toLowerCase()}|${countryClean.toLowerCase()}`;
+                        if (!uniquePlacesMap.has(key)) {
+                            uniquePlacesMap.set(key, { city: cityClean, country_name: countryClean });
+                        }
+                    }
+                });
+            }
+            allPlaces = Array.from(uniquePlacesMap.values());
+
+            countries.clear();
+            allPlaces.forEach(place => {
+                if (place.country_name) {
+                    countries.add(place.country_name);
+                }
+            });
+            const sortedCountries = Array.from(countries).sort();
+
+            const letterOptionsFragment = document.createDocumentFragment();
+            for (let i = 65; i <= 90; i++) {
+                const letter = String.fromCharCode(i);
+                const option = document.createElement('option');
+                option.value = letter;
+                option.textContent = letter;
+                letterOptionsFragment.appendChild(option);
+            }
+            letterSelect.innerHTML = '<option value="any" selected>Any Letter</option>';
+            endLetterSelect.innerHTML = '<option value="any" selected>Any Letter</option>';
+            searchStartLetterSelect.innerHTML = '<option value="any" selected>Any Letter</option>';
+            searchEndLetterSelect.innerHTML = '<option value="any" selected>Any Letter</option>';
+
+            letterSelect.appendChild(letterOptionsFragment.cloneNode(true));
+            endLetterSelect.appendChild(letterOptionsFragment.cloneNode(true));
+            searchStartLetterSelect.appendChild(letterOptionsFragment.cloneNode(true));
+            searchEndLetterSelect.appendChild(letterOptionsFragment.cloneNode(true));
+
+
+            const searchCountryOptionsFragment = document.createDocumentFragment();
+            const anyCountryOptionForSearch = document.createElement('option');
+            anyCountryOptionForSearch.value = "any";
+            anyCountryOptionForSearch.textContent = "Any Country";
+            anyCountryOptionForSearch.selected = true;
+            searchCountryOptionsFragment.appendChild(anyCountryOptionForSearch);
+
+            if (countries.has("United States")) {
+                const usOption = document.createElement('option');
+                usOption.value = "United States";
+                usOption.textContent = "United States";
+                searchCountryOptionsFragment.appendChild(usOption);
+            }
+            sortedCountries.forEach(country => {
+                if (country !== "United States") {
+                    const option = document.createElement('option');
+                    option.value = country;
+                    option.textContent = country;
+                    searchCountryOptionsFragment.appendChild(option);
+                }
+            });
+            searchCountrySelect.innerHTML = '';
+            searchCountrySelect.appendChild(searchCountryOptionsFragment);
+
+
+            const gameCountryOptionsFragment = document.createDocumentFragment();
+            const placeAndCountryModeOption = document.createElement('option');
+            placeAndCountryModeOption.value = 'placeAndCountry';
+            placeAndCountryModeOption.textContent = 'Place and Country Mode';
+            gameCountryOptionsFragment.appendChild(placeAndCountryModeOption);
+
+            const anyCountryOptionForGame = document.createElement('option');
+            anyCountryOptionForGame.value = 'any';
+            anyCountryOptionForGame.textContent = 'Any Country';
+            gameCountryOptionsFragment.appendChild(anyCountryOptionForGame);
+
+            if (countries.has("United States")) {
+                const usOption = document.createElement('option');
+                usOption.value = "United States";
+                usOption.textContent = "United States";
+                gameCountryOptionsFragment.appendChild(usOption);
+            }
+            sortedCountries.forEach(country => {
+                if (country !== "United States") {
+                    const option = document.createElement('option');
+                    option.value = country;
+                    option.textContent = country;
+                    gameCountryOptionsFragment.appendChild(option);
+                }
+            });
+            countrySelect.innerHTML = '';
+            countrySelect.appendChild(gameCountryOptionsFragment);
+
+            loadGameState();
+
+            countrySelect.addEventListener('change', handleCountryChangeAndSaveSettings);
+            letterSelect.addEventListener('change', saveSettings);
+            endLetterSelect.addEventListener('change', saveSettings);
+            timeSelect.addEventListener('change', saveSettings);
+
+            searchBtn.addEventListener('click', performSearch);
+            [searchIncludeInput, searchExcludeInput].forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') performSearch();
+                });
+            });
+             [searchMinLengthInput, searchMaxLengthInput].forEach(input => {
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') performSearch();
+                });
+            });
+
+
+            setupIntegerInputValidation(searchMinLengthInput);
+            setupIntegerInputValidation(searchMaxLengthInput);
+
+            searchStartLetterSelect.addEventListener('change', saveSearchFilters);
+            searchEndLetterSelect.addEventListener('change', saveSearchFilters);
+            searchCountrySelect.addEventListener('change', saveSearchFilters);
+            searchIncludeInput.addEventListener('input', saveSearchFilters);
+            searchExcludeInput.addEventListener('input', saveSearchFilters);
+        }
+
+
+        function handleCountryChangeAndSaveSettings() {
+            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+            updatePlaceInputPlaceholder();
+            saveSettings();
+        }
+
+        rulesBtn.addEventListener('click', function() {
+            const isVisible = rulesContainer.style.display === 'block';
+            rulesContainer.style.display = isVisible ? 'none' : 'block';
+            rulesBtn.innerHTML = isVisible ? '<i class="fas fa-book"></i> Show Rules' : '<i class="fas fa-book"></i> Hide Rules';
+            saveGameState();
+        });
+
+         showSearchBtn.addEventListener('click', function() {
+            const isVisible = searchContainer.style.display === 'block';
+            searchContainer.style.display = isVisible ? 'none' : 'block';
+            showSearchBtn.innerHTML = isVisible ? '<i class="fas fa-search"></i> Show Search' : '<i class="fas fa-search"></i> Hide Search';
+            saveGameState();
+        });
+
+
+        startBtn.addEventListener('click', function() {
+            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+
+            const selectedStartLetter = letterSelect.value;
+            const selectedEndLetter = endLetterSelect.value;
+            const selectedCountryFilter = (currentGameMode === 'placeAndCountry' || countrySelect.value === 'any') ? 'any' : countrySelect.value;
+
+
+            filteredPlaces = allPlaces.filter(place => {
+                const cityLower = place.city.toLowerCase();
+                const matchesStartLetter = selectedStartLetter === 'any' ||
+                                    (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
+                const matchesEndLetter = selectedEndLetter === 'any' ||
+                                    (place.city && cityLower.charAt(cityLower.length - 1) === selectedEndLetter.toLowerCase());
+                const matchesCountry = selectedCountryFilter === 'any' ||
+                                       (place.country_name && place.country_name === selectedCountryFilter);
+                return matchesStartLetter && matchesEndLetter && matchesCountry;
+            });
+
+            timeLeft = parseInt(timeSelect.value) * 60;
+            score = 0;
+            guessedPlaces = [];
+
+            updateTimerDisplay();
+            updateScoreDisplay();
+            updateGuessedPlacesDisplay();
+            updatePlaceInputPlaceholder();
+
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            placeInput.disabled = false;
+            enterBtn.disabled = false;
+            letterSelect.disabled = true;
+            endLetterSelect.disabled = true;
+            countrySelect.disabled = true;
+            timeSelect.disabled = true;
+            gameActive = true;
+
+            placeInput.focus();
+            startTimer();
+            saveGameState();
+        });
+
+        pauseBtn.addEventListener('click', function() {
+            if (gameActive) {
+                clearInterval(timer);
+                gameActive = false;
+                pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                placeInput.disabled = true;
+                enterBtn.disabled = true;
+            } else {
+                if(timeLeft > 0) {
+                    gameActive = true;
+                    pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                    placeInput.disabled = false;
+                    enterBtn.disabled = false;
+                    placeInput.focus();
+                    startTimer();
+                }
+            }
+            saveGameState();
+        });
+
+        resetBtn.addEventListener('click', function() {
+            clearInterval(timer);
+            gameActive = false;
+            timeLeft = 0;
+            score = 0;
+            guessedPlaces = [];
+            wasGameActiveBeforeHidden = false;
+
+
+            updateTimerDisplay();
+            updateScoreDisplay();
+            updateGuessedPlacesDisplay();
+
+
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            placeInput.disabled = true;
+            enterBtn.disabled = true;
+            letterSelect.disabled = false;
+            endLetterSelect.disabled = false;
+            countrySelect.disabled = false;
+            timeSelect.disabled = false;
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            placeInput.value = '';
+
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.remove(['gameState', 'gameSettings', 'searchFilters'], () => {
+                    letterSelect.value = 'any';
+                    endLetterSelect.value = 'any';
+                    countrySelect.value = 'placeAndCountry';
+                    timeSelect.value = '1';
+                    currentGameMode = 'placeAndCountry';
+                    updatePlaceInputPlaceholder();
+
+                    searchStartLetterSelect.value = 'any';
+                    searchEndLetterSelect.value = 'any';
+                    searchCountrySelect.value = 'any';
+                    searchIncludeInput.value = '';
+                    searchExcludeInput.value = '';
+                    searchMinLengthInput.value = '';
+                    searchMaxLengthInput.value = '';
+                    searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
+                    examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
+                    rulesContainer.style.display = 'none';
+                    rulesBtn.innerHTML = '<i class="fas fa-book"></i> Show Rules';
+                    searchContainer.style.display = 'none';
+                    showSearchBtn.innerHTML = '<i class="fas fa-search"></i> Show Search';
+                });
+            } else {
+                letterSelect.value = 'any';
+                endLetterSelect.value = 'any';
+                countrySelect.value = 'placeAndCountry';
+                timeSelect.value = '1';
+                currentGameMode = 'placeAndCountry';
+                updatePlaceInputPlaceholder();
+
+                searchStartLetterSelect.value = 'any';
+                searchEndLetterSelect.value = 'any';
+                searchCountrySelect.value = 'any';
+                searchIncludeInput.value = '';
+                searchExcludeInput.value = '';
+                searchMinLengthInput.value = '';
+                searchMaxLengthInput.value = '';
+                searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
+                examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
+                rulesContainer.style.display = 'none';
+                rulesBtn.innerHTML = '<i class="fas fa-book"></i> Show Rules';
+                searchContainer.style.display = 'none';
+                showSearchBtn.innerHTML = '<i class="fas fa-search"></i> Show Search';
+            }
+        });
+
+        function updatePlaceInputPlaceholder() {
+            if (currentGameMode === 'placeAndCountry') {
+                placeInput.placeholder = 'Enter place, country (e.g., Paris, France)';
+            } else {
+                placeInput.placeholder = 'Enter a place name';
+            }
+        }
+
+        function enterPlace() {
+            if (!gameActive) return;
+
+            const guess = placeInput.value.trim();
+            if (!guess) return;
+
+            const foundPlace = findMatchingPlace(guess);
+
+            if (foundPlace) {
+                 const alreadyGuessed = guessedPlaces.some(guessed =>
+                     guessed.city.toLowerCase() === foundPlace.city.toLowerCase() &&
+                     (currentGameMode === 'placeOnly' || (guessed.country && foundPlace.country_name && guessed.country.toLowerCase() === foundPlace.country_name.toLowerCase()))
+                 );
+
+                 if (!alreadyGuessed) {
+                    score++;
+                    guessedPlaces.push({ city: foundPlace.city, country: foundPlace.country_name });
+                    updateScoreDisplay();
+                    updateGuessedPlacesDisplay();
+                    saveGameState();
+                 }
+            }
+            placeInput.value = '';
+        }
+
+        function findMatchingPlace(guess) {
+            const lowerGuess = guess.toLowerCase();
+
+            for (const place of filteredPlaces) {
+                const placeCityLower = place.city.toLowerCase();
+                const placeCountryLower = place.country_name.toLowerCase();
+
+                if (currentGameMode === 'placeOnly') {
+                    if (placeCityLower === lowerGuess || isCloseMatch(placeCityLower, lowerGuess)) {
+                        return place;
+                    }
+                } else {
+                    const parts = lowerGuess.split(',').map(part => part.trim());
+                    if (parts.length === 2) {
+                        const guessedCity = parts[0];
+                        const guessedCountry = parts[1];
+                        if ((placeCityLower === guessedCity || isCloseMatch(placeCityLower, guessedCity)) &&
+                            (placeCountryLower === guessedCountry || isCloseMatch(placeCountryLower, guessedCountry))) {
+                            return place;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function isCloseMatch(str1, str2) {
+            const s1 = str1.toLowerCase();
+            const s2 = str2.toLowerCase();
+            if (Math.abs(s1.length - s2.length) > 1) return false;
+
+            const distance = levenshteinDistance(s1, s2);
+            if (distance === 1) return true;
+
+            if (s1.length === s2.length && distance === 2) {
+                for (let i = 0; i < s1.length - 1; i++) {
+                    if (s1[i] === s2[i+1] && s1[i+1] === s2[i]) {
+                        const s1Swapped = s1.substring(0, i) + s1[i+1] + s1[i] + s1.substring(i+2);
+                        if (s1Swapped === s2) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+
+        function levenshteinDistance(a, b) {
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= a.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i-1) === a.charAt(j-1)) {
+                        matrix[i][j] = matrix[i-1][j-1];
+                    } else {
+                        matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, matrix[i][j-1] + 1, matrix[i-1][j] + 1);
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function performSearch() {
+            const includeTerms = searchIncludeInput.value.trim().toLowerCase()
+                .split(',')
+                .map(term => term.trim())
+                .filter(term => term.length > 0);
+            const excludeTerms = searchExcludeInput.value.trim().toLowerCase()
+                .split(',')
+                .map(term => term.trim())
+                .filter(term => term.length > 0);
+
+            const selectedSearchStartLetter = searchStartLetterSelect.value;
+            const selectedSearchEndLetter = searchEndLetterSelect.value;
+            const selectedSearchCountry = searchCountrySelect.value;
+            const minLengthText = searchMinLengthInput.value;
+            const maxLengthText = searchMaxLengthInput.value;
+
+            const minLength = minLengthText ? parseInt(minLengthText) : 0;
+            const maxLength = maxLengthText ? parseInt(maxLengthText) : Infinity;
+
+            searchResultsContainer.innerHTML = '';
+
+            const isSearchEffectivelyEmpty = includeTerms.length === 0 &&
+                                          excludeTerms.length === 0 &&
+                                          selectedSearchStartLetter === 'any' &&
+                                          selectedSearchEndLetter === 'any' &&
+                                          selectedSearchCountry === 'any' &&
+                                          !minLengthText &&
+                                          !maxLengthText;
+
+            if (isSearchEffectivelyEmpty) {
+                if (allPlaces.length > 0) {
+                    const randomPlacesArray = getRandomPlaces(allPlaces, 100);
+                    if (randomPlacesArray.length > 0) {
+                        let html = '';
+                        randomPlacesArray.forEach(place => {
+                             html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
+                        });
+                        searchResultsContainer.innerHTML = html;
+                    } else {
+                        searchResultsContainer.innerHTML = '<p class="text-muted">No places available to display at the moment</p>';
+                    }
+                } else {
+                    searchResultsContainer.innerHTML = '<p class="text-muted">No places loaded in the game to search from</p>';
+                }
+                searchResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            const matchingPlaces = allPlaces.filter(place => {
+                const cityLower = place.city.toLowerCase();
+                const countryLower = place.country_name.toLowerCase();
+                const cityLength = place.city.length;
+
+                const matchesAllIncludeTerms = includeTerms.length === 0 || includeTerms.every(term =>
+                    cityLower.includes(term) || countryLower.includes(term)
+                );
+
+                const isExcluded = excludeTerms.length > 0 && excludeTerms.some(term =>
+                    cityLower.includes(term) || countryLower.includes(term)
+                );
+
+                if (!matchesAllIncludeTerms || isExcluded) {
+                    return false;
+                }
+
+                const matchesStartLetter = selectedSearchStartLetter === 'any' || cityLower.startsWith(selectedSearchStartLetter.toLowerCase());
+                const matchesEndLetter = selectedSearchEndLetter === 'any' || cityLower.endsWith(selectedSearchEndLetter.toLowerCase());
+                const matchesCountry = selectedSearchCountry === 'any' || place.country_name === selectedSearchCountry;
+                const matchesMinLength = cityLength >= minLength;
+                const matchesMaxLength = cityLength <= maxLength;
+
+                return matchesStartLetter && matchesEndLetter && matchesCountry && matchesMinLength && matchesMaxLength;
+            });
+
+            if (matchingPlaces.length === 0) {
+                searchResultsContainer.innerHTML = '<p class="text-muted">No places found matching your criteria</p>';
+                return;
+            }
+
+            const resultsToDisplay = getRandomPlaces(matchingPlaces, Math.min(matchingPlaces.length, 100));
+            let html = '';
+            resultsToDisplay.forEach(place => {
+                 html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
+            });
+            searchResultsContainer.innerHTML = html;
+            searchResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+
+        displayBtn.addEventListener('click', function() {
+            const selectedStartLetter = letterSelect.value;
+            const selectedEndLetter = endLetterSelect.value;
+            const selectedCountryFilter = (countrySelect.value === 'placeAndCountry' || countrySelect.value === 'any') ? 'any' : countrySelect.value;
+
+            const filteredForDisplay = allPlaces.filter(place => {
+                const cityLower = place.city.toLowerCase();
+                const matchesStartLetter = selectedStartLetter === 'any' ||
+                                    (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
+                const matchesEndLetter = selectedEndLetter === 'any' ||
+                                    (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
+                const matchesCountry = selectedCountryFilter === 'any' ||
+                                       (place.country_name && place.country_name === selectedCountryFilter);
+                return matchesStartLetter && matchesEndLetter && matchesCountry;
+            });
+            const examples = getRandomPlaces(filteredForDisplay, 8);
+            displayExamplePlaces(examples);
+            examplePlacesContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+
+        function getRandomPlaces(placesArray, count) {
+            if (!Array.isArray(placesArray) || placesArray.length === 0) return [];
+            const shuffled = [...placesArray].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        function displayExamplePlaces(places) {
+            if (places.length === 0) {
+                examplePlacesContainer.innerHTML = '<p class="text-muted">No places found matching current game filters</p>';
+                return;
+            }
+            let html = '';
+            places.forEach(place => {
+                html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
+            });
+            examplePlacesContainer.innerHTML = html;
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            timer = setInterval(function() {
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    gameActive = false;
+                    placeInput.disabled = true;
+                    enterBtn.disabled = true;
+                    pauseBtn.disabled = true;
+                    startBtn.disabled = false;
+                    letterSelect.disabled = false;
+                    endLetterSelect.disabled = false;
+                    countrySelect.disabled = false;
+                    timeSelect.disabled = false;
+                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                        chrome.storage.local.remove(['gameState']);
+                    }
+                } else {
+                    timeLeft--;
+                    updateTimerDisplay();
+                    if (timeLeft % 5 === 0) {
+                        saveGameState();
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateScoreDisplay() {
+            scoreDisplay.textContent = score;
+        }
+
+        function updateGuessedPlacesDisplay() {
+            if (guessedPlaces.length === 0) {
+                guessedPlacesContainer.innerHTML = '<p class="text-muted">No places guessed yet</p>';
+                return;
+            }
+            let html = '';
+            guessedPlaces.forEach(place => {
+                if (currentGameMode === 'placeAndCountry') {
+                    html += `<div class="place-item">${place.city}, ${place.country}</div>`;
+                } else {
+                    html += `<div class="place-item">${place.city}</div>`;
+                }
+            });
+            guessedPlacesContainer.innerHTML = html;
+        }
+
+        function saveGameState() {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                const gameState = {
+                    timeLeft: timeLeft,
+                    score: score,
+                    guessedPlaces: guessedPlaces,
+                    gameActive: gameActive,
+                    wasGameActiveBeforeHidden: wasGameActiveBeforeHidden,
+                    isRulesVisible: rulesContainer.style.display === 'block',
+                    isSearchVisible: searchContainer.style.display === 'block'
+                };
+                chrome.storage.local.set({ gameState: gameState });
+            }
+        }
+
+        function saveSettings() {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                const gameSettings = {
+                    selectedCountryValue: countrySelect.value,
+                    letter: letterSelect.value,
+                    endLetter: endLetterSelect.value,
+                    timeLimit: timeSelect.value
+                };
+                chrome.storage.local.set({ gameSettings: gameSettings });
+            }
+        }
+
+         function saveSearchFilters() {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                const searchFilters = {
+                    startLetter: searchStartLetterSelect.value,
+                    endLetter: searchEndLetterSelect.value,
+                    country: searchCountrySelect.value,
+                    includeTerm: searchIncludeInput.value,
+                    excludeTerm: searchExcludeInput.value,
+                    minLength: searchMinLengthInput.value,
+                    maxLength: searchMaxLengthInput.value
+                };
+                chrome.storage.local.set({ searchFilters: searchFilters });
+            }
+        }
+
+
+        function loadGameState() {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.get(['gameState', 'gameSettings', 'searchFilters'], function(result) {
+                    if (result.gameSettings) {
+                        const savedSettings = result.gameSettings;
+                        countrySelect.value = savedSettings.selectedCountryValue || 'placeAndCountry';
+                        letterSelect.value = savedSettings.letter || 'any';
+                        endLetterSelect.value = savedSettings.endLetter || 'any';
+                        timeSelect.value = savedSettings.timeLimit || '1';
+                    } else {
+                        countrySelect.value = 'placeAndCountry';
+                        letterSelect.value = 'any';
+                        endLetterSelect.value = 'any';
+                        timeSelect.value = '1';
+                    }
+                    currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+                    updatePlaceInputPlaceholder();
+
+                    if (result.searchFilters) {
+                        const savedSearchFilters = result.searchFilters;
+                        searchStartLetterSelect.value = savedSearchFilters.startLetter || 'any';
+                        searchEndLetterSelect.value = savedSearchFilters.endLetter || 'any';
+                        searchCountrySelect.value = savedSearchFilters.country || 'any';
+                        searchIncludeInput.value = savedSearchFilters.includeTerm || '';
+                        searchExcludeInput.value = savedSearchFilters.excludeTerm || '';
+                        searchMinLengthInput.value = savedSearchFilters.minLength || '';
+                        searchMaxLengthInput.value = savedSearchFilters.maxLength || '';
+                        if (searchIncludeInput.value || searchExcludeInput.value ||
+                            searchStartLetterSelect.value !== 'any' || searchEndLetterSelect.value !== 'any' || searchCountrySelect.value !== 'any' ||
+                            searchMinLengthInput.value || searchMaxLengthInput.value) {
+                            performSearch();
+                        }
+                    }
+
+
+                    if (result.gameState) {
+                        const savedState = result.gameState;
+                        timeLeft = savedState.timeLeft || 0;
+                        score = savedState.score || 0;
+                        guessedPlaces = savedState.guessedPlaces || [];
+                        gameActive = savedState.gameActive || false;
+                        wasGameActiveBeforeHidden = savedState.wasGameActiveBeforeHidden || false;
+
+                        rulesContainer.style.display = savedState.isRulesVisible ? 'block' : 'none';
+                        rulesBtn.innerHTML = savedState.isRulesVisible ? '<i class="fas fa-book"></i> Hide Rules' : '<i class="fas fa-book"></i> Show Rules';
+                        searchContainer.style.display = savedState.isSearchVisible ? 'block' : 'none';
+                        showSearchBtn.innerHTML = savedState.isSearchVisible ? '<i class="fas fa-search"></i> Hide Search' : '<i class="fas fa-search"></i> Show Search';
+
+                        updateTimerDisplay();
+                        updateScoreDisplay();
+                        updateGuessedPlacesDisplay();
+
+                        if (gameActive) {
+                            const selectedStartLetter = letterSelect.value;
+                            const selectedEndLetter = endLetterSelect.value;
+                            const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
+
+                            filteredPlaces = allPlaces.filter(place => {
+                                 const cityLower = place.city.toLowerCase();
+                                 const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
+                                 const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
+                                 const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
+                                 return matchesStartLetter && matchesEndLetter && matchesCountry;
+                            });
+
+                            startBtn.disabled = true;
+                            pauseBtn.disabled = false;
+                            placeInput.disabled = false;
+                            enterBtn.disabled = false;
+                            pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                        } else if (timeLeft > 0 && wasGameActiveBeforeHidden) {
+                             const selectedStartLetter = letterSelect.value;
+                             const selectedEndLetter = endLetterSelect.value;
+                             const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
+                             filteredPlaces = allPlaces.filter(place => {
+                                 const cityLower = place.city.toLowerCase();
+                                 const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
+                                 const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
+                                 const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
+                                 return matchesStartLetter && matchesEndLetter && matchesCountry;
+                             });
+                             startBtn.disabled = true;
+                             pauseBtn.disabled = false;
+                             placeInput.disabled = true;
+                             enterBtn.disabled = true;
+                             pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                        }
+                        else {
+                            startBtn.disabled = false;
+                            pauseBtn.disabled = true;
+                            placeInput.disabled = true;
+                            enterBtn.disabled = true;
+                            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                        }
+                    }
+                });
+            } else {
+                countrySelect.value = 'placeAndCountry';
+                letterSelect.value = 'any';
+                endLetterSelect.value = 'any';
+                timeSelect.value = '1';
+                currentGameMode = 'placeAndCountry';
+                updatePlaceInputPlaceholder();
+                updateTimerDisplay();
+                updateScoreDisplay();
+                updateGuessedPlacesDisplay();
+            }
+        }
+
+        enterBtn.addEventListener('click', enterPlace);
+        placeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                enterPlace();
+            }
+        });
+
+        document.addEventListener('visibilitychange', function() {
+            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+                 return;
+            }
+            if (document.hidden) {
+                if (gameActive) {
+                    clearInterval(timer);
+                    wasGameActiveBeforeHidden = true;
+                    gameActive = false;
+                    pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+                    placeInput.disabled = true;
+                    enterBtn.disabled = true;
+                    saveGameState();
+                } else {
+                     wasGameActiveBeforeHidden = false;
+                     saveGameState();
+                }
+            } else {
+                chrome.storage.local.get(['gameState', 'gameSettings'], function(result) {
+                    if (result.gameState && result.gameState.wasGameActiveBeforeHidden && result.gameState.timeLeft > 0) {
+                         const savedState = result.gameState;
+                         const savedSettings = result.gameSettings || {};
+
+                         timeLeft = savedState.timeLeft;
+                         score = savedState.score;
+                         guessedPlaces = savedState.guessedPlaces || [];
+                         wasGameActiveBeforeHidden = false;
+
+                         countrySelect.value = savedSettings.selectedCountryValue || 'placeAndCountry';
+                         letterSelect.value = savedSettings.letter || 'any';
+                         endLetterSelect.value = savedSettings.endLetter || 'any';
+                         timeSelect.value = savedSettings.timeLimit || '1';
+
+                         currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+                         updatePlaceInputPlaceholder();
+                         updateTimerDisplay();
+                         updateScoreDisplay();
+                         updateGuessedPlacesDisplay();
+
+                         const selectedStartLetter = letterSelect.value;
+                         const selectedEndLetter = endLetterSelect.value;
+                         const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
+
+                         filteredPlaces = allPlaces.filter(place => {
+                            const cityLower = place.city.toLowerCase();
+                            const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
+                            const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
+                            const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
+                            return matchesStartLetter && matchesEndLetter && matchesCountry;
+                         });
+
+                         gameActive = true;
+                         startBtn.disabled = true;
+                         pauseBtn.disabled = false;
+                         placeInput.disabled = false;
+                         enterBtn.disabled = false;
+                         pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                         placeInput.focus();
+                         startTimer();
+                         saveGameState();
+                     } else if (result.gameState && result.gameState.timeLeft <=0){
+                        gameActive = false;
+                        startBtn.disabled = false;
+                        pauseBtn.disabled = true;
+                        placeInput.disabled = true;
+                        enterBtn.disabled = true;
+                        letterSelect.disabled = false;
+                        endLetterSelect.disabled = false;
+                        countrySelect.disabled = false;
+                        timeSelect.disabled = false;
+                     }
+                });
+            }
+        });
+        window.addEventListener('load', initGame);
+    </script>
+</body>
+</html>
