@@ -14,31 +14,31 @@
 }
 
 .section-experiments {
-  --section-image: url("experiments-background.webp");
-  --section-focus: 61% 65%;
-  --section-light: radial-gradient(ellipse at 8% 0%, rgb(49 103 218 / 28%), transparent 65%);
-  --section-gradient: linear-gradient(145deg, #101f54, #063e9b 66%, #1187d4);
+  --section-image: url("experiments-background.webp?v=2");
+  --section-focus: 47% 58%;
+  --section-light: linear-gradient(145deg, rgb(230 249 255 / 22%), transparent 55%);
+  --section-gradient: linear-gradient(145deg, #d8f2ff, #b4ddf9 54%, #87b9ee);
 }
 
 .section-learning {
-  --section-image: url("learning-background.webp");
-  --section-focus: 70% 55%;
-  --section-light: radial-gradient(ellipse at 22% 15%, rgb(226 249 255 / 35%), transparent 55%);
-  --section-gradient: linear-gradient(145deg, #d4f2ff, #a9e3eb 48%, #78d9bd);
+  --section-image: url("learning-background.webp?v=2");
+  --section-focus: 69% 65%;
+  --section-light: radial-gradient(ellipse at 22% 15%, rgb(227 255 250 / 24%), transparent 55%);
+  --section-gradient: linear-gradient(150deg, #d8f2ff, #b8e7f3 48%, #bdecd8);
 }
 
 .section-games {
-  --section-image: url("games-background.webp");
-  --section-focus: 64% 58%;
-  --section-light: radial-gradient(ellipse at 5% 0%, rgb(182 224 255 / 24%), transparent 62%);
-  --section-gradient: linear-gradient(148deg, #779afa, #3d4ed2 50%, #612fb4);
+  --section-image: url("games-background.webp?v=2");
+  --section-focus: 25% 60%;
+  --section-light: radial-gradient(ellipse at 12% 8%, rgb(247 230 255 / 19%), transparent 62%);
+  --section-gradient: linear-gradient(135deg, #e4d5fb, #cddafb 56%, #b7d9f8);
 }
 
 .section-old-projects {
-  --section-image: url("old-projects-background.webp");
-  --section-focus: 49% 65%;
-  --section-light: radial-gradient(ellipse at 0% 0%, rgb(133 186 241 / 25%), transparent 65%);
-  --section-gradient: linear-gradient(165deg, #244876, #5973a7 50%, #c05e72 80%, #274970);
+  --section-image: url("old-projects-background.webp?v=2");
+  --section-focus: 48% 60%;
+  --section-light: radial-gradient(ellipse at 92% 2%, rgb(255 230 220 / 25%), transparent 58%);
+  --section-gradient: linear-gradient(140deg, #e7edf9, #f3dce8 52%, #efb6b8);
 }
 
 .section-learning .learning-project {
