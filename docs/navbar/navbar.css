@@ -200,7 +200,8 @@
   }
 
   :where(.site-nav) .nav-panel {
-    border-end-start-radius: 1rem;
+    border-end-start-radius: 1.5rem;
+    box-shadow: inset 0 -1px rgb(29 61 117 / 15%);
   }
 
   :where(.site-nav) .nav-links:hover:has(.category-link[aria-expanded="true"]) {
