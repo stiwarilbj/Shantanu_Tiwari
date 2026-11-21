@@ -62,25 +62,25 @@
 .nav-item {
   position: relative;
   display: flex;
-  flex: 1;
-  min-inline-size: 0;
+  flex: 1 0 auto;
 }
 
 .category-link {
-  flex: 1;
-  min-inline-size: 0;
+  flex: 1 0 auto;
   justify-content: center;
-  gap: clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem);
   padding-inline: var(--nav-link-padding);
   font-size: 0.95em;
 }
 
 .category-label {
   position: relative;
-  inset-inline-start: var(--label-offset, 0px);
   display: flex;
   align-items: center;
-  gap: inherit;
+}
+
+.category-label .chevron {
+  position: absolute;
+  inset-inline-start: calc(100% + clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem));
 }
 
 .menu-toggle {
@@ -199,9 +199,12 @@
   }
 
   .category-label {
-    inset-inline-start: 0;
     flex: 1;
     justify-content: space-between;
+  }
+
+  .category-label .chevron {
+    position: static;
   }
 
   .nav-links .category-link[aria-expanded="true"] {

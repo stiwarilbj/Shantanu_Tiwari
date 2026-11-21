@@ -38,31 +38,10 @@ const withoutHover = window.matchMedia("(hover: none)");
 const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) => ({
   item,
   link: item.querySelector(".category-link"),
-  label: item.querySelector(".category-label"),
   filler: item.querySelector(".filler-link"),
 }));
 let menuOpenedOnHover = false;
 let openCategory = null;
-
-function spaceCategoryLabels() {
-  if (compactLayout.matches) return;
-
-  const rowWidth = menuGroup.getBoundingClientRect().width;
-  const slotWidth = rowWidth / categories.length;
-  const labelWidths = categories.map(({ label }) => label.getBoundingClientRect().width);
-  const totalLabelWidth = labelWidths.reduce((sum, width) => sum + width, 0);
-  // Keep the first and last labels centered and divide the space between them evenly.
-  const startInset = (slotWidth - labelWidths[0]) / 2;
-  const endInset = (slotWidth - labelWidths.at(-1)) / 2;
-  const gap = (rowWidth - startInset - endInset - totalLabelWidth) / (categories.length - 1);
-
-  let nextLabelStart = startInset;
-  for (const [index, { label }] of categories.entries()) {
-    const centeredStart = slotWidth * index + (slotWidth - labelWidths[index]) / 2;
-    label.style.setProperty("--label-offset", `${nextLabelStart - centeredStart}px`);
-    nextLabelStart += labelWidths[index] + gap;
-  }
-}
 
 function setExpanded(control, expanded) {
   control.setAttribute("aria-expanded", String(expanded));
@@ -184,7 +163,3 @@ withoutHover.addEventListener("change", syncHoverMode);
 syncHoverMode();
 menu.hidden = false;
 navigation.dataset.ready = "";
-
-const labelObserver = new ResizeObserver(spaceCategoryLabels);
-labelObserver.observe(menuGroup);
-for (const { label } of categories) labelObserver.observe(label);
