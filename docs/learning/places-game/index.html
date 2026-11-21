@@ -8,25 +8,23 @@
     <link href="vendor/fontawesome/css/fontawesome.min.css" rel="stylesheet">
     <link href="vendor/fontawesome/css/solid.min.css" rel="stylesheet">
     <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="../../navbar/navbar.css?v=2">
+    <script src="../../navbar/navbar.js?v=2" defer></script>
     <style>
         body {
             background-color: #e6f2ff;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 20px;
-            box-sizing: border-box;
+            flex-direction: column;
         }
         .game-container {
             background-color: white;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
             padding: 30px;
-            margin-top: 30px;
-            margin-bottom: 30px;
-            width: 100%;
+            margin: 50px auto;
+            width: calc(100% - 40px);
             max-width: 900px;
             -webkit-user-select: none;
             -moz-user-select: none;
@@ -148,7 +146,10 @@
     </style>
 </head>
 <body>
-    <div class="container game-container">
+    <nav class="site-nav" data-in-flow aria-label="Main navigation">
+        <a class="wordmark" href="../../">Project Lab</a>
+    </nav>
+    <main class="container game-container">
         <a class="btn btn-outline-secondary btn-sm mb-3" href="../">← Learning</a>
         <div class="text-center header">
             <h1><i class="fas fa-globe-americas"></i> Place Naming Game</h1>
@@ -322,7 +323,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </main>
 
     <script src="PlacesData.js"></script>
     <script>

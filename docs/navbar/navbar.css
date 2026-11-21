@@ -1,3 +1,28 @@
+@font-face {
+  font-family: Inter;
+  src: url("../assets/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+.site-nav, .site-nav * {
+  box-sizing: border-box;
+}
+
+.site-nav :is(a, button) {
+  color: inherit;
+  cursor: pointer;
+}
+
+.site-nav a {
+  text-decoration: none;
+}
+
+.site-nav :is(a, button):focus-visible {
+  outline: 3px solid var(--focus, #1453a4);
+  outline-offset: -5px;
+}
+
 .site-nav button {
   border: 0;
   background: none;
@@ -9,6 +34,7 @@
 }
 
 .site-nav {
+  --nav-gutter: var(--gutter, clamp(1rem, 3.5vw, 3.5rem));
   --nav-height: clamp(3.5rem, calc(2.75rem + 2vw), 4.5rem);
   --nav-link-padding: clamp(0.375rem, calc(1.8vw - 0.25rem), 0.9rem);
   --dropdown-surface: #dfebfc;
@@ -28,30 +54,38 @@
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
+  color: var(--ink, #1b242d);
+  font-family: Inter, system-ui, sans-serif;
   font-size: clamp(0.75rem, calc(0.5625rem + 0.49vw), 1rem);
   font-weight: 600;
+  line-height: normal;
 }
 
-.wordmark, .category-link, .menu-toggle {
+.site-nav[data-in-flow] {
+  position: relative;
+  margin-block-end: var(--nav-panel-height, 0px);
+}
+
+:where(.site-nav) :is(.wordmark, .category-link, .menu-toggle) {
   display: flex;
   align-items: center;
   white-space: nowrap;
 }
 
-.wordmark {
-  padding-inline-start: calc(var(--gutter) + 0.375rem);
+:where(.site-nav) .wordmark {
+  padding-inline-start: calc(var(--nav-gutter) + 0.375rem);
   padding-inline-end: calc(clamp(1rem, 2.25vw, 1.75rem) + 1.375rem);
   font-size: clamp(1rem, calc(0.75rem + 1vw), 1.625rem);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.nav-menu {
+:where(.site-nav) .nav-menu {
   display: flex;
   flex: 0 1 min(75vw, 41.5rem);
 }
 
-.nav-links {
+:where(.site-nav) .nav-links {
   display: flex;
   flex: 1;
   margin: 0;
@@ -60,35 +94,35 @@
   font-size: calc(1em + 0.125rem);
 }
 
-.nav-item {
+:where(.site-nav) .nav-item {
   display: flex;
   flex: 1 0 auto;
 }
 
-.category-link {
+:where(.site-nav) .category-link {
   flex: 1 0 auto;
   justify-content: center;
   padding-inline: var(--nav-link-padding);
   font-size: 0.95em;
 }
 
-.category-label {
+:where(.site-nav) .category-label {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.category-label .chevron {
+:where(.site-nav) .category-label .chevron {
   position: absolute;
   inset-inline-start: calc(100% + clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem));
 }
 
-.menu-toggle {
+:where(.site-nav) .menu-toggle {
   display: none;
   gap: 0.65rem;
 }
 
-.chevron {
+:where(.site-nav) .chevron {
   display: block;
   inline-size: 0.58em;
   block-size: 0.58em;
@@ -98,16 +132,16 @@
   transform: rotate(45deg);
 }
 
-.category-link:not([aria-expanded]) .chevron {
+:where(.site-nav) .category-link:not([aria-expanded]) .chevron {
   display: none;
 }
 
-.menu-toggle[aria-expanded="true"] .chevron {
+:where(.site-nav) .menu-toggle[aria-expanded="true"] .chevron {
   margin-block-start: 0.25em;
   transform: rotate(225deg);
 }
 
-.nav-panel {
+:where(.site-nav) .nav-panel {
   position: absolute;
   inset: 100% 0 auto;
   max-block-size: calc(100vh - var(--nav-height));
@@ -119,25 +153,26 @@
   box-shadow: var(--dropdown-shadow);
 }
 
-.nav-panel-content {
+:where(.site-nav) .nav-panel-content {
   display: flex;
   align-items: flex-start;
   gap: clamp(1.25rem, 3.5vw, 3rem);
   inline-size: min(100%, 80rem);
   min-block-size: 9rem;
   margin-inline: auto;
-  padding: clamp(1.5rem, 3vw, 2.5rem) var(--gutter);
+  padding: clamp(1.5rem, 3vw, 2.5rem) var(--nav-gutter);
 }
 
-.nav-panel-title {
+:where(.site-nav) .nav-panel-title {
   flex: 0 0 25%;
+  margin: 0;
   font-size: clamp(1.25rem, 2.2vw, 1.75rem);
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
 
-.nav-panel-links {
+:where(.site-nav) .nav-panel-links {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
@@ -149,11 +184,11 @@
   list-style: none;
 }
 
-.nav-panel-links li {
+:where(.site-nav) .nav-panel-links li {
   flex: 0 1 13rem;
 }
 
-.nav-panel-links a {
+:where(.site-nav) .nav-panel-links a {
   display: flex;
   align-items: center;
   min-block-size: 2.75rem;
@@ -163,7 +198,7 @@
   font-size: 1rem;
 }
 
-.nav-panel-links a:is(:hover, :focus-visible, :active) {
+:where(.site-nav) .nav-panel-links a:is(:hover, :focus-visible, :active) {
   background-color: var(--dropdown-hover);
 }
 
@@ -187,7 +222,7 @@
     gap: 0 0.5rem;
   }
 
-  .wordmark, .menu-toggle {
+  :where(.site-nav) :is(.wordmark, .menu-toggle) {
     min-block-size: var(--nav-height);
   }
 
@@ -199,10 +234,10 @@
     display: flex;
     justify-content: flex-end;
     min-inline-size: min(8.5rem, 42vw);
-    padding-inline: 1.25rem var(--gutter);
+    padding-inline: 1.25rem var(--nav-gutter);
   }
 
-  .nav-links {
+  :where(.site-nav) .nav-links {
     flex: 1 0 100%;
     flex-direction: column;
     align-items: stretch;
@@ -225,31 +260,31 @@
     display: none;
   }
 
-  .nav-item {
+  :where(.site-nav) .nav-item {
     flex: initial;
     flex-wrap: wrap;
   }
 
-  .nav-item + .nav-item {
+  :where(.site-nav) .nav-item + .nav-item {
     border-block-start: var(--dropdown-divider);
   }
 
-  .category-link {
+  :where(.site-nav) .category-link {
     justify-content: space-between;
     min-block-size: clamp(2.75rem, calc(2.5rem + 1.25vw), 3rem);
-    padding-inline: var(--gutter);
+    padding-inline: var(--nav-gutter);
   }
 
-  .category-label {
+  :where(.site-nav) .category-label {
     flex: 1;
     justify-content: space-between;
   }
 
-  .nav-links .category-link:is(:hover, :focus-visible, :active) {
+  :where(.site-nav) .nav-links .category-link:is(:hover, :focus-visible, :active) {
     background-color: var(--dropdown-hover);
   }
 
-  .nav-panel {
+  :where(.site-nav) .nav-panel {
     position: static;
     flex: 1 0 100%;
     max-block-size: none;
@@ -259,23 +294,23 @@
     box-shadow: none;
   }
 
-  .nav-panel-content {
+  :where(.site-nav) .nav-panel-content {
     display: block;
     min-block-size: auto;
-    padding: 0 var(--gutter) 0.5rem;
+    padding: 0 var(--nav-gutter) 0.5rem;
   }
 
-  .nav-panel-title {
+  :where(.site-nav) .nav-panel-title {
     display: none;
   }
 
-  .nav-panel-links {
+  :where(.site-nav) .nav-panel-links {
     display: block;
     padding: 0;
     border: 0;
   }
 
-  .nav-panel-links a {
+  :where(.site-nav) .nav-panel-links a {
     padding-inline: 1rem;
     border: 0;
     border-radius: 0.375rem;
