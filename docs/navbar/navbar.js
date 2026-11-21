@@ -2,17 +2,25 @@ const navigation = document.querySelector(".site-nav");
 const siteRoot = new URL("../", document.currentScript.src);
 const sections = [
   ["experiments", "Experiments"],
-  ["learning", "Learning"],
+  ["learning", "Learning", [["places-game", "Place Naming Game"]]],
   ["games", "Games"],
   ["old-projects", "Old Projects"],
 ];
 
-const sectionLinks = sections.map(([slug, name]) => `
+const sectionLinks = sections.map(([slug, name, projects = []]) => `
       <li class="nav-item">
-        <a class="category-link" href="${slug}/" aria-controls="${slug}-filler">
+        <a class="category-link" href="${slug}/" aria-controls="${slug}-panel">
           <span class="category-label">${name} <span class="chevron" aria-hidden="true"></span></span>
         </a>
-        <a class="filler-link" id="${slug}-filler" href="${slug}/filler/" aria-label="Filler for ${name}" hidden>Filler</a>
+        <div class="nav-panel" id="${slug}-panel" hidden>
+          <div class="nav-panel-content">
+            <p class="nav-panel-title" aria-hidden="true">${name}</p>
+            <ul class="nav-panel-links">
+              ${projects.map(([path, title]) => `<li><a href="${slug}/${path}/">${title}</a></li>`).join("")}
+              <li><a href="${slug}/filler/" aria-label="Filler for ${name}">Filler</a></li>
+            </ul>
+          </div>
+        </div>
       </li>`).join("");
 
 navigation.insertAdjacentHTML("beforeend", `
@@ -25,7 +33,7 @@ navigation.insertAdjacentHTML("beforeend", `
     </div>`);
 
 const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
-for (const link of navigation.querySelectorAll(".category-link, .filler-link")) {
+for (const link of navigation.querySelectorAll(".category-link, .nav-panel a")) {
   const destination = new URL(link.getAttribute("href"), siteRoot);
   link.href = destination.href;
   if (destination.pathname === currentPath) link.setAttribute("aria-current", "page");
@@ -34,11 +42,10 @@ for (const link of navigation.querySelectorAll(".category-link, .filler-link")) 
 const menu = navigation.querySelector(".menu-toggle");
 const menuGroup = navigation.querySelector(".nav-menu");
 const compactLayout = window.matchMedia("(width < 35rem), (hover: none)");
-const withoutHover = window.matchMedia("(hover: none)");
 const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) => ({
   item,
   link: item.querySelector(".category-link"),
-  filler: item.querySelector(".filler-link"),
+  panel: item.querySelector(".nav-panel"),
 }));
 let menuOpenedOnHover = false;
 let openCategory = null;
@@ -47,34 +54,34 @@ function setExpanded(control, expanded) {
   control.setAttribute("aria-expanded", String(expanded));
 }
 
-function closeSubmenu() {
+function closePanel() {
   if (!openCategory) return;
 
   setExpanded(openCategory.link, false);
-  openCategory.filler.hidden = true;
+  openCategory.panel.hidden = true;
   openCategory = null;
 }
 
-function showSubmenu(category) {
+function showPanel(category) {
   if (openCategory === category) return;
 
-  closeSubmenu();
+  closePanel();
   openCategory = category;
   setExpanded(category.link, true);
-  category.filler.hidden = false;
+  category.panel.hidden = false;
 }
 
 function closeMenu() {
-  closeSubmenu();
+  closePanel();
   setExpanded(menu, false);
   menuOpenedOnHover = false;
 }
 
-function syncHoverMode() {
+function syncLayout() {
   closeMenu();
-  for (const { link, filler } of categories) {
-    filler.hidden = !withoutHover.matches;
-    if (withoutHover.matches) {
+  for (const { link, panel } of categories) {
+    panel.hidden = !compactLayout.matches;
+    if (compactLayout.matches) {
       link.removeAttribute("aria-expanded");
     } else {
       setExpanded(link, false);
@@ -93,7 +100,7 @@ menu.addEventListener("click", (event) => {
 });
 
 menu.addEventListener("pointerenter", (event) => {
-  if (event.pointerType === "touch" || withoutHover.matches || menu.getAttribute("aria-expanded") === "true") return;
+  if (event.pointerType === "touch" || menu.getAttribute("aria-expanded") === "true") return;
 
   menuOpenedOnHover = true;
   setExpanded(menu, true);
@@ -104,30 +111,30 @@ menuGroup.addEventListener("pointerleave", () => {
 });
 
 for (const category of categories) {
-  const { item, link, filler } = category;
+  const { item, link, panel } = category;
 
   link.addEventListener("pointerenter", (event) => {
-    if (event.pointerType === "touch" || withoutHover.matches || openCategory?.filler.matches(":focus")) return;
+    if (event.pointerType === "touch" || compactLayout.matches || openCategory?.panel.contains(document.activeElement)) return;
 
-    showSubmenu(category);
+    showPanel(category);
   });
 
   item.addEventListener("pointerleave", () => {
     if (openCategory === category && !item.querySelector(":focus-visible")) {
-      closeSubmenu();
+      closePanel();
     }
   });
 
   link.addEventListener("focus", () => {
-    if (!withoutHover.matches && link.matches(":focus-visible")) showSubmenu(category);
+    if (!compactLayout.matches && link.matches(":focus-visible")) showPanel(category);
   });
 
   link.addEventListener("keydown", (event) => {
-    if (event.key !== "ArrowDown" || withoutHover.matches) return;
+    if (event.key !== "ArrowDown" || compactLayout.matches) return;
 
     event.preventDefault();
-    showSubmenu(category);
-    filler.focus();
+    showPanel(category);
+    panel.querySelector("a").focus();
   });
 }
 
@@ -139,7 +146,7 @@ document.addEventListener("focusin", (event) => {
   if (!navigation.contains(event.target)) {
     closeMenu();
   } else if (openCategory && !openCategory.item.contains(event.target)) {
-    closeSubmenu();
+    closePanel();
   }
 });
 
@@ -147,8 +154,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
 
   if (openCategory) {
-    if (document.activeElement === openCategory.filler) openCategory.link.focus();
-    closeSubmenu();
+    if (openCategory.panel.contains(document.activeElement)) openCategory.link.focus();
+    closePanel();
     event.preventDefault();
   } else if (menu.getAttribute("aria-expanded") === "true") {
     closeMenu();
@@ -157,9 +164,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-compactLayout.addEventListener("change", closeMenu);
-withoutHover.addEventListener("change", syncHoverMode);
+compactLayout.addEventListener("change", syncLayout);
 
-syncHoverMode();
+syncLayout();
 menu.hidden = false;
 navigation.dataset.ready = "";
