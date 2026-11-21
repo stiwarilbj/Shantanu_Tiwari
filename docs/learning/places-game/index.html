@@ -54,10 +54,14 @@
             gap: 0.375rem;
         }
         .game-content,
-        .game-play {
+        .game-play,
+        .game-panels {
             display: flex;
             flex-direction: column;
             gap: inherit;
+        }
+        .game-panels:not(:has(> .game-panel:not([hidden]))) {
+            display: none;
         }
         .game-container .btn {
             --bs-btn-font-size: 0.875rem;
@@ -118,11 +122,51 @@
             font-weight: bold;
             color: #2ecc71;
         }
-        .rules-container, .search-container {
+        .game-panel {
             background-color: #f8f9fa;
             border-radius: 10px;
-            padding: 1rem;
-            display: none;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            line-height: 1.35;
+        }
+        .game-container .game-panel h4 {
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+        .rules-container ul {
+            columns: 2 16rem;
+            column-gap: 1.5rem;
+            margin: 0;
+            padding-inline-start: 1rem;
+        }
+        .rules-container li {
+            break-inside: avoid;
+            margin-bottom: 0.1875rem;
+        }
+        .search-container {
+            container-type: inline-size;
+        }
+        .search-container .form-label {
+            margin-bottom: 0.125rem;
+        }
+        .game-container .search-container :is(.form-control, .form-select) {
+            padding-block: 0.25rem;
+            padding-inline-start: 0.375rem;
+        }
+        .search-container .form-select {
+            padding-inline-end: 1rem;
+            background-position: right 0.3125rem center;
+            background-size: 0.625rem auto;
+        }
+        .search-actions {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.375rem;
+            margin-top: 0.375rem;
+        }
+        .game-container .search-actions .btn {
+            --bs-btn-font-size: 0.8125rem;
+            --bs-btn-padding-y: 0.25rem;
         }
         .places-list-container {
             max-height: 305px;
@@ -132,14 +176,21 @@
             padding: 0.375rem 0.5rem;
             overflow-wrap: anywhere;
         }
-         .search-results-container {
-            max-height: 300px;
+        .search-results-container {
+            flex: 1;
+            min-inline-size: 0;
+            max-block-size: clamp(3.5rem, 14vh, 7.5rem);
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 5px;
-            padding: 10px;
-            margin-top: 15px;
-            margin-bottom: 0;
+            padding: 0.3125rem 0.5rem;
+            overflow-wrap: anywhere;
+        }
+        .search-results-container > p {
+            margin: 0;
+        }
+        .search-results-container .place-item {
+            padding: 0.1875rem 0;
         }
         .place-item {
             padding: 5px;
@@ -215,6 +266,11 @@
                 background-size: 0.625rem auto;
             }
         }
+        @container (width >= 24rem) {
+            .search-container .search-detail {
+                width: 25%;
+            }
+        }
         @media (width < 28rem) {
             .game-actions .btn {
                 flex: 1 1 45%;
@@ -246,6 +302,9 @@
             .places-list-container {
                 padding-inline: 0.375rem;
             }
+            .game-panel {
+                font-size: 0.75rem;
+            }
         }
         @media (width >= 45rem) and (height <= 36rem) {
             .game-container {
@@ -268,6 +327,20 @@
             }
             .game-actions .btn {
                 --bs-btn-padding-x: 0.375rem;
+            }
+        }
+        @media (width >= 45rem) and (height > 36rem) {
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) {
+                max-width: 64rem;
+                flex-flow: row wrap;
+                align-items: flex-start;
+            }
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) > :is(.header, .game-toolbar) {
+                flex: 0 0 100%;
+            }
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) > :is(.game-panels, .game-content) {
+                flex: 1;
+                min-inline-size: 0;
             }
         }
     </style>
@@ -295,78 +368,65 @@
         </div>
 
 
-        <div id="rulesContainer" class="rules-container">
-            <h4>Game Rules:</h4>
-            <ul>
-                <li>Select a starting letter, ending letter, and/or country to limit your answers</li>
-                <li>To play "Place and Country" mode, select the "Place and Country Mode" option in the Country dropdown, this is the default mode</li>
-                <li>Choose a time limit (1-5 minutes)</li>
-                <li>Click "Start Game" to begin</li>
-                <li>In "Place Only" mode, type place names that match your selected criteria.</li>
-                <li>In "Place and Country" mode, type the place name followed by a comma and then the country name (e.g., "Paris, France") where extra spaces around the comma will be ignored, and you must enter both the place and country to get points</li>
-                <li>Each correct answer adds to your score</li>
-                <li>You can be off by 1 letter or have transposed adjacent letters in your answer (applies to both place and country in "Place and Country" mode)</li>
-                <li>Use the Search feature to find places. For "Include" and "Not Include", you can enter multiple strings separated by commas (e.g., "new, park" or "old, city").
-                    <ul>
-                        <li><strong>Include:</strong> All specified strings must be present in the place name or country.</li>
-                        <li><strong>Not Include:</strong> None of the specified strings should be present in the place name or country.</li>
-                    </ul>
-                </li>
-                <li>Optionally filter search by starting/ending letter, country, and city name length.</li>
-                <li>Use "Display Places" to see 8 random example places based on current game filters.</li>
-                <li>Pause the game if you need to take a break.</li>
-            </ul>
-        </div>
+        <div class="game-panels">
+            <div id="rulesContainer" class="game-panel rules-container" hidden>
+                <h4>Game Rules</h4>
+                <ul>
+                    <li>Pick a 1–5 minute time limit and any starting letter, ending letter, or country filters. Then select <strong>Start Game</strong>.</li>
+                    <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
+                    <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
+                    <li>Each correct answer gets one point. A name can be one letter off or have two neighboring letters swapped.</li>
+                    <li><strong>Search</strong> by first or last letter, country, or name length. Separate terms with commas. <strong>Include</strong> checks for every term in the place or country, and <strong>Don't Include</strong> skips any match.</li>
+                    <li><strong>Display Places</strong> shows eight random examples using your filters. Select <strong>Pause</strong> to take a break.</li>
+                </ul>
+            </div>
 
-        <div id="searchContainer" class="search-container">
-             <h4><i class="fas fa-search"></i> Search Places</h4>
-             <div class="row mb-3">
-                <div class="col-md-4">
-                    <label for="searchStartLetterSelect" class="form-label">Starting Letter</label>
-                    <select id="searchStartLetterSelect" class="form-select">
-                        <option value="any" selected>Any Letter</option>
-                    </select>
+            <div id="searchContainer" class="game-panel search-container" hidden>
+                <h4><i class="fas fa-search" aria-hidden="true"></i> Search Places</h4>
+                <div class="row g-1">
+                    <div class="col-4">
+                        <label for="searchStartLetterSelect" class="form-label">Starting Letter</label>
+                        <select id="searchStartLetterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label for="searchEndLetterSelect" class="form-label">Ending Letter</label>
+                        <select id="searchEndLetterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
+                        </select>
+                    </div>
+                    <div class="col-4">
+                        <label for="searchCountrySelect" class="form-label">Country</label>
+                        <select id="searchCountrySelect" class="form-select">
+                            <option value="any" selected>Any</option>
+                        </select>
+                    </div>
+                    <div class="col-6 search-detail">
+                        <label for="searchIncludeInput" class="form-label">Include</label>
+                        <input type="text" id="searchIncludeInput" class="form-control" placeholder="e.g., new, park">
+                    </div>
+                    <div class="col-6 search-detail">
+                        <label for="searchExcludeInput" class="form-label">Don't Include</label>
+                        <input type="text" id="searchExcludeInput" class="form-control" placeholder="e.g., old, city">
+                    </div>
+                    <div class="col-6 search-detail">
+                        <label for="searchMinLengthInput" class="form-label">Min. characters</label>
+                        <input type="number" id="searchMinLengthInput" class="form-control" placeholder="e.g., 2" min="1" step="1">
+                    </div>
+                    <div class="col-6 search-detail">
+                        <label for="searchMaxLengthInput" class="form-label">Max. characters</label>
+                        <input type="number" id="searchMaxLengthInput" class="form-control" placeholder="e.g., 10" min="1" step="1">
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label for="searchEndLetterSelect" class="form-label">Ending Letter</label>
-                    <select id="searchEndLetterSelect" class="form-select">
-                        <option value="any" selected>Any Letter</option>
-                    </select>
+                <div class="search-actions">
+                    <button id="searchBtn" class="btn btn-secondary">
+                        <i class="fas fa-search" aria-hidden="true"></i> Search
+                    </button>
+                    <div id="searchResults" class="search-results-container" role="region" aria-label="Search results" tabindex="0">
+                        <p class="text-muted">Search results will appear here</p>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <label for="searchCountrySelect" class="form-label">Country</label>
-                    <select id="searchCountrySelect" class="form-select">
-                        <option value="any" selected>Any Country</option>
-                    </select>
-                </div>
-            </div>
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="searchIncludeInput" class="form-label">Include</label>
-                    <input type="text" id="searchIncludeInput" class="form-control" placeholder="e.g., new, park">
-                </div>
-                <div class="col-md-6">
-                    <label for="searchExcludeInput" class="form-label">Don't Include</label>
-                    <input type="text" id="searchExcludeInput" class="form-control" placeholder="e.g., old, city">
-                </div>
-            </div>
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="searchMinLengthInput" class="form-label">Minimum Characters</label>
-                    <input type="number" id="searchMinLengthInput" class="form-control" placeholder="e.g., 2" min="1" step="1">
-                </div>
-                <div class="col-md-6">
-                    <label for="searchMaxLengthInput" class="form-label">Maximum Characters</label>
-                    <input type="number" id="searchMaxLengthInput" class="form-control" placeholder="e.g., 10" min="1" step="1">
-                </div>
-            </div>
-            <div class="text-center mb-3">
-                 <button id="searchBtn" class="btn btn-secondary">
-                    <i class="fas fa-search"></i> Search
-                </button>
-            </div>
-            <div id="searchResults" class="search-results-container">
-                <p class="text-muted">Search results will appear here</p>
             </div>
         </div>
 
@@ -581,7 +641,7 @@
             const searchCountryOptionsFragment = document.createDocumentFragment();
             const anyCountryOptionForSearch = document.createElement('option');
             anyCountryOptionForSearch.value = "any";
-            anyCountryOptionForSearch.textContent = "Any Country";
+            anyCountryOptionForSearch.textContent = "Any";
             anyCountryOptionForSearch.selected = true;
             searchCountryOptionsFragment.appendChild(anyCountryOptionForSearch);
 
@@ -669,7 +729,7 @@
         }
 
         function setPanelVisibility(button, panel, isVisible) {
-            panel.style.display = isVisible ? 'block' : 'none';
+            panel.hidden = !isVisible;
             button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
         }
 
@@ -1104,8 +1164,8 @@
                     guessedPlaces: guessedPlaces,
                     gameActive: gameActive,
                     wasGameActiveBeforeHidden: wasGameActiveBeforeHidden,
-                    isRulesVisible: rulesContainer.style.display === 'block',
-                    isSearchVisible: searchContainer.style.display === 'block'
+                    isRulesVisible: !rulesContainer.hidden,
+                    isSearchVisible: !searchContainer.hidden
                 };
                 chrome.storage.local.set({ gameState: gameState });
             }
