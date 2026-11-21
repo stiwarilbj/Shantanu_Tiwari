@@ -13,9 +13,17 @@
     var(--section-gradient);
 }
 
+.section-content {
+  inline-size: min(100%, 68rem);
+  padding-block: clamp(3.5rem, calc(1.75rem + 5.5vw), 6.5rem) clamp(4.5rem, 10vw, 7rem);
+  padding-inline: clamp(1.5rem, 4vw, 3.25rem);
+  text-align: center;
+}
+
 .section-experiments {
   --section-image: url("experiments-background.webp?v=2");
   --section-focus: 47% 58%;
+  --section-narrow-focus: 42% 58%;
   --section-light: linear-gradient(145deg, rgb(230 249 255 / 22%), transparent 55%);
   --section-gradient: linear-gradient(145deg, #d8f2ff, #b4ddf9 54%, #87b9ee);
 }
@@ -23,6 +31,7 @@
 .section-learning {
   --section-image: url("learning-background.webp?v=2");
   --section-focus: 69% 65%;
+  --section-narrow-focus: 74% 65%;
   --section-light: radial-gradient(ellipse at 22% 15%, rgb(227 255 250 / 24%), transparent 55%);
   --section-gradient: linear-gradient(150deg, #d8f2ff, #b8e7f3 48%, #bdecd8);
 }
@@ -30,6 +39,7 @@
 .section-games {
   --section-image: url("games-background.webp?v=2");
   --section-focus: 25% 60%;
+  --section-narrow-focus: 16% 60%;
   --section-light: radial-gradient(ellipse at 12% 8%, rgb(247 230 255 / 19%), transparent 62%);
   --section-gradient: linear-gradient(135deg, #e4d5fb, #cddafb 56%, #b7d9f8);
 }
@@ -37,13 +47,23 @@
 .section-old-projects {
   --section-image: url("old-projects-background.webp?v=2");
   --section-focus: 48% 60%;
+  --section-narrow-focus: 54% 60%;
   --section-light: radial-gradient(ellipse at 92% 2%, rgb(255 230 220 / 25%), transparent 58%);
   --section-gradient: linear-gradient(140deg, #e7edf9, #f3dce8 52%, #efb6b8);
 }
 
 .section-learning .learning-project {
+  inline-size: min(92%, 27.5rem);
+  margin-block-start: clamp(2.875rem, 5vw, 4.5rem);
   border-color: rgb(242 255 253 / 82%);
   background: linear-gradient(145deg, rgb(249 255 255 / 88%), rgb(215 248 244 / 74%));
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
+  text-align: start;
+}
+
+@media (max-aspect-ratio: 4/5) {
+  .section-scene {
+    background-position: center, var(--section-narrow-focus), center;
+  }
 }
