@@ -8,4 +8,4 @@
 
 - Add `<header data-site-navbar></header>` at the top of every new page. Load the shared `docs/navbar/navbar.css` and `docs/navbar/navbar.js` using paths relative to the page and copy their current version parameters from an existing page.
 - Add each new project or section page to the appropriate section in `docs/navbar/navbar.js` so it appears in the desktop panels and phone menu.
-- Keep the navbar markup, sizing, and behavior in `docs/navbar`. The shared navbar stays visible on scroll and reserves space for expanded panels. Check the links and layout with mouse, keyboard, and touch, and fix any overlap or blocked controls.
+- Keep the navbar markup, sizing, and behavior in `docs/navbar`. The shared navbar stays visible on scroll. Desktop hover panels sit under the section buttons, and the phone menu reserves space when expanded. Check the links and layout with mouse, keyboard, and touch, and fix any overlap or blocked controls.

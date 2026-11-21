@@ -40,7 +40,6 @@
   z-index: 2;
   flex-shrink: 0;
   min-block-size: var(--nav-height);
-  margin-block-end: var(--nav-panel-height, 0px);
   background:
     radial-gradient(ellipse at 54% -30%, rgb(245 249 255 / 58%), transparent 70%),
     linear-gradient(112deg, #bde4ff, #cfe2ff 48%, #e1d4ff);
@@ -202,6 +201,10 @@
     position: relative;
   }
 
+  :where(.site-nav) .nav-panel {
+    border-end-start-radius: 1rem;
+  }
+
   :where(.site-nav) .nav-links:hover:has(.category-link[aria-expanded="true"]) {
     --nav-hover-inset: clamp(0.25rem, 0.9vw, 0.75rem);
   }
@@ -219,6 +222,10 @@
 }
 
 @media (width < 35rem), (hover: none) {
+  [data-site-navbar] {
+    margin-block-end: var(--nav-panel-height, 0px);
+  }
+
   .site-nav {
     flex-wrap: wrap;
     gap: 0 0.5rem;

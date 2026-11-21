@@ -177,11 +177,7 @@ menu.hidden = false;
 navigation.dataset.ready = "";
 
 const reservePanelSpace = new ResizeObserver(() => {
-  const visiblePanel = compactLayout.matches ? compactPanel : openCategory?.panel;
-  const height = visiblePanel?.getBoundingClientRect().height ?? 0;
+  const height = compactPanel.getBoundingClientRect().height;
   navbarContainer.style.setProperty("--nav-panel-height", `${height}px`);
 });
 reservePanelSpace.observe(compactPanel, { box: "border-box" });
-for (const { panel } of categories) {
-  reservePanelSpace.observe(panel, { box: "border-box" });
-}
