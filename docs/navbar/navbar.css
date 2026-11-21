@@ -107,14 +107,14 @@
 }
 
 :where(.site-nav) .category-label {
-  position: relative;
   display: flex;
   align-items: center;
+  gap: clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem);
 }
 
 :where(.site-nav) .category-label .chevron {
-  position: absolute;
-  inset-inline-start: calc(100% + clamp(0.25rem, calc(1.4vw - 0.15rem), 0.75rem));
+  /* Reserve space for the rotated chevron past its layout box. */
+  margin-inline-end: 0.12em;
 }
 
 :where(.site-nav) .menu-toggle {
