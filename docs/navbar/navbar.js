@@ -4,17 +4,20 @@ navbarContainer.style.minBlockSize = "var(--nav-height)";
 
 const navbarUrl = new URL(import.meta.url);
 const siteRoot = new URL("../", navbarUrl);
-const stylesheetUrl = new URL("navbar.css", navbarUrl);
-stylesheetUrl.search = navbarUrl.search;
 
-const stylesheet = document.createElement("link");
-stylesheet.rel = "stylesheet";
-stylesheet.href = stylesheetUrl.href;
-await new Promise((resolve) => {
-  stylesheet.addEventListener("load", resolve, { once: true });
-  stylesheet.addEventListener("error", resolve, { once: true });
-  document.head.append(stylesheet);
-});
+await Promise.all(["navbar.css", "dropdown.css"].map((filename) => {
+  const stylesheetUrl = new URL(filename, navbarUrl);
+  stylesheetUrl.search = navbarUrl.search;
+
+  const stylesheet = document.createElement("link");
+  stylesheet.rel = "stylesheet";
+  stylesheet.href = stylesheetUrl.href;
+  return new Promise((resolve) => {
+    stylesheet.addEventListener("load", resolve, { once: true });
+    stylesheet.addEventListener("error", resolve, { once: true });
+    document.head.append(stylesheet);
+  });
+}));
 
 const sections = [
   ["experiments", "Experiments"],
