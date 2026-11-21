@@ -46,12 +46,14 @@ const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) =
 }));
 let menuOpenedOnHover = false;
 let openCategory = null;
+let panelCloseTimer;
 
 function setExpanded(control, expanded) {
   control.setAttribute("aria-expanded", String(expanded));
 }
 
 function closePanel() {
+  clearTimeout(panelCloseTimer);
   if (!openCategory) return;
 
   setExpanded(openCategory.link, false);
@@ -103,9 +105,15 @@ menu.addEventListener("pointerenter", (event) => {
   setExpanded(menu, true);
 });
 
+menuGroup.addEventListener("pointerenter", () => clearTimeout(panelCloseTimer));
+
 menuGroup.addEventListener("pointerleave", () => {
   if (menuOpenedOnHover && !menuGroup.contains(document.activeElement)) closeMenu();
-  if (openCategory && !openCategory.item.querySelector(":focus-visible")) closePanel();
+  if (openCategory && !openCategory.item.querySelector(":focus-visible")) {
+    panelCloseTimer = setTimeout(() => {
+      if (!openCategory?.item.querySelector(":focus-visible")) closePanel();
+    }, 150);
+  }
 });
 
 for (const category of categories) {
