@@ -6,8 +6,10 @@
   <meta name="description" content="A place for experiments, games, things to learn, and projects from the archive">
   <title>Project Lab</title>
   <link rel="stylesheet" href="./assets/site.css?v=3">
+  <link rel="stylesheet" href="./assets/project-previews.css">
   <link rel="icon" href="assets/favicon.ico" sizes="16x16 32x32 48x48 64x64">
   <script type="module" src="./navbar/navbar.js?v=28" blocking="render"></script>
+  <script type="module" src="./assets/project-previews.js"></script>
 </head>
 <body>
   <header data-site-navbar></header>
@@ -20,10 +22,14 @@
       <section class="showcase content" aria-labelledby="showcase-title">
         <h2 id="showcase-title">Project Showcase</h2>
         <div class="project-tiles">
-          <a class="tile project-tile" href="projects/project-1/">
-            <span class="tile-title">Project 1</span>
-            <span class="tile-arrow" aria-hidden="true">→</span>
-          </a>
+          <article class="tile project-tile project-preview" data-project-preview="places-game">
+            <a class="project-preview-link" href="learning/places-game/">
+              <span class="project-preview-heading">
+                <span class="tile-title">Place Naming Game</span>
+                <span class="tile-arrow" aria-hidden="true">→</span>
+              </span>
+            </a>
+          </article>
           <a class="tile project-tile" href="projects/project-2/">
             <span class="tile-title">Project 2</span>
             <span class="tile-arrow" aria-hidden="true">→</span>

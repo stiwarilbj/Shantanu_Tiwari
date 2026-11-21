@@ -55,11 +55,6 @@
 .section-learning .learning-project {
   inline-size: min(92%, 27.5rem);
   margin-block-start: clamp(4.625rem, calc(1.875rem + 5vw), 6.5rem);
-  border-color: rgb(242 255 253 / 82%);
-  background: linear-gradient(145deg, rgb(249 255 255 / 88%), rgb(215 248 244 / 74%));
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  text-align: start;
 }
 
 @media (max-aspect-ratio: 4/5) {
