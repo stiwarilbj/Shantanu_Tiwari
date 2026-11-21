@@ -1,5 +1,21 @@
 const navbarContainer = document.querySelector("[data-site-navbar]");
-const siteRoot = new URL("../", document.currentScript.src);
+navbarContainer.style.setProperty("--nav-height", "clamp(2.75rem, calc(2rem + 2vw), 3.5rem)");
+navbarContainer.style.minBlockSize = "var(--nav-height)";
+
+const navbarUrl = new URL(import.meta.url);
+const siteRoot = new URL("../", navbarUrl);
+const stylesheetUrl = new URL("navbar.css", navbarUrl);
+stylesheetUrl.search = navbarUrl.search;
+
+const stylesheet = document.createElement("link");
+stylesheet.rel = "stylesheet";
+stylesheet.href = stylesheetUrl.href;
+await new Promise((resolve) => {
+  stylesheet.addEventListener("load", resolve, { once: true });
+  stylesheet.addEventListener("error", resolve, { once: true });
+  document.head.append(stylesheet);
+});
+
 const sections = [
   ["experiments", "Experiments"],
   ["learning", "Learning", [["places-game", "Place Naming Game"]]],
