@@ -197,6 +197,23 @@
   text-decoration-thickness: 1px;
 }
 
+@media (width >= 35rem) and (hover: hover) {
+  :where(.site-nav) .nav-links:hover:has(.category-link[aria-expanded="true"]) {
+    --nav-hover-inset: clamp(0.25rem, 0.9vw, 0.75rem);
+  }
+
+  /* Trade padding for margin so the gaps don't move the labels. */
+  :where(.site-nav .nav-item + .nav-item) .category-link {
+    margin-inline-start: var(--nav-hover-inset, 0px);
+    padding-inline-start: calc(var(--nav-link-padding) - var(--nav-hover-inset, 0px));
+  }
+
+  :where(.site-nav .nav-item:not(:last-child)) .category-link {
+    margin-inline-end: var(--nav-hover-inset, 0px);
+    padding-inline-end: calc(var(--nav-link-padding) - var(--nav-hover-inset, 0px));
+  }
+}
+
 @media (width < 35rem), (hover: none) {
   .site-nav {
     flex-wrap: wrap;

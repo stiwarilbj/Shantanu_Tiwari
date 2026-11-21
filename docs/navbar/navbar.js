@@ -105,21 +105,17 @@ menu.addEventListener("pointerenter", (event) => {
 
 menuGroup.addEventListener("pointerleave", () => {
   if (menuOpenedOnHover && !menuGroup.contains(document.activeElement)) closeMenu();
+  if (openCategory && !openCategory.item.querySelector(":focus-visible")) closePanel();
 });
 
 for (const category of categories) {
-  const { item, link, panel } = category;
+  const { link, panel } = category;
 
-  link.addEventListener("pointerenter", (event) => {
+  // A gap disappearing under a stationary pointer shouldn't reopen a panel.
+  link.addEventListener("pointermove", (event) => {
     if (event.pointerType === "touch" || compactLayout.matches || openCategory?.panel.contains(document.activeElement)) return;
 
     showPanel(category);
-  });
-
-  item.addEventListener("pointerleave", () => {
-    if (openCategory === category && !item.querySelector(":focus-visible")) {
-      closePanel();
-    }
   });
 
   link.addEventListener("focus", () => {
