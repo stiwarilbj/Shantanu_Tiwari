@@ -73,7 +73,7 @@ a[href], button:enabled {
 }
 
 .hero {
-  padding-block: clamp(3rem, 6.75vw, 6.5rem) clamp(3rem, calc(5.75vw + 0.5rem), 6rem);
+  padding-block: clamp(3rem, 6.75vw, 6.5rem) clamp(4rem, calc(5.75vw + 1.5rem), 7rem);
   text-align: center;
 }
 
