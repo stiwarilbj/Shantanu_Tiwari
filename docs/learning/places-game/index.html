@@ -139,6 +139,19 @@
         #rulesBtn, #showSearchBtn, #searchBtn, #startBtn, #pauseBtn, #resetBtn, #displayBtn, #enterBtn {
             cursor: grab;
         }
+        .panel-toggle {
+            white-space: nowrap;
+        }
+        .panel-toggle-label {
+            display: inline-grid;
+        }
+        .panel-toggle-label > span {
+            grid-area: 1 / 1;
+        }
+        .panel-toggle[aria-expanded="true"] .panel-toggle-label > :first-child,
+        .panel-toggle[aria-expanded="false"] .panel-toggle-label > :last-child {
+            visibility: hidden;
+        }
         .form-select {
             cursor: pointer;
         }
@@ -154,11 +167,15 @@
         </div>
 
         <div class="d-flex flex-wrap justify-content-center mb-3">
-             <button id="rulesBtn" class="btn btn-info me-2 mb-2">
-                <i class="fas fa-book"></i> Show Rules
+            <button id="rulesBtn" type="button" class="btn btn-info panel-toggle me-2 mb-2"
+                    aria-controls="rulesContainer" aria-expanded="false">
+                <i class="fas fa-book" aria-hidden="true"></i>
+                <span class="panel-toggle-label"><span>Show Rules</span><span>Hide Rules</span></span>
             </button>
-             <button id="showSearchBtn" class="btn btn-info mb-2">
-                <i class="fas fa-search"></i> Show Search
+            <button id="showSearchBtn" type="button" class="btn btn-info panel-toggle mb-2"
+                    aria-controls="searchContainer" aria-expanded="false">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <span class="panel-toggle-label"><span>Show Search</span><span>Hide Search</span></span>
             </button>
         </div>
 
@@ -534,17 +551,18 @@
             saveSettings();
         }
 
+        function setPanelVisibility(button, panel, isVisible) {
+            panel.style.display = isVisible ? 'block' : 'none';
+            button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+        }
+
         rulesBtn.addEventListener('click', function() {
-            const isVisible = rulesContainer.style.display === 'block';
-            rulesContainer.style.display = isVisible ? 'none' : 'block';
-            rulesBtn.innerHTML = isVisible ? '<i class="fas fa-book"></i> Show Rules' : '<i class="fas fa-book"></i> Hide Rules';
+            setPanelVisibility(rulesBtn, rulesContainer, rulesBtn.getAttribute('aria-expanded') === 'false');
             saveGameState();
         });
 
-         showSearchBtn.addEventListener('click', function() {
-            const isVisible = searchContainer.style.display === 'block';
-            searchContainer.style.display = isVisible ? 'none' : 'block';
-            showSearchBtn.innerHTML = isVisible ? '<i class="fas fa-search"></i> Show Search' : '<i class="fas fa-search"></i> Hide Search';
+        showSearchBtn.addEventListener('click', function() {
+            setPanelVisibility(showSearchBtn, searchContainer, showSearchBtn.getAttribute('aria-expanded') === 'false');
             saveGameState();
         });
 
@@ -655,10 +673,8 @@
                     searchMaxLengthInput.value = '';
                     searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
                     examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
-                    rulesContainer.style.display = 'none';
-                    rulesBtn.innerHTML = '<i class="fas fa-book"></i> Show Rules';
-                    searchContainer.style.display = 'none';
-                    showSearchBtn.innerHTML = '<i class="fas fa-search"></i> Show Search';
+                    setPanelVisibility(rulesBtn, rulesContainer, false);
+                    setPanelVisibility(showSearchBtn, searchContainer, false);
                 });
             } else {
                 letterSelect.value = 'any';
@@ -677,10 +693,8 @@
                 searchMaxLengthInput.value = '';
                 searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
                 examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
-                rulesContainer.style.display = 'none';
-                rulesBtn.innerHTML = '<i class="fas fa-book"></i> Show Rules';
-                searchContainer.style.display = 'none';
-                showSearchBtn.innerHTML = '<i class="fas fa-search"></i> Show Search';
+                setPanelVisibility(rulesBtn, rulesContainer, false);
+                setPanelVisibility(showSearchBtn, searchContainer, false);
             }
         });
 
@@ -1051,10 +1065,8 @@
                         gameActive = savedState.gameActive || false;
                         wasGameActiveBeforeHidden = savedState.wasGameActiveBeforeHidden || false;
 
-                        rulesContainer.style.display = savedState.isRulesVisible ? 'block' : 'none';
-                        rulesBtn.innerHTML = savedState.isRulesVisible ? '<i class="fas fa-book"></i> Hide Rules' : '<i class="fas fa-book"></i> Show Rules';
-                        searchContainer.style.display = savedState.isSearchVisible ? 'block' : 'none';
-                        showSearchBtn.innerHTML = savedState.isSearchVisible ? '<i class="fas fa-search"></i> Hide Search' : '<i class="fas fa-search"></i> Show Search';
+                        setPanelVisibility(rulesBtn, rulesContainer, savedState.isRulesVisible);
+                        setPanelVisibility(showSearchBtn, searchContainer, savedState.isSearchVisible);
 
                         updateTimerDisplay();
                         updateScoreDisplay();
