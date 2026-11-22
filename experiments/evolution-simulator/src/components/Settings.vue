@@ -118,153 +118,155 @@ onMounted(()=>dialog.value.showModal())
 </script>
 <template>
   <dialog ref="dialog" class="settings-sheet" aria-labelledby="settings-title" @cancel.prevent="lab.closeSettings()">
-    <button class="icon settings-close" aria-label="Close settings" @click="lab.closeSettings()"><CircleX :size="26"/></button>
     <form class="settings-form" novalidate @submit.prevent="apply">
       <header class="settings-intro">
+        <button type="button" class="icon settings-close" aria-label="Close settings" @click="lab.closeSettings()"><CircleX :size="26"/></button>
         <h1 id="settings-title">{{ fork==null ? 'Simulation Settings' : 'Branch Settings' }}</h1>
         <p v-if="fork==null">Choose the starting traits, then watch what survives.</p>
         <p v-else>Keep Days 1–{{ fork }}. Apply these rules from Day {{ fork+1 }}.</p>
       </header>
-      <section class="setting-section">
-        <h2>Blob Creatures</h2>
-        <div class="species-tabs" aria-label="Edit species">
-          <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
-            :aria-pressed="selected.id===s.id" :style="{'--species':s.color}" @click="tab=s.id">
-            <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
-          </button>
-          <button v-if="fork==null" class="secondary" type="button" @click="add()"><Plus :size="15"/> Add species</button>
-        </div>
-        <div v-if="fork==null" class="species-editor">
-          <label>Name <input :id="selected.id+'.name'" v-model="selected.name" maxlength="30"></label>
-          <label>Color <input :id="selected.id+'.color'" v-model="selected.color" type="color"></label>
-          <label><input v-model="selected.enabled" type="checkbox"> Enabled</label>
-          <details class="species-actions"><summary>Species actions</summary>
-            <button type="button" @click="add(true)">Duplicate</button><button type="button" @click="reorder(-1)">Move left</button>
-            <button type="button" @click="reorder(1)">Move right</button><button type="button" :disabled="draft.species.length<2" @click="remove">Remove</button>
-          </details>
-        </div>
-        <div v-if="savedSpecies" class="center quiet">Species removed from draft. <button type="button" class="link" @click="undo">Undo</button></div>
-        <div v-if="fork==null" class="species-traits">
-          <div class="species-trait-fields">
-            <NumberField :id="selected.id+'.count'" v-model="selected.count" label="Founders" :min="10" :max="1000" compact :error="issue[selected.id+'.count']"/>
-            <NumberField v-for="key in TRAITS" :id="selected.id+'.'+key" :key="key" v-model="selected[key]" :label="labels[key]"
-              :min="1" :max="100" :tint="swatches[key]" compact :error="issue[selected.id+'.'+key]"/>
+      <div class="settings-fields">
+        <section class="setting-section">
+          <h2>Blob Creatures</h2>
+          <div class="species-tabs" aria-label="Edit species">
+            <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
+              :aria-pressed="selected.id===s.id" :style="{'--species':s.color}" @click="tab=s.id">
+              <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
+            </button>
+            <button v-if="fork==null" class="secondary" type="button" @click="add()"><Plus :size="15"/> Add species</button>
           </div>
-          <small class="quiet traits-readout">{{ travel(selected,draft).toFixed(0) }} units/s · {{ Number.isFinite(endurance) ? endurance.toFixed(1) : '—' }} s of movement on starting energy</small>
-        </div>
-      </section>
-      <section class="setting-section">
-        <h2>When they reproduce</h2>
-        <p class="quiet mutation-note">
-          Newborn traits vary around the parent. {{ standardDeviation ? 'Spread uses standard deviation (σ).' : 'Spread uses variance (σ²); inherited traits stay at least 1.' }}
-        </p>
-        <div class="form-stack mutation-stack">
-            <div v-for="key in TRAITS" :key="key" class="variance-row">
-              <NumberField :id="selected.id+'.'+spreadKey+'.'+key" v-model="selected[spreadKey][key]"
-                :label="(standardDeviation ? 'σ ' : 'σ² ') + labels[key]"
-                :min="standardDeviation ? 0 : .01" :max="10" :step=".01" :pace="1" :tint="swatches[key]"
-                :disabled="!selected.mutation[key]" :error="issue[selected.id+'.'+spreadKey+'.'+key]" compact/>
-              <div class="variance-meta mutation-meta">
-                <template v-if="Number.isFinite(selected[spreadKey][key])">
-                  <small>{{ standardDeviation ? 'σ = '+selected[spreadKey][key] : 'σ = '+Math.sqrt(selected[spreadKey][key]).toFixed(2) }}</small>
-                  <small>Variance (σ²) = {{ standardDeviation ? Number((selected[spreadKey][key] ** 2).toFixed(3)) : selected[spreadKey][key] }}</small>
-                </template>
-                <label><input type="checkbox" v-model="selected.mutation[key]" :aria-label="'Allow '+key+' mutation'"> Mutate</label>
-              </div>
+          <div v-if="fork==null" class="species-editor">
+            <label>Name <input :id="selected.id+'.name'" v-model="selected.name" maxlength="30"></label>
+            <label>Color <input :id="selected.id+'.color'" v-model="selected.color" type="color"></label>
+            <label><input v-model="selected.enabled" type="checkbox"> Enabled</label>
+            <details class="species-actions"><summary>Species actions</summary>
+              <button type="button" @click="add(true)">Duplicate</button><button type="button" @click="reorder(-1)">Move left</button>
+              <button type="button" @click="reorder(1)">Move right</button><button type="button" :disabled="draft.species.length<2" @click="remove">Remove</button>
+            </details>
+          </div>
+          <div v-if="savedSpecies" class="center quiet">Species removed from draft. <button type="button" class="link" @click="undo">Undo</button></div>
+          <div v-if="fork==null" class="species-traits">
+            <div class="species-trait-fields">
+              <NumberField :id="selected.id+'.count'" v-model="selected.count" label="Founders" :min="10" :max="1000" compact :error="issue[selected.id+'.count']"/>
+              <NumberField v-for="key in TRAITS" :id="selected.id+'.'+key" :key="key" v-model="selected[key]" :label="labels[key]"
+                :min="1" :max="100" :tint="swatches[key]" compact :error="issue[selected.id+'.'+key]"/>
             </div>
-        </div>
-      </section>
-      <section class="setting-section">
-        <h2>Each generation</h2>
-        <div class="daily-cards">
-          <div class="daily-card energy-card">
-            <NumberField :id="selected.id+'.energy'" v-model="selected.energy" label="Energy" :min="10" :max="1000" :pace="100" tint="#8F8048" compact :disabled="fork!=null" :error="issue[selected.id+'.energy']"/>
-            <button class="link gold" type="button" :aria-expanded="rewards" @click="rewards=!rewards">Refill rewards {{ rewards ? '▴' : '▾' }}</button>
+            <small class="quiet traits-readout">{{ travel(selected,draft).toFixed(0) }} units/s · {{ Number.isFinite(endurance) ? endurance.toFixed(1) : '—' }} s of movement on starting energy</small>
           </div>
-          <div class="daily-card food-card">
-            <NumberField id="food" v-model="draft.food" label="Food" :min="10" :max="1000" tint="#6C7C3A" compact :error="issue.food"/>
-            <label class="olive-label">Food schedule <select v-model="draft.scheduleMode" @change="delete issue.schedule"><option value="constant">Constant</option><option value="ramp">Ramp</option><option value="step">Step</option></select></label>
+        </section>
+        <section class="setting-section">
+          <h2>When they reproduce</h2>
+          <p class="quiet mutation-note">
+            Newborn traits vary around the parent. {{ standardDeviation ? 'Spread uses standard deviation (σ).' : 'Spread uses variance (σ²); inherited traits stay at least 1.' }}
+          </p>
+          <div class="form-stack mutation-stack">
+              <div v-for="key in TRAITS" :key="key" class="variance-row">
+                <NumberField :id="selected.id+'.'+spreadKey+'.'+key" v-model="selected[spreadKey][key]"
+                  :label="(standardDeviation ? 'σ ' : 'σ² ') + labels[key]"
+                  :min="standardDeviation ? 0 : .01" :max="10" :step=".01" :pace="1" :tint="swatches[key]"
+                  :disabled="!selected.mutation[key]" :error="issue[selected.id+'.'+spreadKey+'.'+key]" compact/>
+                <div class="variance-meta mutation-meta">
+                  <template v-if="Number.isFinite(selected[spreadKey][key])">
+                    <small>{{ standardDeviation ? 'σ = '+selected[spreadKey][key] : 'σ = '+Math.sqrt(selected[spreadKey][key]).toFixed(2) }}</small>
+                    <small>Variance (σ²) = {{ standardDeviation ? Number((selected[spreadKey][key] ** 2).toFixed(3)) : selected[spreadKey][key] }}</small>
+                  </template>
+                  <label><input type="checkbox" v-model="selected.mutation[key]" :aria-label="'Allow '+key+' mutation'"> Mutate</label>
+                </div>
+              </div>
           </div>
-        </div>
-        <p class="quiet center reset-note">Food and energy reset at dawn.</p>
-        <p v-if="draft.scheduleMode==='constant' && draft.schedule.length" class="quiet center reset-note">Constant runs use the daily food count. If the schedule has invalid points, starting the run clears the schedule.</p>
-        <div v-if="rewards" class="setting-inset">
-          <NumberField id="plantReward" v-model="draft.plantReward" label="Plant reward" :min="0" :max="1000" :pace="100" tint="#6C7C3A" :error="issue.plantReward"/>
-          <NumberField id="preyReward" v-model="draft.preyReward" label="Prey reward" :min="0" :max="1000" :pace="100" tint="#8F8048" :error="issue.preyReward"/>
-          <p class="quiet">Each plant or prey gives one food credit. A refill of 0 leaves energy unchanged. Higher values restore energy up to the blob’s starting amount.</p>
-          <button type="button" class="secondary" @click="draft.preyReward=draft.plantReward">Equal rewards</button>
-        </div>
-        <div v-if="draft.scheduleMode!=='constant'" class="setting-inset">
-          <strong>Food schedule</strong><p class="quiet">Day 1 follows Starting plants · {{ draft.food }}</p>
-          <div class="schedule-row" v-for="(point,i) in draft.schedule" :key="i">
-            <label>Day <input v-model.number="point.day" type="number" min="2" :max="draft.days"></label>
-            <label>Plants <input v-model.number="point.food" type="number" min="10" max="1000"></label>
-            <button type="button" class="icon" aria-label="Remove schedule point" @click="draft.schedule.splice(i,1)"><Trash2 :size="17"/></button>
+        </section>
+        <section class="setting-section">
+          <h2>Each generation</h2>
+          <div class="daily-cards">
+            <div class="daily-card energy-card">
+              <NumberField :id="selected.id+'.energy'" v-model="selected.energy" label="Energy" :min="10" :max="1000" :pace="100" tint="#8F8048" compact :disabled="fork!=null" :error="issue[selected.id+'.energy']"/>
+              <button class="link gold" type="button" :aria-expanded="rewards" @click="rewards=!rewards">Refill rewards {{ rewards ? '▴' : '▾' }}</button>
+            </div>
+            <div class="daily-card food-card">
+              <NumberField id="food" v-model="draft.food" label="Food" :min="10" :max="1000" tint="#6C7C3A" compact :error="issue.food"/>
+              <label class="olive-label">Food schedule <select v-model="draft.scheduleMode" @change="delete issue.schedule"><option value="constant">Constant</option><option value="ramp">Ramp</option><option value="step">Step</option></select></label>
+            </div>
           </div>
-          <p v-if="issue.schedule" class="issue">{{ issue.schedule }}</p>
-          <button type="button" class="secondary" @click="addAnchor">Add point</button>
-          <button v-if="draft.schedule.length" type="button" class="link" @click="draft.schedule=[]">Clear</button>
-        </div>
-      </section>
-      <section class="setting-section">
-        <h2>Finally</h2>
-        <div class="setting-inset final-fields">
-          <label class="run-name">Run name <input id="name" v-model="draft.name" maxlength="60"></label>
-          <NumberField id="days" v-model="draft.days" label="Days to run" :min="10" :max="1000" :error="issue.days"/>
-          <template v-if="!endsWhenSettled(draft)">
-            <NumberField id="duration" v-model="seconds" label="Seconds per day" :min="1" :max="60" :step=".1" :error="issue.duration"/>
-          </template>
-          <NumberField id="seed" v-model="draft.seed" label="Random seed" :min="1" :max="MAX_SEED" :disabled="fork!=null" :error="issue.seed"/>
-          <template v-if="!endsWhenSettled(draft)">
-            <div class="quick-picks"><button v-for="n in [1,5,10,20,30,60]" :key="n" type="button" class="secondary" :aria-pressed="seconds===n" @click="seconds=n">{{ n }} s</button></div>
-            <small class="quiet">Up to {{ ((draft.days*seconds)/60).toFixed(1) }} min of playback at 1×</small>
-          </template>
-          <div class="seed-actions">
-            <button v-if="fork==null" type="button" class="secondary" @click="draft.seed=randomSeed(draft.seed)"><Dices :size="16"/> Roll seed</button>
-            <button type="button" class="secondary" @click="copySeed"><component :is="copied ? Check : Copy" :size="16"/>{{ copied ? 'Copied' : 'Copy seed' }}</button>
+          <p class="quiet center reset-note">Food and energy reset at dawn.</p>
+          <p v-if="draft.scheduleMode==='constant' && draft.schedule.length" class="quiet center reset-note">Constant runs use the daily food count. If the schedule has invalid points, starting the run clears the schedule.</p>
+          <div v-if="rewards" class="setting-inset">
+            <NumberField id="plantReward" v-model="draft.plantReward" label="Plant reward" :min="0" :max="1000" :pace="100" tint="#6C7C3A" :error="issue.plantReward"/>
+            <NumberField id="preyReward" v-model="draft.preyReward" label="Prey reward" :min="0" :max="1000" :pace="100" tint="#8F8048" :error="issue.preyReward"/>
+            <p class="quiet">Each plant or prey gives one food credit. A refill of 0 leaves energy unchanged. Higher values restore energy up to the blob’s starting amount.</p>
+            <button type="button" class="secondary" @click="draft.preyReward=draft.plantReward">Equal rewards</button>
           </div>
-        </div>
-        <small v-if="endsWhenSettled(draft)" class="quiet run-days-note">Days end when creatures settle.</small>
-        <div class="start-modes" aria-label="Playback mode">
-          <button v-for="[mode,name,body] in [['prepare','Prepare and watch','Build the archive in the background.'],['live','Watch live','Run each tick as you watch.']]" :key="mode" type="button"
-            class="secondary" :aria-pressed="draft.mode===mode" @click="draft.mode=mode"><strong>{{ name }}</strong><small>{{ body }}</small></button>
-        </div>
-        <div class="run-controls">
-          <label v-if="draft.version >= SETTLED_RULE_VERSION" class="run-mode">End each day
-            <select v-model="draft.endMode">
-              <option value="settled">When all blobs settle or die</option>
-              <option value="timed">After a fixed time</option>
-            </select>
-          </label>
-        </div>
-        <div class="advanced setting-inset">
-          <button type="button" class="secondary" :aria-expanded="advanced" @click="advanced=!advanced">Advanced Rules {{ advanced ? '▴' : '▾' }}</button>
-          <div v-if="advanced" class="advanced-grid">
-            <label v-if="standardDeviation">Foraging rules <select v-model="foraging">
-              <option value="standard">Standard</option><option value="walkthrough">Video experiment</option>
-            </select></label>
-            <small v-if="foraging==='walkthrough'" class="quiet">
-              {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start each day along all four gray sides.' :
-                'Blobs turn in steps and start the next day where their parents reached the edge.' }}
-            </small>
-            <label><input v-model="draft.predation" type="checkbox"> Predation</label>
-            <label><input v-model="draft.sameSpecies" type="checkbox" :disabled="!draft.predation"> Same-species hunting</label>
-            <small v-if="draft.predation" class="quiet predation-note">
-              A hunter must be at least {{ draft.version === LEGACY_RULE_VERSION ? '20%' : '25%' }} larger than its prey.
-            </small>
-            <label>Stride <select v-model="draft.stride"><option value="linked">Size-linked</option><option value="speed">Speed only</option></select></label>
-            <label>Energy model <select v-model="draft.metabolism">
-              <option value="walkthrough">Video walkthrough</option><option value="product">Product</option><option value="additive">Earlier additive</option>
-            </select></label>
-            <label>Mutation profile <select v-model="mutationProfile"><option value="" disabled>Custom</option><option value="all">All unlocked</option><option value="speed">Speed only</option><option value="locked">All locked</option></select></label>
-            <output v-if="draft.metabolism==='walkthrough'">
-              (size³ × (distance per step)² + sight range) ÷ 10,000
-              <small>{{ walkthroughStepCost(selected,draft).toFixed(3) }} energy per 0.1 s step for {{ selected.name }}</small>
-            </output>
-            <output v-else>{{ draft.metabolism==='product' ? 'size³ × speed² × sense ÷ 20,000' : '0.001 × (size³ × effective speed² + sense)' }}<small>{{ cost(selected,draft).toFixed(1) }} energy/s for {{ selected.name }}</small></output>
+          <div v-if="draft.scheduleMode!=='constant'" class="setting-inset">
+            <strong>Food schedule</strong><p class="quiet">Day 1 follows Starting plants · {{ draft.food }}</p>
+            <div class="schedule-row" v-for="(point,i) in draft.schedule" :key="i">
+              <label>Day <input v-model.number="point.day" type="number" min="2" :max="draft.days"></label>
+              <label>Plants <input v-model.number="point.food" type="number" min="10" max="1000"></label>
+              <button type="button" class="icon" aria-label="Remove schedule point" @click="draft.schedule.splice(i,1)"><Trash2 :size="17"/></button>
+            </div>
+            <p v-if="issue.schedule" class="issue">{{ issue.schedule }}</p>
+            <button type="button" class="secondary" @click="addAnchor">Add point</button>
+            <button v-if="draft.schedule.length" type="button" class="link" @click="draft.schedule=[]">Clear</button>
           </div>
-        </div>
-      </section>
+        </section>
+        <section class="setting-section">
+          <h2>Finally</h2>
+          <div class="setting-inset final-fields">
+            <label class="run-name">Run name <input id="name" v-model="draft.name" maxlength="60"></label>
+            <NumberField id="days" v-model="draft.days" label="Days to run" :min="10" :max="1000" :error="issue.days"/>
+            <template v-if="!endsWhenSettled(draft)">
+              <NumberField id="duration" v-model="seconds" label="Seconds per day" :min="1" :max="60" :step=".1" :error="issue.duration"/>
+            </template>
+            <NumberField id="seed" v-model="draft.seed" label="Random seed" :min="1" :max="MAX_SEED" :disabled="fork!=null" :error="issue.seed"/>
+            <template v-if="!endsWhenSettled(draft)">
+              <div class="quick-picks"><button v-for="n in [1,5,10,20,30,60]" :key="n" type="button" class="secondary" :aria-pressed="seconds===n" @click="seconds=n">{{ n }} s</button></div>
+              <small class="quiet">Up to {{ ((draft.days*seconds)/60).toFixed(1) }} min of playback at 1×</small>
+            </template>
+            <div class="seed-actions">
+              <button v-if="fork==null" type="button" class="secondary" @click="draft.seed=randomSeed(draft.seed)"><Dices :size="16"/> Roll seed</button>
+              <button type="button" class="secondary" @click="copySeed"><component :is="copied ? Check : Copy" :size="16"/>{{ copied ? 'Copied' : 'Copy seed' }}</button>
+            </div>
+          </div>
+          <small v-if="endsWhenSettled(draft)" class="quiet run-days-note">Days end when creatures settle.</small>
+          <div class="start-modes" aria-label="Playback mode">
+            <button v-for="[mode,name,body] in [['prepare','Prepare and watch','Build the archive in the background.'],['live','Watch live','Run each tick as you watch.']]" :key="mode" type="button"
+              class="secondary" :aria-pressed="draft.mode===mode" @click="draft.mode=mode"><strong>{{ name }}</strong><small>{{ body }}</small></button>
+          </div>
+          <div class="run-controls">
+            <label v-if="draft.version >= SETTLED_RULE_VERSION" class="run-mode">End each day
+              <select v-model="draft.endMode">
+                <option value="settled">When all blobs settle or die</option>
+                <option value="timed">After a fixed time</option>
+              </select>
+            </label>
+          </div>
+          <div class="advanced setting-inset">
+            <button type="button" class="secondary" :aria-expanded="advanced" @click="advanced=!advanced">Advanced Rules {{ advanced ? '▴' : '▾' }}</button>
+            <div v-if="advanced" class="advanced-grid">
+              <label v-if="standardDeviation">Foraging rules <select v-model="foraging">
+                <option value="standard">Standard</option><option value="walkthrough">Video experiment</option>
+              </select></label>
+              <small v-if="foraging==='walkthrough'" class="quiet">
+                {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start each day along all four gray sides.' :
+                  'Blobs turn in steps and start the next day where their parents reached the edge.' }}
+              </small>
+              <label><input v-model="draft.predation" type="checkbox"> Predation</label>
+              <label><input v-model="draft.sameSpecies" type="checkbox" :disabled="!draft.predation"> Same-species hunting</label>
+              <small v-if="draft.predation" class="quiet predation-note">
+                A hunter must be at least {{ draft.version === LEGACY_RULE_VERSION ? '20%' : '25%' }} larger than its prey.
+              </small>
+              <label>Stride <select v-model="draft.stride"><option value="linked">Size-linked</option><option value="speed">Speed only</option></select></label>
+              <label>Energy model <select v-model="draft.metabolism">
+                <option value="walkthrough">Video walkthrough</option><option value="product">Product</option><option value="additive">Earlier additive</option>
+              </select></label>
+              <label>Mutation profile <select v-model="mutationProfile"><option value="" disabled>Custom</option><option value="all">All unlocked</option><option value="speed">Speed only</option><option value="locked">All locked</option></select></label>
+              <output v-if="draft.metabolism==='walkthrough'">
+                (size³ × (distance per step)² + sight range) ÷ 10,000
+                <small>{{ walkthroughStepCost(selected,draft).toFixed(3) }} energy per 0.1 s step for {{ selected.name }}</small>
+              </output>
+              <output v-else>{{ draft.metabolism==='product' ? 'size³ × speed² × sense ÷ 20,000' : '0.001 × (size³ × effective speed² + sense)' }}<small>{{ cost(selected,draft).toFixed(1) }} energy/s for {{ selected.name }}</small></output>
+            </div>
+          </div>
+        </section>
+      </div>
       <footer class="settings-footer">
         <div v-if="titleErrors.length" class="settings-errors issue" tabindex="-1" role="alert"><p>Review the setup</p><ul><li v-for="error in titleErrors" :key="error.key">{{ error.message }}</li></ul></div>
         <p>{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} plants per founder</p>

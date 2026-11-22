@@ -190,6 +190,39 @@ test.describe('short touch viewports', () => {
     await expect(page.getByRole('dialog', { name: 'Explore the tabletop' })).toBeVisible()
   })
 
+  test('settings fields scroll clear of the title and Evolve button @pages', async ({ page }) => {
+    for (const [width, height] of [[320, 420], [740, 320]]) {
+      await page.setViewportSize({ width, height })
+      await page.getByRole('button', { name: 'Simulation Settings' }).tap()
+      const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+      const fields = settings.locator('.settings-fields')
+      const close = settings.getByRole('button', { name: 'Close settings' })
+      const evolve = settings.getByRole('button', { name: 'Evolve!', exact: true })
+      const initial = await fields.boundingBox()
+      const closeBox = await close.boundingBox()
+      expect(initial.y).toBeGreaterThanOrEqual(closeBox.y + closeBox.height)
+      expect(initial.y + initial.height).toBeLessThanOrEqual((await evolve.boundingBox()).y)
+
+      const mutation = settings.getByRole('checkbox', { name: 'Allow size mutation' })
+      const checked = await mutation.isChecked()
+      await mutation.tap()
+      await expect(mutation).toHaveJSProperty('checked', !checked)
+
+      const days = settings.getByRole('spinbutton', { name: 'Days to run' })
+      await days.fill('1')
+      await evolve.tap()
+      const errors = settings.getByRole('alert')
+      await expect(errors).toContainText('Days')
+      await expect(errors).toBeInViewport({ ratio: 1 })
+      await expect(days).toBeFocused()
+      await expect(days).toBeInViewport({ ratio: 1 })
+      await expect(close).toBeInViewport({ ratio: 1 })
+      await expect(evolve).toBeInViewport({ ratio: 1 })
+      await close.tap()
+      await expect(settings).toBeHidden()
+    }
+  })
+
   test('following a creature leaves its controls and playback reachable on a phone @pages', async ({ page }) => {
     await page.getByRole('button', { name: 'Follow creature' }).tap()
     const follow = page.locator('.creature-flower')
