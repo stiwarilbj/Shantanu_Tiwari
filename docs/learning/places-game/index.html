@@ -35,14 +35,16 @@
             }
         }
         .game-container {
+            --control-padding-block: clamp(0.25rem, calc(1dvh - 0.0625rem), 0.3125rem);
             background-color: white;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
-            gap: clamp(0.5rem, 1.6vh, 0.875rem);
-            padding: clamp(0.75rem, 2vw, 1.25rem);
-            margin: clamp(0.5rem, 2vh, 1.25rem) auto;
+            gap: clamp(0.375rem, calc(2.5dvh - 0.375rem), 0.875rem);
+            padding-block: clamp(0.625rem, 2.2dvh, 1.25rem);
+            padding-inline: clamp(0.625rem, 2vw, 1.25rem);
+            margin: clamp(1rem, 3.2dvh, 2rem) auto;
             width: calc(100% - clamp(1rem, 4vw, 2rem));
             max-width: 44rem;
             font-size: 0.875rem;
@@ -81,12 +83,12 @@
         }
         .game-container .btn {
             --bs-btn-font-size: 0.875rem;
-            --bs-btn-padding-y: 0.3125rem;
+            --bs-btn-padding-y: var(--control-padding-block);
             --bs-btn-padding-x: 0.625rem;
         }
         .game-container :is(.form-select, .form-control) {
             font-size: inherit;
-            padding-block: 0.3125rem;
+            padding-block: var(--control-padding-block);
         }
         .btn-primary {
             background-color: #3498db;
@@ -223,7 +225,10 @@
             container-type: inline-size;
             background-color: #f8f9fa;
             border-radius: 10px;
-            padding: 0.625rem 0.75rem;
+            padding: clamp(0.5rem, calc(2dvh - 0.1875rem), 0.625rem) 0.75rem;
+        }
+        .settings-card .row {
+            align-items: flex-end;
         }
         .game-container h4 {
             font-size: 1rem;
@@ -291,23 +296,15 @@
             .game-actions .btn {
                 flex: 1 1 45%;
             }
-        }
-        @media (width < 23rem), (width < 28rem) and (height < 40rem) {
             .game-container {
-                gap: 0.375rem;
-                margin-block: 0.5rem;
-                padding: 0.5rem;
-                font-size: 0.8125rem;
+                padding: clamp(0.5rem, 2.25vw, 0.75rem);
                 line-height: 1.4;
-            }
-            .game-container .btn {
-                --bs-btn-font-size: 0.8125rem;
             }
             .game-toolbar {
                 gap: 0.25rem;
             }
             .game-toolbar .btn {
-                --bs-btn-padding-x: 0.25rem;
+                --bs-btn-padding-x: 0.375rem;
             }
             .settings-card {
                 padding: 0.5rem 0.625rem;
@@ -318,8 +315,43 @@
             .places-list-container {
                 padding-inline: 0.375rem;
             }
-            .game-panel {
-                font-size: 0.75rem;
+        }
+        @media (width < 28rem) and (height <= 40rem) {
+            .game-container {
+                gap: 0.375rem;
+            }
+        }
+        @media (22.5rem <= width < 28rem) and (height <= 40rem) {
+            .game-actions {
+                gap: 0.25rem;
+            }
+            .game-actions .btn {
+                flex: 1 0 auto;
+                --bs-btn-padding-x: 0.25rem;
+            }
+            .game-actions i {
+                display: none;
+            }
+        }
+        @media (height <= 38rem) {
+            @container (width >= 28rem) {
+                .settings-card .row {
+                    --bs-gutter-x: 0.375rem;
+                }
+                .settings-card .col {
+                    width: 21.5%;
+                }
+                .settings-card .col:has(> #timeSelect) {
+                    width: 17%;
+                }
+                .settings-card .setting-mode {
+                    width: 40%;
+                }
+                .settings-card .form-select {
+                    padding-inline: 0.375rem 1rem;
+                    background-position: right 0.3125rem center;
+                    background-size: 0.625rem auto;
+                }
             }
         }
         @media (width >= 45rem) and (height <= 36rem) {
@@ -327,7 +359,6 @@
                 gap: 0.375rem;
                 max-width: 58rem;
                 padding: 0.625rem 0.75rem;
-                margin-block: 0.5rem;
             }
             .game-content {
                 flex-direction: row;
