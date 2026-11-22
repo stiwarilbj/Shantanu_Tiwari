@@ -49,20 +49,6 @@ small{font-size:.84em}
 .skip-link{position:fixed;z-index:30;top:8px;left:8px;padding:10px 15px;background:#111;transform:translateY(-130%)}
 .skip-link:focus{transform:none}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-body:has(> [data-site-navbar]){
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-  height:100dvh;
-}
-body > [data-site-navbar]{color-scheme:light}
-[data-site-navbar] + #app{
-  position:relative;
-  isolation:isolate;
-  flex:1;
-  min-height:0;
-  height:auto;
-}
 #main-surface{flex:1;min-height:0;overflow:clip}
 #main-surface.reading-surface{margin-top:90px;overflow:auto;overscroll-behavior:contain}
 #main-surface:focus{outline:none}

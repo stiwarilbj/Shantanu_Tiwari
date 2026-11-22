@@ -237,7 +237,7 @@ test('the four gray home sides and corners stay visible during replay and in Can
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
   await openSimulator(page)
-  await expect(page).toHaveTitle('Evolution Simulator')
+  await expect(page).toHaveTitle(/^Evolution Simulator(?: \| Project Lab)?$/)
   await startRun(page)
   const field = page.getByRole('region', { name:'Simulation field' })
   const canvas = field.locator('canvas.world-canvas')

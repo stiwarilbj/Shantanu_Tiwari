@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       projectLab && {
-        name: 'project-lab-navbar',
+        name: 'project-lab-page',
         transformIndexHtml: {
           order: 'post',
           handler(html) {
@@ -21,11 +21,21 @@ export default defineConfig(({ mode }) => {
             if (!navbar) throw new Error('Could not find the shared navbar in the Project Lab homepage')
 
             return {
-              html: html.replace(/^[ \t]*<link rel="icon"[^>]*>\r?\n/m, ''),
+              html: html
+                .replace(/^[ \t]*<link rel="icon"[^>]*>\r?\n/m, '')
+                .replace('<meta name="theme-color" content="#242424">', '<meta name="theme-color" content="#cfe2ff">')
+                .replace('<title>Evolution Simulator</title>', '<title>Evolution Simulator | Project Lab</title>')
+                .replace('<body>', '<body class="project-lab-page">'),
               tags: [
                 { tag: 'link', attrs: { rel: 'icon', href: '../../assets/favicon.ico' }, injectTo: 'head' },
                 { tag: 'script', attrs: { type: 'module', src: `../../navbar/${navbar}`, blocking: 'render' }, injectTo: 'head' },
                 { tag: 'header', attrs: { 'data-site-navbar': true }, injectTo: 'body-prepend' },
+                {
+                  tag: 'div',
+                  attrs: { class: 'project-lab-heading' },
+                  injectTo: 'body-prepend',
+                  children: '\n      <a href="../">Experiments</a>\n      <h1>Evolution Simulator</h1>\n    ',
+                },
               ],
             }
           },

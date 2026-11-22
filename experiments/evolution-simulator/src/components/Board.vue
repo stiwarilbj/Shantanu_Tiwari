@@ -15,9 +15,7 @@ const emit = defineEmits(['select', 'fallback'])
 const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
-const stageColor = '#242424'
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(stageColor)
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
 const overhead = new THREE.OrthographicCamera(-350, 350, 350, -350, 1, 4500)
 overhead.up.set(0, 0, -1)
@@ -38,6 +36,7 @@ const homeColor = '#E5E5E5'
 const legacyOutlineSize = FIELD - 16
 const meshKinds = {}
 let renderer, canvas, ctx, orbit, resize, raf, down, previousFrame, height = 1, width = 1, dirty = true
+let stageColor
 let tabletop, refugeSurface, refugeOutline
 let contact, contactTexture
 let pickBody, bodyIds = [], screenBlobs = [], followed = false, manual = false, previousTime = 0
@@ -609,6 +608,9 @@ function useCanvasFallback() {
 }
 
 function setupRenderer() {
+  const theme = getComputedStyle(host.value)
+  stageColor = theme.getPropertyValue('--board-background').trim() || theme.getPropertyValue('--stage').trim()
+  scene.background = new THREE.Color(stageColor)
   contact = makeContactShadow()
   placeBoard()
   meshes()

@@ -104,7 +104,7 @@ test('the stride race and energy lesson explain what bigger blobs spend', async 
   await expect(guide.getByRole('button', { name:'Pause example' })).toBeVisible()
 })
 
-test('guided boards stay visible in a short split window', async ({ page }) => {
+test('guided boards stay visible in a short split window @pages', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 420 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openWalkthrough(page)
@@ -121,6 +121,7 @@ test('guided boards stay visible in a short split window', async ({ page }) => {
     await expect(progress).toBeEnabled()
     await expect(board).toBeInViewport({ ratio: 1 })
     expect((await board.boundingBox()).height).toBeGreaterThanOrEqual(160)
+    await expect(guide.locator('.guided-controls')).toBeInViewport({ ratio: 1 })
     await expect(progress).toBeInViewport({ ratio: 1 })
     await progress.press('End')
     expect(Number(await progress.inputValue())).toBeGreaterThan(0)
