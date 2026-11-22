@@ -156,7 +156,13 @@ test('the size mutation preview plays the field and follows two recorded creatur
   await preview.getByRole('button', { name:'Restart preview' }).click()
   await expect(time).toHaveValue('0')
 
-  await preview.getByRole('button', { name:'Day 6', exact:true }).click()
+  const daySix = preview.getByRole('button', { name:'Day 6', exact:true })
+  const dayHundred = preview.getByRole('button', { name:'Day 100', exact:true })
+  await daySix.press('Enter')
+  await expect(preview.getByText(/Day 6 at dawn/)).toBeVisible()
+  await expect(daySix).toBeFocused({ timeout:1000 })
+  await page.keyboard.press('Tab')
+  await expect(dayHundred).toBeFocused()
   await preview.getByRole('button', { name:'Follow hunter' }).click()
   await expect(speed).toHaveValue('1')
   await expect(time).toHaveValue('0')
@@ -173,7 +179,7 @@ test('the size mutation preview plays the field and follows two recorded creatur
   await readout.getByRole('button', { name:/Reach refuge/ }).click()
   await expect(readout.getByText('Home', { exact:true })).toBeVisible()
 
-  await preview.getByRole('button', { name:'Day 100', exact:true }).click()
+  await dayHundred.click()
   await expect(play).toBeEnabled()
   await expect(speed).toHaveValue('4')
   await expect(preview.getByText(/Day 100 at dawn/)).toBeVisible()

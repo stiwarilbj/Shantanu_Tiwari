@@ -81,6 +81,8 @@ function chooseShot(value) {
 }
 
 async function loadDay(value) {
+  if (loading.value && day.value === value) return
+
   const token = ++request
   day.value = value
   chooseShot('field')
@@ -185,7 +187,7 @@ onBeforeUnmount(() => {
           <div class="size-preview-moments">
             <div role="group" aria-label="Preview days">
               <button v-for="value in milestoneDays" :key="value" type="button" class="secondary"
-                :aria-pressed="day===value" :disabled="loading && day===value" @click="loadDay(value)">Day {{ value }}</button>
+                :aria-pressed="day===value" :aria-disabled="loading && day===value" @click="loadDay(value)">Day {{ value }}</button>
             </div>
             <div v-if="day===focusDay" role="group" aria-label="Preview cameras">
               <button type="button" class="secondary" :aria-pressed="shot==='field'" :disabled="!track" @click="chooseShot('field')">Field view</button>
