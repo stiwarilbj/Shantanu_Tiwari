@@ -60,9 +60,8 @@
     flex-wrap: wrap;
     justify-content: flex-start;
     align-content: stretch;
-    column-gap: 0.25rem;
     min-block-size: 6.0625rem;
-    padding-inline: var(--nav-link-padding);
+    padding-inline-end: var(--nav-link-padding);
   }
 
   .site-nav .nav-panel-links li {
@@ -74,6 +73,19 @@
     min-block-size: 3rem;
     padding: 0.5rem 0.75rem;
     text-align: center;
+  }
+
+  /* Include the left inset and share the space between labels across their links. */
+  .site-nav .nav-panel-links li:first-child > a {
+    padding-inline-start: calc(0.75rem + var(--nav-link-padding));
+  }
+
+  .site-nav .nav-panel-links li + li > a {
+    padding-inline-start: 0.875rem;
+  }
+
+  .site-nav .nav-panel-links li:not(:last-child) > a {
+    padding-inline-end: 0.875rem;
   }
 
   :where(.site-nav) .nav-links:has(.category-link[aria-expanded="true"]:hover) {
