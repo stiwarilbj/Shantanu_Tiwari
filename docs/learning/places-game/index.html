@@ -36,40 +36,31 @@
             }
         }
         .game-container {
-            --control-padding-block: clamp(0.3125rem, 0.9dvh, 0.4375rem);
+            --control-padding-block: clamp(0.3125rem, 1dvh, 0.5rem);
             background-color: white;
             border-radius: 15px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
-            gap: clamp(0.375rem, calc(2.5dvh - 0.375rem), 0.875rem);
-            padding-block: clamp(0.625rem, 2.2dvh, 1.25rem);
-            padding-inline: clamp(0.625rem, 2vw, 1.25rem);
+            gap: clamp(0.625rem, calc(9dvh - 3.0625rem), 1.375rem);
+            padding: clamp(0.75rem, calc(9dvh - 3.0625rem), 1.5rem);
             margin: clamp(1rem, 3.2dvh, 2rem) auto;
             width: calc(100% - clamp(1rem, 4vw, 2rem));
-            max-width: 52rem;
-            font-size: 0.9375rem;
+            max-width: 54rem;
+            font-size: clamp(0.9375rem, 2.1dvh, 1rem);
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
         }
-        .game-header,
-        .round-bar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem 0.75rem;
-        }
-        .game-header {
+        .header {
             color: #2c3e50;
         }
-        .game-header h1 {
-            font-size: clamp(1.375rem, calc(1.1rem + 1.4vw), 2rem);
-            margin-bottom: 0.25rem;
+        .header h1 {
+            font-size: clamp(1.375rem, calc(1.15rem + 1.4vw), 2.25rem);
+            margin-bottom: 0.375rem;
         }
-        .game-header p,
+        .header p,
         .places-list-container > p {
             margin-bottom: 0;
         }
@@ -77,18 +68,7 @@
         .game-actions {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.375rem;
-        }
-        .game-container .game-actions .btn {
-            --bs-btn-padding-x: 0.5rem;
-        }
-        #pauseBtn {
-            min-inline-size: 5.5rem;
-        }
-        .round-status {
-            display: flex;
-            flex: 1 0 auto;
-            justify-content: space-between;
+            justify-content: center;
             gap: 0.5rem;
         }
         .game-content,
@@ -102,9 +82,9 @@
             display: none;
         }
         .game-container .btn {
-            --bs-btn-font-size: 0.9375rem;
+            --bs-btn-font-size: inherit;
             --bs-btn-padding-y: var(--control-padding-block);
-            --bs-btn-padding-x: 0.625rem;
+            --bs-btn-padding-x: 0.75rem;
         }
         .game-container :is(.form-select, .form-control) {
             font-size: inherit;
@@ -150,25 +130,29 @@
             background-color: #5a6268;
             border-color: #545b62;
         }
-        .timer-display,
-        .score-display {
-            font-size: 1.125rem;
-            font-weight: bold;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
         .timer-display {
-            color: #be382b;
+            font-size: clamp(1.25rem, 3.3dvh, 1.75rem);
+            font-weight: bold;
+            color: #b7372a;
         }
         .score-display {
-            color: #167348;
+            font-size: clamp(1.125rem, 2.8dvh, 1.375rem);
+            font-weight: bold;
+            color: #147745;
+        }
+        #pauseBtn {
+            min-inline-size: 6.25rem;
         }
         .game-panel {
             background-color: #f8f9fa;
             border-radius: 10px;
             padding: 0.5rem 0.75rem;
             font-size: 0.875rem;
-            line-height: 1.45;
+            line-height: 1.35;
+        }
+        .game-container .game-panel h2 {
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
         }
         .rules-container ul {
             columns: 2 16rem;
@@ -200,6 +184,10 @@
             align-items: flex-start;
             gap: 0.375rem;
             margin-top: 0.375rem;
+        }
+        .game-container .search-actions .btn {
+            --bs-btn-font-size: 0.8125rem;
+            --bs-btn-padding-y: 0.25rem;
         }
         .places-list-container {
             max-height: 305px;
@@ -240,50 +228,22 @@
             container-type: inline-size;
             background-color: #f8f9fa;
             border-radius: 10px;
-            padding: 0.625rem 0.75rem;
+            padding: clamp(0.625rem, calc(5dvh - 1.25rem), 1.125rem);
         }
-        .settings-fields {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: end;
-            gap: 0.5rem 0.625rem;
-        }
-        .setting-field {
-            flex: 1 1 calc(50% - 0.3125rem);
-            min-inline-size: 0;
-        }
-        .setting-mode {
-            flex-basis: calc(100% - 6.5rem);
-        }
-        .setting-time {
-            flex-basis: 5.875rem;
+        .settings-card .row {
+            --bs-gutter-x: clamp(0.75rem, 2vw, 1.25rem);
+            --bs-gutter-y: clamp(0.5rem, 1.6dvh, 0.875rem);
+            align-items: flex-end;
         }
         .game-container h2 {
             font-size: 1rem;
             margin-bottom: 0.375rem;
         }
+        .settings-card h2 {
+            font-size: clamp(1rem, 2.6dvh, 1.25rem);
+        }
         .settings-card .form-label {
             margin-bottom: 0.1875rem;
-        }
-        .settings-card .form-select {
-            padding-inline: 0.5rem 1.125rem;
-            background-position: right 0.375rem center;
-            background-size: 0.625rem auto;
-        }
-        .places-heading {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.25rem;
-            min-block-size: 2rem;
-            margin-block-end: 0.25rem;
-        }
-        .places-heading h2 {
-            margin: 0;
-        }
-        .game-container .places-heading .btn {
-            --bs-btn-padding-y: 0.1875rem;
-            --bs-btn-padding-x: 0.5rem;
         }
 
         input[type="text"],
@@ -315,51 +275,118 @@
         .form-select {
             cursor: pointer;
         }
+        @container (width < 22rem) {
+            .settings-card .row {
+                --bs-gutter-x: 0.375rem;
+            }
+            .settings-card .col {
+                width: calc(100% / 3);
+            }
+            .settings-card .setting-mode {
+                width: 100%;
+            }
+            .settings-card .form-select {
+                padding-inline: 0.375rem 1rem;
+                background-position: right 0.3125rem center;
+                background-size: 0.625rem auto;
+            }
+        }
         @container (width >= 24rem) {
             .search-container .search-detail {
                 width: 25%;
             }
         }
-        @container (width >= 28rem) {
-            .setting-field {
-                flex: 1 1 0;
-            }
-            .setting-mode {
-                flex-grow: 2;
-            }
-        }
-        @media (width < 40rem) {
-            .game-header {
-                justify-content: center;
-                text-align: center;
-            }
-        }
         @media (width < 28rem) {
+            .game-actions .btn {
+                flex: 1 1 45%;
+            }
             .game-container {
-                padding: clamp(0.5rem, 2.25vw, 0.75rem);
-                line-height: 1.45;
+                padding: clamp(0.625rem, 3vw, 0.875rem);
+                line-height: 1.4;
+            }
+            .game-toolbar {
+                gap: 0.25rem;
+            }
+            .game-toolbar .btn {
+                --bs-btn-padding-x: 0.375rem;
             }
             .settings-card {
+                padding: 0.5rem 0.625rem;
+            }
+            .settings-card .row {
+                --bs-gutter-y: 0.375rem;
+            }
+            .places-list-container {
                 padding-inline: 0.375rem;
             }
         }
         @media (width < 28rem) and (height <= 40rem) {
-            .game-header p {
+            .game-container {
+                gap: clamp(0.5rem, 1.5dvh, 0.75rem);
+            }
+        }
+        @media (22.5rem <= width < 28rem) and (height <= 40rem) {
+            .game-actions {
+                gap: 0.25rem;
+            }
+            .game-actions i {
                 display: none;
             }
         }
-        @media (width >= 45rem) {
+        @media (height <= 38rem) {
+            @container (width >= 28rem) {
+                .settings-card .row {
+                    --bs-gutter-x: 0.375rem;
+                }
+                .settings-card .col {
+                    width: 21.5%;
+                }
+                .settings-card .col:has(> #timeSelect) {
+                    width: 17%;
+                }
+                .settings-card .setting-mode {
+                    width: 40%;
+                }
+                .settings-card .form-select {
+                    padding-inline: 0.375rem 1rem;
+                    background-position: right 0.3125rem center;
+                    background-size: 0.625rem auto;
+                }
+            }
+        }
+        @media (width >= 45rem) and (height <= 31rem) {
+            .game-container {
+                gap: 0.375rem;
+                max-width: 58rem;
+                padding: 0.625rem 0.75rem;
+            }
             .game-content {
                 flex-direction: row;
                 align-items: flex-start;
-                gap: clamp(0.75rem, 1.5vw, 1rem);
             }
             .settings-card {
-                flex: 0 1 20rem;
-                min-inline-size: 17rem;
+                flex: 2 1 0;
+                min-width: 0;
             }
             .game-play {
-                flex: 1 1 28rem;
+                flex: 3 1 0;
+                min-width: 0;
+            }
+            .game-actions .btn {
+                --bs-btn-padding-x: 0.375rem;
+            }
+        }
+        @media (width >= 45rem) and (height > 31rem) {
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) {
+                max-width: 64rem;
+                flex-flow: row wrap;
+                align-items: flex-start;
+            }
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) > :is(.header, .game-toolbar) {
+                flex: 0 0 100%;
+            }
+            .game-container:has(> .game-panels > .game-panel:not([hidden])) > :is(.game-panels, .game-content) {
+                flex: 1;
                 min-inline-size: 0;
             }
         }
@@ -368,35 +395,35 @@
 <body>
     <header data-site-navbar></header>
     <main class="container game-container">
-        <header class="game-header">
-            <div>
-                <h1><i class="fas fa-globe-americas" aria-hidden="true"></i> Place Naming Game</h1>
-                <p>Name places before the timer runs out</p>
-            </div>
-            <div class="game-toolbar">
-                <button id="rulesBtn" type="button" class="btn btn-info panel-toggle"
-                        aria-controls="rulesContainer" aria-expanded="false">
-                    <i class="fas fa-book" aria-hidden="true"></i>
-                    <span class="panel-toggle-label"><span>Show Rules</span><span>Hide Rules</span></span>
-                </button>
-                <button id="showSearchBtn" type="button" class="btn btn-info panel-toggle"
-                        aria-controls="searchContainer" aria-expanded="false">
-                    <i class="fas fa-search" aria-hidden="true"></i>
-                    <span class="panel-toggle-label"><span>Show Search</span><span>Hide Search</span></span>
-                </button>
-            </div>
-        </header>
+        <div class="text-center header">
+            <h1><i class="fas fa-globe-americas" aria-hidden="true"></i> Place Naming Game</h1>
+            <p>Test your geography knowledge by naming as many places as you can!</p>
+        </div>
+
+        <div class="game-toolbar">
+            <button id="rulesBtn" type="button" class="btn btn-info panel-toggle"
+                    aria-controls="rulesContainer" aria-expanded="false">
+                <i class="fas fa-book" aria-hidden="true"></i>
+                <span class="panel-toggle-label"><span>Show Rules</span><span>Hide Rules</span></span>
+            </button>
+            <button id="showSearchBtn" type="button" class="btn btn-info panel-toggle"
+                    aria-controls="searchContainer" aria-expanded="false">
+                <i class="fas fa-search" aria-hidden="true"></i>
+                <span class="panel-toggle-label"><span>Show Search</span><span>Hide Search</span></span>
+            </button>
+        </div>
+
 
         <div class="game-panels">
             <div id="rulesContainer" class="game-panel rules-container" hidden>
                 <h2>Game Rules</h2>
                 <ul>
-                    <li>Pick a 1–5 minute time limit and any first letter, last letter, or country filters. Then select <strong>Start</strong>.</li>
+                    <li>Pick a 1–5 minute time limit and any starting letter, ending letter, or country filters. Then select <strong>Start Game</strong>.</li>
                     <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
                     <li>Each correct answer gets one point. A name can be one letter off or have two neighboring letters swapped.</li>
                     <li><strong>Search</strong> by first or last letter, country, or name length. Separate terms with commas. <strong>Include</strong> checks for every term in the place or country, and <strong>Don't Include</strong> skips any match.</li>
-                    <li>Select <strong>Show</strong> next to <strong>Examples</strong> to see up to eight random places that match your filters. Select <strong>Pause</strong> to take a break.</li>
+                    <li><strong>Display Places</strong> shows eight random examples using your filters. Select <strong>Pause</strong> to take a break.</li>
                 </ul>
             </div>
 
@@ -449,18 +476,25 @@
             </div>
         </div>
 
+
         <div class="game-content">
             <section class="settings-card" aria-labelledby="settings-heading">
                 <h2 id="settings-heading"><i class="fas fa-cog" aria-hidden="true"></i> Game Settings</h2>
-                <div class="settings-fields">
-                    <div class="setting-field setting-mode">
-                        <label for="countrySelect" class="form-label">Mode or country</label>
-                        <select id="countrySelect" class="form-select">
-                            <option value="placeAndCountry" selected>Place and country</option>
+                <div class="row row-cols-2 g-2">
+                    <div class="col">
+                        <label for="letterSelect" class="form-label">Starting Letter</label>
+                        <select id="letterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
                         </select>
                     </div>
-                    <div class="setting-field setting-time">
-                        <label for="timeSelect" class="form-label">Time limit</label>
+                    <div class="col">
+                        <label for="endLetterSelect" class="form-label">Ending Letter</label>
+                        <select id="endLetterSelect" class="form-select">
+                            <option value="any" selected>Any Letter</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label for="timeSelect" class="form-label">Time Limit</label>
                         <select id="timeSelect" class="form-select">
                             <option value="1" selected>1 Minute</option>
                             <option value="2">2 Minutes</option>
@@ -468,41 +502,22 @@
                             <option value="5">5 Minutes</option>
                         </select>
                     </div>
-                    <div class="setting-field">
-                        <label for="letterSelect" class="form-label">First letter</label>
-                        <select id="letterSelect" class="form-select">
-                            <option value="any" selected>Any Letter</option>
-                        </select>
-                    </div>
-                    <div class="setting-field">
-                        <label for="endLetterSelect" class="form-label">Last letter</label>
-                        <select id="endLetterSelect" class="form-select">
-                            <option value="any" selected>Any Letter</option>
+                    <div class="col setting-mode">
+                        <label for="countrySelect" class="form-label">Country / Game Mode</label>
+                        <select id="countrySelect" class="form-select">
+                            <option value="placeAndCountry" selected>Place and Country Mode</option>
                         </select>
                     </div>
                 </div>
             </section>
 
             <div class="game-play">
-                <div class="round-bar">
-                    <div class="game-actions">
-                        <button id="startBtn" class="btn btn-success">
-                            <i class="fas fa-play" aria-hidden="true"></i> Start
-                        </button>
-                        <button id="pauseBtn" class="btn btn-warning" disabled>
-                            <i class="fas fa-pause" aria-hidden="true"></i> Pause
-                        </button>
-                        <button id="resetBtn" class="btn btn-danger">
-                            <i class="fas fa-redo" aria-hidden="true"></i> Reset
-                        </button>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="timer-display">
+                        <i class="fas fa-clock"></i> Time: <span id="timer">00:00</span>
                     </div>
-                    <div class="round-status">
-                        <div class="timer-display">
-                            Time: <span id="timer">00:00</span>
-                        </div>
-                        <div class="score-display">
-                            Score: <span id="score">0</span>
-                        </div>
+                    <div class="score-display">
+                        <i class="fas fa-star"></i> Score: <span id="score">0</span>
                     </div>
                 </div>
 
@@ -514,23 +529,33 @@
                     </button>
                 </div>
 
+                <div class="game-actions">
+                    <button id="startBtn" class="btn btn-success">
+                        <i class="fas fa-play"></i> Start Game
+                    </button>
+                    <button id="pauseBtn" class="btn btn-warning" disabled>
+                        <i class="fas fa-pause"></i> Pause
+                    </button>
+                    <button id="resetBtn" class="btn btn-danger">
+                        <i class="fas fa-redo"></i> Reset Game
+                    </button>
+                    <button id="displayBtn" class="btn btn-info" type="button" aria-controls="examplePlaces">
+                        <i class="fas fa-list"></i> Display Places
+                    </button>
+                </div>
+
+
                 <div class="row row-cols-2 gx-2">
                     <div class="col">
-                        <div class="places-heading">
-                            <h2>Guesses</h2>
-                        </div>
+                        <h2><i class="fas fa-check-circle" aria-hidden="true"></i> Guessed Places</h2>
                         <div id="guessedPlaces" class="places-list-container">
-                            <p class="text-muted">No guesses yet</p>
+                            <p class="text-muted">No places guessed yet</p>
                         </div>
                     </div>
                     <div class="col">
-                        <div class="places-heading">
-                            <h2>Examples</h2>
-                            <button id="displayBtn" class="btn btn-outline-primary" type="button"
-                                    aria-controls="examplePlaces" aria-label="Show example places">Show</button>
-                        </div>
+                        <h2><i class="fas fa-lightbulb" aria-hidden="true"></i> Example Places</h2>
                         <div id="examplePlaces" class="places-list-container">
-                            <p class="text-muted">No examples yet</p>
+                            <p class="text-muted">Click "Display Places" to see examples</p>
                         </div>
                     </div>
                 </div>
@@ -688,7 +713,7 @@
             const gameCountryOptionsFragment = document.createDocumentFragment();
             const placeAndCountryModeOption = document.createElement('option');
             placeAndCountryModeOption.value = 'placeAndCountry';
-            placeAndCountryModeOption.textContent = 'Place and country';
+            placeAndCountryModeOption.textContent = 'Place and Country Mode';
             gameCountryOptionsFragment.appendChild(placeAndCountryModeOption);
 
             const anyCountryOptionForGame = document.createElement('option');
@@ -871,7 +896,7 @@
                     searchMinLengthInput.value = '';
                     searchMaxLengthInput.value = '';
                     searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
-                    examplePlacesContainer.innerHTML = '<p class="text-muted">No examples yet</p>';
+                    examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
                     setPanelVisibility(rulesBtn, rulesContainer, false);
                     setPanelVisibility(showSearchBtn, searchContainer, false);
                 });
@@ -891,7 +916,7 @@
                 searchMinLengthInput.value = '';
                 searchMaxLengthInput.value = '';
                 searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
-                examplePlacesContainer.innerHTML = '<p class="text-muted">No examples yet</p>';
+                examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
                 setPanelVisibility(rulesBtn, rulesContainer, false);
                 setPanelVisibility(showSearchBtn, searchContainer, false);
             }
@@ -1164,7 +1189,7 @@
 
         function updateGuessedPlacesDisplay() {
             if (guessedPlaces.length === 0) {
-                guessedPlacesContainer.innerHTML = '<p class="text-muted">No guesses yet</p>';
+                guessedPlacesContainer.innerHTML = '<p class="text-muted">No places guessed yet</p>';
                 return;
             }
             let html = '';
