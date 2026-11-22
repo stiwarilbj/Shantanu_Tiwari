@@ -965,20 +965,28 @@
             const lowerGuess = guess.toLowerCase();
             const needsCountry = currentGameMode === 'placeAndCountry';
             const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
-            if (needsCountry && parts.length !== 2) return null;
+            if (needsCountry && parts.length < 2) return null;
 
-            const [guessedCity, guessedCountry] = parts;
+            // Either name can contain commas, so try each possible separator.
+            const candidatePairs = needsCountry ? parts.slice(0, -1).map((_, index) => [
+                parts.slice(0, index + 1).join(', '),
+                parts.slice(index + 1).join(', '),
+            ]) : [parts];
             let typoMatch = null;
             for (const place of filteredPlaces) {
-                const exactCity = place.city.toLowerCase() === guessedCity;
-                const exactCountry = !needsCountry || place.country_name.toLowerCase() === guessedCountry;
-                if (exactCity && exactCountry) return place;
+                const city = place.city.toLowerCase();
+                const country = needsCountry ? place.country_name.toLowerCase() : '';
+                for (const [guessedCity, guessedCountry] of candidatePairs) {
+                    const exactCity = city === guessedCity;
+                    const exactCountry = !needsCountry || country === guessedCountry;
+                    if (exactCity && exactCountry) return place;
 
-                // Keep a typo match in case the filtered list has no exact answer.
-                if (!typoMatch &&
-                    (exactCountry || isCloseMatch(place.country_name, guessedCountry)) &&
-                    (exactCity || isCloseMatch(place.city, guessedCity))) {
-                    typoMatch = place;
+                    // Keep a typo match in case the filtered list has no exact answer.
+                    if (!typoMatch &&
+                        (exactCountry || isCloseMatch(country, guessedCountry)) &&
+                        (exactCity || isCloseMatch(city, guessedCity))) {
+                        typoMatch = place;
+                    }
                 }
             }
             return typoMatch;
