@@ -9,7 +9,7 @@ Watch blobs look for food, hunt, and have babies. Small changes in speed, size, 
 - **World** plays one day at a time. Pick a blob to follow it, or use **Quick Sim** to jump ahead. If the last blob dies, select the extinction tile to watch the ending.
 - **Settings** lets you make species, change their traits, and decide how much food to put out.
 - **Trends** shows how the population changes over time. Choose **Walk through age**, then pick a day to see the ages behind the average. **Compare** lets you look at two runs side by side.
-- **About** includes a guided walkthrough and a 600-generation experiment you can run and replay. Open **Try an experiment** to start a new run with a different seed or amount of food.
+- **About** includes a 100-day preview where you can follow a hunter and a plant forager. Use the 600-day comparison to see how changing size mutation affects the whole group. **Try an experiment** lets you start a new run with a different seed or amount of food.
 
 ## Run it locally
 

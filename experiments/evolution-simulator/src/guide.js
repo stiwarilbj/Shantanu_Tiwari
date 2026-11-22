@@ -23,6 +23,8 @@ export const lessons = [
     text:'Watch a parent settle, meet its newborn, then follow the young blob the next day. In this example, the child inherits a much shorter sense range.' },
   { id:'trends', title:'Reading the results', timestamp:302, example:'sight-comparison',
     text:'Trends shows the blobs that start each day. Compare the sight circles on Day 1 and Day 648 to see how sight changed during a 1,000-day run.' },
+  { id:'size-preview', title:'Size mutation preview', timestamp:385,
+    text:'Watch a field of blobs with a wider size mutation. Then follow a hunter and a plant forager from the same dawn and see how long each spends looking for food.' },
   { id:'closing', title:'Try an experiment', timestamp:604,
     text:'What changes when the blobs start in new places or have fewer plants to eat? Pick one setting and see what happens over several days.' },
 ]

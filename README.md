@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs look for food, hunt, and pass on traits like size, speed, and sight. Try a new random seed or food supply, then follow a creature or replay an earlier day. Compare two runs side by side, or pick a day on the Age chart to see how many blobs are young or old.
+Watch blobs hunt, gather food, and pass on traits like size and speed. Jump through a 100-day preview, then slow down to follow a hunter and a plant forager. Try your own food supply or seed, compare two runs, and use the Age chart to find out how old the blobs are.
 
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 

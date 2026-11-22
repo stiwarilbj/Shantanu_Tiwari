@@ -22,8 +22,7 @@ test('the illustrated walkthrough opens a real family replay @pages', async ({ p
   await panel.getByRole('button', { name:'Primer', exact:true }).click()
   await expect(panel.getByRole('img')).toHaveCount(3)
   await expect.poll(() => panel.getByRole('img').evaluateAll(images => images.every(img => img.naturalWidth > 0))).toBe(true)
-  await panel.getByRole('button', { name:'The host', exact:true }).click()
-  await expect(panel.getByRole('img', { name:/science host/ })).toBeVisible()
+  await expect(panel.getByRole('button')).toHaveText(['Finches', 'Primer'])
 
   await page.getByRole('button', { name:'A newborn’s sight', exact:true }).click()
   const activeRun = page.getByRole('button', { name:'Run options' })
@@ -137,12 +136,94 @@ test('the final chapter keeps its tabletop visible above the actions on a phone'
   }
 })
 
+test('the size mutation preview plays the field and follows two recorded creatures @pages', async ({ page }) => {
+  await openWalkthrough(page, true)
+  const active = new URL(page.url()).hash.split('/about')[0]
+  await page.getByRole('button', { name:'Size mutation preview', exact:true }).click()
+  const preview = page.getByRole('region', { name:'Size mutation preview' })
+  await expect(preview.getByRole('heading', { name:'Size mutation preview' })).toBeFocused()
+  await expect(preview.getByText('Dawn · 50 founders')).toBeVisible()
+  await expect(preview.locator('canvas')).toBeVisible()
+  await preview.getByRole('button', { name:'Prepare 100-day preview' }).press('Enter')
+  const play = preview.getByRole('button', { name:'Play preview' })
+  await expect(play).toBeEnabled({timeout:20_000})
+  const speed = preview.getByRole('combobox', { name:'Preview playback speed' })
+  await expect(speed).toHaveValue('4')
+  await expect(preview.getByText(/Day 1 at dawn · 50 blobs · Mean size 10.00/)).toBeVisible()
+  const time = preview.getByRole('slider', { name:'Preview time' })
+  await play.click()
+  await expect.poll(async () => Number(await time.inputValue())).toBeGreaterThan(0.1)
+  await preview.getByRole('button', { name:'Restart preview' }).click()
+  await expect(time).toHaveValue('0')
+
+  await preview.getByRole('button', { name:'Day 6', exact:true }).click()
+  await preview.getByRole('button', { name:'Follow hunter' }).click()
+  await expect(speed).toHaveValue('1')
+  await expect(time).toHaveValue('0')
+  const readout = preview.getByLabel('Creature readout')
+  await expect(readout.getByRole('heading', { name:/^Hunter/ })).toBeVisible()
+  await readout.getByRole('button', { name:/Catch prey/ }).click()
+  await expect(readout.getByRole('button', { name:/Catch prey/ })).toHaveAttribute('data-reached','true')
+  const hunterMeal = Number(await time.inputValue())
+  await preview.getByRole('button', { name:'Follow forager' }).click()
+  await expect(readout.getByRole('heading', { name:/Plant forager/ })).toBeVisible()
+  await expect(time).toHaveValue('0')
+  await readout.getByRole('button', { name:/Eat a plant/ }).first().click()
+  expect(Number(await time.inputValue())).toBeGreaterThan(hunterMeal)
+  await readout.getByRole('button', { name:/Reach refuge/ }).click()
+  await expect(readout.getByText('Home', { exact:true })).toBeVisible()
+
+  await preview.getByRole('button', { name:'Day 100', exact:true }).click()
+  await expect(play).toBeEnabled()
+  await expect(speed).toHaveValue('4')
+  await expect(preview.getByText(/Day 100 at dawn/)).toBeVisible()
+  await preview.getByRole('button', { name:/Set up the 600-day comparison/ }).click()
+  await expect(page.getByRole('heading', { name:'Compare size mutation' })).toBeFocused()
+  await expect(page.getByLabel('Days per run')).toHaveValue('600')
+  expect(new URL(page.url()).hash.split('/about')[0]).toBe(active)
+})
+
+test('the size preview can be canceled or retried without losing keyboard focus', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.previewTestMode = 'hold'
+    const send = Worker.prototype.postMessage
+    Worker.prototype.postMessage = function(message, ...args) {
+      if (message.type !== 'init' || message.config?.name !== 'Size mutation preview' || window.previewTestMode === 'run') {
+        return send.call(this, message, ...args)
+      }
+      if (window.previewTestMode === 'fail') {
+        setTimeout(() => this.onmessage?.({ data:{ type:'error', message:'Fixture failure' } }), 0)
+      }
+    }
+  })
+  await openWalkthrough(page)
+  await page.getByRole('button', { name:'Size mutation preview', exact:true }).click()
+  const preview = page.getByRole('region', { name:'Size mutation preview' })
+  await expect(preview.getByRole('heading', { name:'Size mutation preview' })).toBeFocused()
+  const prepare = preview.getByRole('button', { name:'Prepare 100-day preview' })
+  const cancel = preview.getByRole('button', { name:'Cancel', exact:true })
+  await prepare.press('Enter')
+  await expect(cancel).toBeFocused()
+  await cancel.press('Enter')
+  await expect(prepare).toBeFocused()
+  await expect(preview.getByRole('status')).toHaveText('Preview canceled.')
+
+  await page.evaluate(() => { window.previewTestMode = 'fail' })
+  await prepare.press('Enter')
+  const retry = preview.getByRole('button', { name:'Retry preview' })
+  await expect(retry).toBeFocused()
+  await expect(preview.getByRole('status')).toHaveText('The preview could not be prepared.')
+  await page.evaluate(() => { window.previewTestMode = 'run' })
+  await retry.press('Enter')
+  await expect(preview.getByRole('button', { name:'Play preview' })).toBeFocused()
+})
+
 test('the stride race and energy lesson explain what bigger blobs spend', async ({ page }) => {
   await openWalkthrough(page)
   await page.getByRole('button', { name:'Size and stride', exact:true }).click()
   const panel = page.locator('.chapter-panel')
-  await panel.getByText('See the original Rust rule').click()
-  await expect(panel.locator('code')).toContainText('self.speed.0 * self.size.0 / 10.')
+  await panel.getByText('See how stride is calculated').click()
+  await expect(panel.locator('code')).toContainText('inherited speed × body size ÷ 10')
   await expect(panel.locator('.stride-flag')).toHaveCount(2)
   await page.clock.install()
   await panel.getByRole('button', { name:'Play race' }).click()

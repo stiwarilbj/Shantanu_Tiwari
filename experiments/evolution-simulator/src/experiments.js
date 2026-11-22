@@ -2,6 +2,7 @@ import { starter, WALKTHROUGH_RULE_VERSION } from './engine/config.js'
 
 export const SIZE_MUTATION_SEED = 118
 export const SIZE_MUTATION_DAYS = 600
+export const SIZE_PREVIEW_DAYS = 100
 
 function applySizeExperiment(config, size, seed = SIZE_MUTATION_SEED, days = SIZE_MUTATION_DAYS) {
   config.version = WALKTHROUGH_RULE_VERSION
@@ -53,4 +54,11 @@ export function sizeMutationPair(seed, days) {
     applySizeExperiment(setup, size, seed, days)
     return setup
   })
+}
+
+export function sizePreviewSetup() {
+  const setup = starter()
+  setup.name = 'Size mutation preview'
+  applySizeExperiment(setup, 1, SIZE_MUTATION_SEED, SIZE_PREVIEW_DAYS)
+  return setup
 }
