@@ -30,12 +30,6 @@ export default defineConfig(({ mode }) => {
                 { tag: 'link', attrs: { rel: 'icon', href: '../../assets/favicon.ico' }, injectTo: 'head' },
                 { tag: 'script', attrs: { type: 'module', src: `../../navbar/${navbar}`, blocking: 'render' }, injectTo: 'head' },
                 { tag: 'header', attrs: { 'data-site-navbar': true }, injectTo: 'body-prepend' },
-                {
-                  tag: 'div',
-                  attrs: { class: 'project-lab-heading' },
-                  injectTo: 'body-prepend',
-                  children: '\n      <a href="../">Experiments</a>\n      <h1>Evolution Simulator</h1>\n    ',
-                },
               ],
             }
           },

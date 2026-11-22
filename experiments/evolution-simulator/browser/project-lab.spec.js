@@ -8,13 +8,43 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Simulation Settings' })).toBeEnabled()
 })
 
-test('the keyboard skip link clears the shared navbar and the project links back to Experiments @pages', async ({ page }) => {
+test('the simulator fills the viewport below the shared navbar @pages', async ({ page }) => {
   await expect(page).toHaveTitle('Evolution Simulator | Project Lab')
-  await expect(page.getByRole('heading', { name: 'Evolution Simulator', exact: true })).toBeVisible()
+  const navbar = page.getByRole('navigation', { name: 'Main navigation' })
+  const app = page.locator('#app')
+  await expect(navbar).toBeVisible()
 
-  const breadcrumb = page.locator('.project-lab-heading').getByRole('link', { name: 'Experiments' })
+  for (const [width, height] of [[1440, 900], [768, 530], [390, 844], [320, 420], [740, 380], [740, 320]]) {
+    await page.setViewportSize({ width, height })
+    await expect.poll(() => app.evaluate(element => {
+      const { left, right, top, bottom } = element.getBoundingClientRect()
+      const navbarBottom = document.querySelector('[data-site-navbar]').getBoundingClientRect().bottom
+      return {
+        left,
+        right,
+        gap: top - navbarBottom,
+        bottom,
+        horizontalScroll: document.documentElement.scrollWidth - innerWidth,
+        verticalScroll: document.documentElement.scrollHeight - innerHeight,
+        corners: [0, innerWidth - 1].every(x =>
+          [Math.ceil(navbarBottom), innerHeight - 1].every(y => element.contains(document.elementFromPoint(x, y)))
+        ),
+      }
+    })).toEqual({ left: 0, right: width, gap: 0, bottom: height, horizontalScroll: 0, verticalScroll: 0, corners: true })
+  }
+
+  const stats = page.getByRole('heading', { name: 'Current Generation Stats' })
+  await stats.scrollIntoViewIfNeeded()
+  await expect(stats).toBeInViewport({ ratio: 0.95 })
+  expect(await page.locator('#main-surface').evaluate(surface => surface.scrollTop)).toBeGreaterThan(0)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
+test('the keyboard skip link clears the shared navbar and Experiments stays reachable @pages', async ({ page }) => {
+  const navbar = page.getByRole('navigation', { name: 'Main navigation' })
   const skipLink = page.getByRole('link', { name: 'Skip to content' })
-  await breadcrumb.focus()
+  await navbar.getByRole('link', { name: 'Old Projects', exact: true }).press('ArrowDown')
+  await expect(navbar.getByRole('link', { name: 'Filler for Old Projects' })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(skipLink).toBeFocused()
   expect(await skipLink.evaluate(link => {
@@ -24,7 +54,7 @@ test('the keyboard skip link clears the shared navbar and the project links back
   await page.keyboard.press('Enter')
   await expect(page.locator('#main-surface')).toBeFocused()
 
-  await breadcrumb.click()
+  await navbar.getByRole('link', { name: 'Experiments', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Experiments', exact: true })).toBeVisible()
 })
 
@@ -66,7 +96,7 @@ test.describe('short touch viewports', () => {
       stageHeight: document.querySelector('.stage').getBoundingClientRect().height,
       fullWidth: document.documentElement.scrollWidth,
     }))
-    expect(layout.tabletopTop).toBeGreaterThan(layout.panelBottom)
+    expect(layout.tabletopTop).toBeCloseTo(layout.panelBottom)
     expect(layout.stageHeight).toBeGreaterThan(150)
     expect(layout.fullWidth).toBe(320)
 
