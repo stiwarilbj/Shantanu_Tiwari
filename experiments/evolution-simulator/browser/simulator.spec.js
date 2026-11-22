@@ -200,7 +200,7 @@ test('the production build runs a new experiment and shows its charts @pages', a
     if (isAppRequest(failed.url())) problems.push(failed.url())
   })
   if (process.env.PAGES_URL) {
-    const built = await readFile('dist/index.html', 'utf8')
+    const built = await readFile(new URL('../../../docs/experiments/evolution-simulator/index.html', import.meta.url), 'utf8')
     const entry = built.match(/<script type="module"[^>]* src="([^"]+)"/)?.[1]
     expect(entry).toBeTruthy()
     await expect.poll(async () => (await request.get('./')).text(), { timeout: 45000 }).toContain(entry)
@@ -245,7 +245,7 @@ test('the four gray home sides and corners stay visible during replay and in Can
     await page.getByRole('button', { name:'View options' }).click()
     await page.getByRole('button', { name:/^Overhead/ }).click()
   }
-  const painted = { sides:[229,229,229,229], corners:[229,229,229,229], interior:255 }
+  const painted = { sides:[201,201,201,201], corners:[201,201,201,201], interior:243 }
   await overhead()
   await expect(field.getByText('Canvas view', { exact:true })).toHaveCount(0)
   await expect.poll(() => fieldColors(page, canvas)).toEqual(painted)
@@ -292,7 +292,7 @@ test('the four gray home sides and corners stay visible during replay and in Can
   await time.fill('0')
   if (!(await page.locator('.world').getAttribute('class')).includes('is-overhead')) await overhead()
   await expect.poll(() => fieldColors(page, canvas)).toEqual({
-    sides:[255,255,255,255], corners:[255,255,255,255], interior:255,
+    sides:[243,243,243,243], corners:[243,243,243,243], interior:243,
   })
   expect(errors).toEqual([])
 })
@@ -529,7 +529,7 @@ test('slow live playback draws intermediate poses and replay seeks directly to t
     const bodyGradients = new WeakSet()
     let seen = false, center
     painter.fillRect = function (...args) {
-      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#242424') seen = false
+      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#132437') seen = false
       return originals.clear.apply(this, args)
     }
     painter.ellipse = function (x, y, ...args) {
@@ -685,7 +685,7 @@ test('Mini line can plot Population and Age at Death', async ({ page }) => {
   await population.click()
   await expect(table).toBeHidden()
   await expect(population).toHaveAttribute('aria-pressed', 'true')
-  await expect(line).toHaveAttribute('stroke', '#EEEDD6')
+  await expect(line).toHaveAttribute('stroke', '#F2EBD1')
   await expect(line).toHaveAttribute('d', /M.*L/)
 
   await page.setViewportSize({ width: 512, height: 480 })
@@ -1039,7 +1039,7 @@ test('downloaded chart PNG keeps the chart readable on a light page', async ({ p
       hasLightMarks,
     }
   }, png.toString('base64'))
-  expect(result).toEqual({ ...source, background: [36, 36, 36, 255], hasLightMarks: true })
+  expect(result).toEqual({ ...source, background: [19, 36, 55, 255], hasLightMarks: true })
 })
 
 test('Jump to chart reaches Overview with separate or combined scales', async ({ page }) => {
@@ -1282,11 +1282,11 @@ test('Trends compares sight spread in the filtered days and opens each closing c
     }
     const { fillRect, fill } = CanvasRenderingContext2D.prototype
     CanvasRenderingContext2D.prototype.fillRect = function (...args) {
-      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#242424') window.sightCircles = 0
+      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#132437') window.sightCircles = 0
       return fillRect.apply(this, args)
     }
     CanvasRenderingContext2D.prototype.fill = function (...args) {
-      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#e4f5fe') window.sightCircles++
+      if (this.canvas.classList.contains('world-canvas') && this.fillStyle === '#ceeafe') window.sightCircles++
       return fill.apply(this, args)
     }
   })
@@ -1358,7 +1358,7 @@ test('compact Trends plots fill the dawn spread and read the mean and SD togethe
   await page.getByRole('link', { name: 'Trends', exact: true }).click()
   await expect(page.locator('.walkthrough-plots h2')).toHaveText(['Population', 'Age', 'Speed', 'Size', 'Sense Range'])
   const age = page.locator('#chart-age canvas')
-  await expect.poll(() => page.evaluate(() => window.ageChart.fills)).toContain('rgba(253, 222, 59, 0.1)')
+  await expect.poll(() => page.evaluate(() => window.ageChart.fills)).toContain('rgba(241, 206, 102, 0.1)')
   await age.hover({ position:{ x:40, y:60 } })
   await expect.poll(() => page.evaluate(() => window.ageChart.texts)).toContain('Mean  0.00 ± 0.00')
   const day = page.locator('#chart-population canvas')

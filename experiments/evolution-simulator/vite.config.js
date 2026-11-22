@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
             return {
               html: html
                 .replace(/^[ \t]*<link rel="icon"[^>]*>\r?\n/m, '')
-                .replace('<meta name="theme-color" content="#242424">', '<meta name="theme-color" content="#cfe2ff">')
+                .replace('<meta name="theme-color" content="#132437">', '<meta name="theme-color" content="#cfe2ff">')
                 .replace('<title>Evolution Simulator</title>', '<title>Evolution Simulator | Project Lab</title>')
                 .replace('<body>', '<body class="project-lab-page">'),
               tags: [

@@ -80,6 +80,41 @@ test('simulator popups close on Escape without stealing focus from other control
   await expect(view).toBeFocused()
 })
 
+test('staged comparison stays below the shared navbar and fits both boards @pages', async ({ page }) => {
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Days per run' }).selectOption('100')
+  await page.getByRole('button', { name: 'Run both and compare' }).click()
+  await page.getByRole('button', { name: /Stage video moments/ }).click()
+  const play = page.getByRole('button', { name: 'Play video sequence' })
+  const stop = page.getByRole('button', { name: 'Stop video sequence' })
+  const stage = page.locator('.cinematic-sequence')
+  const navbar = page.getByRole('navigation', { name: 'Main navigation' })
+  const wordmark = navbar.getByRole('link', { name: 'Project Lab' })
+
+  for (const [width, height] of [[1280, 850], [390, 844]]) {
+    await page.setViewportSize({ width, height })
+    await play.click()
+    await expect(stop).toBeFocused()
+    await expect(page.getByRole('navigation', { name: 'Evolution Simulator navigation' })).toBeHidden()
+    const bounds = await stage.evaluate(element => {
+      const frame = element.getBoundingClientRect()
+      const nav = document.querySelector('[data-site-navbar]').getBoundingClientRect()
+      const lanes = [...element.querySelectorAll('.paired-boards > section')]
+      const [first, second] = lanes.map(lane => lane.getBoundingClientRect())
+      return { top: frame.top, navBottom: nav.bottom, bottom: frame.bottom,
+        stacked: second.top >= first.bottom, secondVisible: second.bottom <= frame.bottom }
+    })
+    expect(bounds.top).toBeCloseTo(bounds.navBottom)
+    expect(bounds.bottom).toBe(height)
+    expect(bounds.stacked).toBe(width <= 560)
+    expect(bounds.secondVisible).toBe(true)
+    await wordmark.click({ trial: true })
+    await page.keyboard.press('Escape')
+    await expect(stage).toHaveCount(0)
+    await expect(play).toBeFocused()
+  }
+})
+
 test.describe('short touch viewports', () => {
   test.use({ isMobile: true, hasTouch: true, viewport: { width: 320, height: 420 } })
 

@@ -32,7 +32,23 @@ const cast = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 const radiusGeometry = new THREE.CircleGeometry(1, 32)
-const homeColor = '#E5E5E5'
+const field = {
+  surface: '#F3F7FB',
+  refuge: '#C9D5E1',
+  refugeLine: '#577488',
+  rim: '#A7B8CA',
+  litSide: '#849AB1',
+  shadedSide: '#697F96',
+  underside: '#5D7085',
+}
+const marks = {
+  food: '#83A51E',
+  sight: '#CEEAFE',
+  selected: '#285B89',
+  hovered: '#6A53A8',
+  plantCredit: '#A1C33F',
+  preyCredit: '#D38C80',
+}
 const legacyOutlineSize = FIELD - 16
 const meshKinds = {}
 let renderer, canvas, ctx, orbit, resize, raf, down, previousFrame, height = 1, width = 1, dirty = true
@@ -66,14 +82,14 @@ function makeContactShadow() {
 
 function placeBoard() {
   const slab = new THREE.Mesh(new THREE.BoxGeometry(540, 10, 540),
-    ['#9C9C9C','#AAAAAA','#CDCDCD','#888888','#A3A3A3','#AAAAAA'].map(fill => new THREE.MeshBasicMaterial({ color:fill })))
+    [field.shadedSide, field.litSide, field.rim, field.underside, field.shadedSide, field.litSide].map(fill => new THREE.MeshBasicMaterial({ color:fill })))
   slab.position.y = -6
   scene.add(slab)
   const plane = new THREE.PlaneGeometry(FIELD, FIELD)
-  refugeSurface = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: homeColor }))
+  refugeSurface = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: field.refuge }))
   refugeSurface.rotation.x = -Math.PI / 2
   refugeSurface.position.y = -0.8
-  tabletop = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: '#ffffff' }))
+  tabletop = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: field.surface }))
   tabletop.rotation.x = -Math.PI / 2
   tabletop.position.y = -0.7
   scene.add(refugeSurface, tabletop)
@@ -85,7 +101,7 @@ function placeBoard() {
   const edgeGeometry = new THREE.EdgesGeometry(corners)
   corners.dispose()
   refugeOutline = new THREE.LineSegments(edgeGeometry,
-    new THREE.LineDashedMaterial({ color: '#6C847C', dashSize: 7, gapSize: 5, transparent: true, opacity: .65 }))
+    new THREE.LineDashedMaterial({ color: field.refugeLine, dashSize: 7, gapSize: 5, transparent: true, opacity: .65 }))
   refugeOutline.rotation.x = -Math.PI / 2
   refugeOutline.position.y = 0.05
   refugeOutline.computeLineDistances()
@@ -258,21 +274,21 @@ function draw3d(blobs, frame, view, { min, max }) {
   }
   frame.plants.forEach((p, i) => {
     const x = p.x - 250, z = p.y - 250
-    write(pellets, i, '#83A51E', x, 2.2, z, 1)
+    write(pellets, i, marks.food, x, 2.2, z, 1)
     if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8, .045, z + .35, 3.2, 2.3, 1, -Math.PI / 2)
   })
-  sight.forEach((b,i)=>write(vision, i, '#E4F5FE', b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
+  sight.forEach((b,i)=>write(vision, i, marks.sight, b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
   indicators.forEach((b, i) => {
     if (energy.count) {
       color.copy(energyLow).lerp(energyFull, b.energy / b.capacity)
       write(energy, i, color, b.x - 250, .06, b.y - 250, b.r * 1.5, b.r * 1.5, 1, -Math.PI / 2)
     }
     if (credit.count) for (let j = 0; j < b.credits; j++) {
-      write(credit, pips++, j < b.preyCredits ? '#D38C80' : '#A1C33F',
+      write(credit, pips++, j < b.preyCredits ? marks.preyCredit : marks.plantCredit,
         b.x - 250 - b.r * 1.7 + j * 2.6, .1, b.y - 250 + b.r * 1.5, 1.15, 1.15, 1, -Math.PI / 2)
     }
   })
-  outlines.forEach((b,i)=>write(ring, i, b===chosen?'#33786D':'#C92922', b.x-250, .14, b.y-250, b.r*1.53, b.r*1.53, 1, -Math.PI/2))
+  outlines.forEach((b,i)=>write(ring, i, b === chosen ? marks.selected : marks.hovered, b.x-250, .14, b.y-250, b.r*1.53, b.r*1.53, 1, -Math.PI/2))
   const refugeWidth = frame.refugeWidth ?? 0
   const interior = FIELD - 2 * refugeWidth
   refugeSurface.visible = refugeWidth > 0
@@ -344,20 +360,20 @@ function draw2d(blobs, frame, view, { min, max }) {
   const top = corners(270).map(([x,z]) => p(x,-1,z)), bottom = corners(270).map(([x,z]) => p(x,-11,z))
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4
-    polygon([top[i],top[j],bottom[j],bottom[i]], i % 2 ? '#969696' : '#AAAAAA')
+    polygon([top[i],top[j],bottom[j],bottom[i]], i % 2 ? field.shadedSide : field.litSide)
   }
-  polygon(top, '#CDCDCD')
+  polygon(top, field.rim)
   const refugeWidth = frame.refugeWidth ?? 0
-  const field = corners(FIELD / 2).map(([x,z]) => p(x,0,z))
+  const fieldPolygon = corners(FIELD / 2).map(([x,z]) => p(x,0,z))
   const interior = FIELD / 2 - refugeWidth
-  polygon(field, refugeWidth ? homeColor : '#FFFFFF')
+  polygon(fieldPolygon, refugeWidth ? field.refuge : field.surface)
   ctx.save()
   ctx.clip()
-  if (refugeWidth) polygon(corners(interior).map(([x,z]) => p(x,0,z)), '#FFFFFF')
+  if (refugeWidth) polygon(corners(interior).map(([x,z]) => p(x,0,z)), field.surface)
   const eligible = b => !props.layers?.selected || b.id === props.selected
   if (props.layers?.homes) {
     const points = corners(refugeWidth ? interior : legacyOutlineSize / 2).map(([x,z]) => p(x,0,z))
-    ctx.strokeStyle = '#6C847C'
+    ctx.strokeStyle = field.refugeLine
     ctx.setLineDash([4,3])
     polygonPath(points)
     ctx.stroke()
@@ -378,14 +394,14 @@ function draw2d(blobs, frame, view, { min, max }) {
       const unit = p(b.x-250,2.35,b.y-250)
       const scale = overheadView ? width/(overhead.right-overhead.left) : Math.hypot(unit.x-q.x,unit.y-q.y)/2.15
       const senseRadius = b.sense * scale
-      ellipse(q.x,q.y,senseRadius,senseRadius*(overheadView ? 1 : .36),'#E4F5FE')
+      ellipse(q.x,q.y,senseRadius,senseRadius*(overheadView ? 1 : .36),marks.sight)
     }
     if (!simple || b.id === props.selected) softShadow(q.x+r*.42,q.y+r*.09,r*1.7,r*(overheadView?1.12:.51))
     if (props.layers?.energy && eligible(b)) ellipse(q.x,q.y,r*1.46,r*.43,b.energy/b.capacity>.45?'#F4DF86':'#CCCCCC')
     if (b.id === props.selected && !(props.tabletop && props.follow)) {
       ctx.beginPath()
       ctx.ellipse(q.x,q.y,r*1.47,r*.48,0,0,Math.PI*2)
-      ctx.strokeStyle='#33786D'
+      ctx.strokeStyle=marks.selected
       ctx.stroke()
     }
   })
@@ -398,6 +414,7 @@ function draw2d(blobs, frame, view, { min, max }) {
       const r = pelletRadius
       const gradient = ctx.createRadialGradient(t.x-r*.3,t.y-r*.4,0,t.x,t.y,r*1.15)
       gradient.addColorStop(0,'#A9BA4D')
+      gradient.addColorStop(.55, marks.food)
       gradient.addColorStop(1,'#647D22')
       ellipse(t.x,t.y,r,r,gradient)
       continue
@@ -426,14 +443,14 @@ function draw2d(blobs, frame, view, { min, max }) {
       ctx.fillStyle=grad
       ctx.fill()
       if (b.id === hovered.value) {
-        ctx.strokeStyle = '#C92922'
+        ctx.strokeStyle = marks.hovered
         ctx.lineWidth = 1.3
         ctx.stroke()
       }
       ctx.restore()
       ellipse(x+side*r*.53,y-h*.78,Math.max(.65,r*.08),Math.max(.65,r*.08),'#0A0A0A')
     }
-    if (props.layers?.credits && eligible(b)) for (let i=0;i<b.credits;i++) ellipse(x-r+i*4,y+4,1.8,1.5,i<b.preyCredits?'#D38C80':'#A1C33F')
+    if (props.layers?.credits && eligible(b)) for (let i=0;i<b.credits;i++) ellipse(x-r+i*4,y+4,1.8,1.5,i < b.preyCredits ? marks.preyCredit : marks.plantCredit)
     screenBlobs.push({ id:b.id,x,y:overheadView?y:y-h*.5,r:Math.max(r,4),h })
   }
 }

@@ -11,15 +11,11 @@
 
 .project-lab-page > #app {
   --app-ui-font: Inter, system-ui, sans-serif;
-  --board-background: #192a3c;
-  --toolbar-bg: #142334;
-  --toolbar-line: #395169;
-  --toolbar-hover: #253f58;
+  --board-background: var(--stage);
+  --toolbar-bg: var(--input);
+  --toolbar-line: var(--line);
+  --toolbar-hover: var(--inset);
   --world-menu-top: 68px;
-  --dock: #121e2c;
-  --line: var(--toolbar-line);
-  --focus: #a1d7ff;
-  --teal: #285985;
   position: relative;
   isolation: isolate;
   flex: 1 0 0;
@@ -64,7 +60,7 @@
 }
 
 .project-lab-page .app-header nav a {
-  color: #c4d2e3;
+  color: var(--muted);
 }
 
 .project-lab-page .app-header nav a[aria-current="page"]::after {
@@ -75,21 +71,17 @@
 .project-lab-page .view-tools .icon:is([aria-expanded="true"], [aria-pressed="true"]),
 .project-lab-page .view-tools .icon:hover:not(:disabled) {
   background: var(--toolbar-hover);
-  color: #f5faff;
+  color: var(--ink);
 }
 
 .project-lab-page .settings-pill {
   min-inline-size: auto;
 }
 
-.project-lab-page .settings-pill:hover {
-  background: #346b9b;
-}
-
 .project-lab-page .run-status {
   border: 1px solid var(--toolbar-line);
   background: var(--toolbar-bg);
-  color: #d6e4f3;
+  color: var(--cream);
   font-variant-numeric: tabular-nums;
 }
 
@@ -119,7 +111,7 @@
 .project-lab-page .view-tools .icon {
   block-size: 2.25rem;
   min-block-size: 2.25rem;
-  color: #d0deec;
+  color: var(--cream);
 }
 
 .project-lab-page :is(.layer-panel, .view-menu) {
@@ -161,15 +153,6 @@
 
 .project-lab-page :is(.stage, .world:fullscreen, .guided-board) {
   background: var(--board-background);
-}
-
-.project-lab-page .dock {
-  background: #0e1925;
-}
-
-.project-lab-page .flower-legend {
-  background: #101c2a;
-  border-color: #2a4056;
 }
 
 .project-lab-page > #app > .skip-link {

@@ -10,7 +10,7 @@ const props = defineProps({ id:String, title:String, rows:Array, series:Array, u
   pin:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean })
 const emit = defineEmits(['hide','focus','pin','watch','range'])
 const canvas = ref(), hovered = ref(null)
-let chart, brush, ignoreClick = false
+let chart, brush, chartTheme, ignoreClick = false
 const hidden = ref([])
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
@@ -72,7 +72,7 @@ const marker = {
     const ctx=instance.ctx
     ctx.save()
     if (brush) {
-      ctx.fillStyle='#71D2C044'
+      ctx.fillStyle=chartTheme.rail+'44'
       ctx.fillRect(dayX(Math.min(brush.start,brush.end)),area.top,
         Math.abs(dayX(brush.end)-dayX(brush.start)),area.bottom-area.top)
     }
@@ -89,7 +89,7 @@ const marker = {
       const i=props.rows.findIndex(row=>row.day===annotation.day)
       if(i>=0) mark(dayX(i),annotation.color,[3,4])
     }
-    if(index>=0) mark(dayX(index),props.pin===active.value?'#BDBAB0':'#777268')
+    if(index>=0) mark(dayX(index),props.pin===active.value ? chartTheme.focus : chartTheme.quiet)
     ctx.restore()
   },
   afterDatasetsDraw(instance) {
@@ -98,8 +98,8 @@ const marker = {
     if (!area || y<area.top || y>area.bottom) return
     const ctx=instance.ctx
     ctx.save()
-    ctx.strokeStyle='#99958a'
-    ctx.fillStyle='#BDBAB0'
+    ctx.strokeStyle=chartTheme.quiet
+    ctx.fillStyle=chartTheme.muted
     ctx.setLineDash([4,4])
     ctx.beginPath()
     ctx.moveTo(area.left,y)
@@ -109,7 +109,6 @@ const marker = {
     ctx.restore()
   }
 }
-const axis = { color:'#BDBAB0',font:{family:'Source Sans',size:12},maxTicksLimit:6 }
 function update() {
   if(!chart) return
   chart.data.labels=props.rows.map(r=>r.day)
@@ -126,7 +125,11 @@ function update() {
   chart.update('none')
 }
 function create() {
-  const ticks=props.compact ? { ...axis,color:'#8E8A80',font:{...axis.font,size:11} } : axis
+  const style = getComputedStyle(canvas.value)
+  const themeNames = ['ink', 'cream', 'muted', 'quiet', 'line', 'subtle', 'panel', 'focus', 'rail']
+  chartTheme = Object.fromEntries(themeNames.map(name => [name, style.getPropertyValue('--'+name).trim()]))
+  const axis = { color:chartTheme.muted, font:{family:'Source Sans',size:12}, maxTicksLimit:6 }
+  const ticks = props.compact ? { ...axis, font:{...axis.font,size:11} } : axis
   chart=new Chart(canvas.value,{
     type:'line', plugins:[marker],data:{labels:[],datasets:[]},
     options:{
@@ -144,8 +147,8 @@ function create() {
       },
       layout:{padding:{left:8,right:12,top:6}},
       plugins:{filler:{propagate:false},tooltip:{
-        enabled:true, backgroundColor:'#111110',titleColor:'#FFFDFC',bodyColor:'#BDBAB0',
-        padding:11, borderColor:'#56534A', borderWidth:1, cornerRadius:4,
+        enabled:true, backgroundColor:chartTheme.panel,titleColor:chartTheme.ink,bodyColor:chartTheme.muted,
+        padding:11, borderColor:chartTheme.line, borderWidth:1, cornerRadius:6,
         titleFont:{family:'Lab Mono',size:15},bodyFont:{family:'Lab Mono',size:12},
         displayColors:true,
         filter:item=>props.series[item.datasetIndex]?.tooltip!==false,
@@ -162,9 +165,9 @@ function create() {
         }
       }},
       scales:{
-        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:props.compact?'#3D3A35':'#56534A'} },
-        y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0?'#545147':'#33332F'},border:{color:props.compact?'#3D3A35':'#45433F'},grace:'7%' },
-        y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:'#EEEDD6'},grid:{drawOnChartArea:false},border:{color:'#45433F'} }
+        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:chartTheme.line} },
+        y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0 ? chartTheme.line : chartTheme.subtle},border:{color:chartTheme.line},grace:'7%' },
+        y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:chartTheme.cream},grid:{drawOnChartArea:false},border:{color:chartTheme.line} }
       }
     }
   })
@@ -192,7 +195,7 @@ function downloadChart() {
 }
 </script>
 <template>
-  <article class="trend-plot" :class="{ 'focused-plot':focus || spotlight, 'spotlight-plot':spotlight, 'compact-plot':compact }" :style="{'--plot':color || '#EEEDD6'}"
+  <article class="trend-plot" :class="{ 'focused-plot':focus || spotlight, 'spotlight-plot':spotlight, 'compact-plot':compact }" :style="{'--plot':color || 'var(--cream)'}"
     :aria-label="title+' chart'" :id="focus ? undefined : 'chart-'+title.toLowerCase().replaceAll(' ','-')">
     <header class="plot-heading">
       <button v-if="hideable && !focus && !spotlight" class="chart-hide" :aria-label="'Hide '+title" @click="emit('hide')"><Minus :size="13"/></button>

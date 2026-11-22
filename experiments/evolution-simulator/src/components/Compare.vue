@@ -308,7 +308,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
 </script>
 
 <template>
-  <Teleport to="body" :disabled="!sequence">
+  <Teleport to="#app" :disabled="!sequence">
   <main class="compare-page" :class="{ 'cinematic-sequence':sequence }" @keydown.esc="sequence ? stopVideoSequence() : focus=''">
     <header><h1>Compare runs</h1><button class="secondary" @click="emit('library')">Run Library</button></header>
     <div class="compare-selects">
