@@ -22,7 +22,7 @@ await Promise.all(["navbar.css", "dropdown.css", "search.css"].map((filename) =>
 }));
 
 const sections = [
-  ["experiments", "Experiments"],
+  ["experiments", "Experiments", [["evolution-simulator", "Evolution Simulator"]]],
   ["learning", "Learning", [["places-game", "Place Naming Game"]]],
   ["games", "Games"],
   ["old-projects", "Old Projects"],

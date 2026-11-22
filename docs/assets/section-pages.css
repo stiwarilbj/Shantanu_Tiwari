@@ -52,7 +52,7 @@
   --section-gradient: linear-gradient(140deg, #e7edf9, #f3dce8 52%, #efb6b8);
 }
 
-.section-learning .learning-project {
+.section-content > .project-preview {
   inline-size: min(92%, 27.5rem);
   margin-block-start: clamp(4.625rem, calc(1.875rem + 5vw), 6.5rem);
 }

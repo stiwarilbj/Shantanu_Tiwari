@@ -1,10 +1,12 @@
 # [Project Lab](https://stiwarilbj.github.io/Shantanu_Tiwari/)
 
-Project Lab is a place to test ideas, learn by doing, play games, and revisit older projects. Try the Place Naming Game in the [Project Showcase](https://stiwarilbj.github.io/Shantanu_Tiwari/#showcase-title) or use [Explore](https://stiwarilbj.github.io/Shantanu_Tiwari/#explore-title) to browse the four sections. Use the search bar to jump to a project or section by name.
+Project Lab is a place to test ideas, learn by doing, play games, and revisit older projects. Try Evolution Simulator and the Place Naming Game in the [Project Showcase](https://stiwarilbj.github.io/Shantanu_Tiwari/#showcase-title), or browse the four sections under [Explore](https://stiwarilbj.github.io/Shantanu_Tiwari/#explore-title). Use the search bar to jump to a project or section by name.
 
 ## [Experiments](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/)
 
-The first experiment is still to come.
+### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
+
+Watch blobs look for food, hunt, and pass on traits like size, speed, and sight. Set up your own species and food supply, then follow one creature or skip ahead to see which traits spread. Replay earlier generations and use charts to compare two runs side by side.
 
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 

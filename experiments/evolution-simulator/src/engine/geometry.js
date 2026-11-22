@@ -1,0 +1,113 @@
+import { LEGACY_RULE_VERSION } from './config.js'
+
+export const FIELD = 500
+export const REFUGE_WIDTH = 50
+export const DT = 0.05
+export const WALKTHROUGH_STEP = 0.1
+export const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+export const radius = size => size <= 100 ? 0.25 * size : 25 + 25 * (size - 100) / size
+export const travel = (blob, config) => 10 * blob.speed * (config.stride === 'linked' ? blob.size / 10 : 1)
+export const walkthroughStepCost = (blob, config) =>
+  (blob.size ** 3 * (travel(blob, config) * WALKTHROUGH_STEP) ** 2 + blob.sense) / 10000
+
+export function cost(blob, config) {
+  if (config.metabolism === 'walkthrough') return walkthroughStepCost(blob, config) / WALKTHROUGH_STEP
+  if (config.metabolism === 'product') return blob.size ** 3 * blob.speed ** 2 * blob.sense / 20000
+  return 0.001 * (blob.size ** 3 * (travel(blob, config) / 10) ** 2 + blob.sense)
+}
+export const canHunt = (hunter, prey, config) => config.predation && hunter.id !== prey.id &&
+  (config.sameSpecies || hunter.species !== prey.species) &&
+  (config.version === LEGACY_RULE_VERSION ? hunter.size >= 1.2 * prey.size : prey.size <= 0.8 * hunter.size)
+
+export function turn(from, to) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from))
+}
+
+export function edgePoint(x, y, width = 0) {
+  const side = Math.min(y, FIELD - x, FIELD - y, x)
+  if (width && side <= width) return { x, y }
+  if (side === y) return { x, y: width }
+  if (side === FIELD - x) return { x: FIELD - width, y }
+  if (side === FIELD - y) return { x, y: FIELD - width }
+  return { x: width, y }
+}
+
+export function refugeDistance({ x, y }, width) {
+  return Math.max(0, Math.min(x, y, FIELD - x, FIELD - y) - width)
+}
+
+export function homePoints(blob, width = 0) {
+  if (width && refugeDistance(blob, width) === 0) {
+    return [{ x: blob.x, y: blob.y, dx: 0, dy: 0, distance: 0 }]
+  }
+  const edge = width || blob.r + 6
+  return [
+    { x: edge, y: blob.y }, { x: FIELD - edge, y: blob.y },
+    { x: blob.x, y: edge }, { x: blob.x, y: FIELD - edge }
+  ].map(point => {
+    const dx = point.x - blob.x, dy = point.y - blob.y
+    const distance = Math.hypot(dx, dy)
+    return { ...point, dx, dy, distance: !width && distance <= 6 && (
+      blob.x <= edge || blob.x >= FIELD - edge || blob.y <= edge || blob.y >= FIELD - edge
+    ) ? 0 : distance }
+  }).sort((a, b) => a.distance - b.distance)
+}
+
+// Fraction along a movement segment at its first entry into any side of the border.
+export function refugeContact(path, width) {
+  const { x, y, dx, dy } = path
+  const distances = [[x, x + dx], [y, y + dy], [FIELD - x, FIELD - (x + dx)], [FIELD - y, FIELD - (y + dy)]]
+  let time = Infinity
+  for (const [start, end] of distances) {
+    if (start <= width) return 0
+    if (end <= width) time = Math.min(time, (start - width) / (start - end))
+  }
+  return time
+}
+
+export function pathOf(blob, direction, speed, stepSeconds) {
+  const dx = Math.cos(direction) * speed * stepSeconds, dy = Math.sin(direction) * speed * stepSeconds
+  const tx = dx > 0 ? (FIELD - blob.r - blob.x) / dx : dx < 0 ? (blob.r - blob.x) / dx : 1
+  const ty = dy > 0 ? (FIELD - blob.r - blob.y) / dy : dy < 0 ? (blob.r - blob.y) / dy : 1
+  const stop = clamp(Math.min(tx, ty), 0, 1)
+  return { x: blob.x, y: blob.y, dx: dx * stop, dy: dy * stop }
+}
+
+// Fraction along two simultaneous line segments at the first circle contact.
+export function contact(a, b, r) {
+  const x = a.x - b.x, y = a.y - b.y, dx = a.dx - (b.dx || 0), dy = a.dy - (b.dy || 0)
+  const c = x * x + y * y - r * r
+  if (c <= 0) return 0
+  const aa = dx * dx + dy * dy, halfB = x * dx + y * dy
+  if (aa === 0 || halfB >= 0) return null
+  const discriminant = halfB * halfB - aa * c
+  if (discriminant < 0) return null
+  const t = (-halfB - Math.sqrt(discriminant)) / aa
+  return t >= 0 && t <= 1 ? t : null
+}
+
+const CELL = 25
+const SIDE = Math.ceil(FIELD / CELL)
+const cell = value => clamp(Math.floor(value / CELL), 0, SIDE - 1)
+
+export class Grid {
+  constructor() { this.cells = new Map() }
+
+  insert(item, x = item.x, y = item.y, x2 = x, y2 = y) {
+    for (let i = cell(Math.min(x, x2)); i <= cell(Math.max(x, x2)); i++) {
+      for (let j = cell(Math.min(y, y2)); j <= cell(Math.max(y, y2)); j++) {
+        const key = i * SIDE + j
+        if (!this.cells.has(key)) this.cells.set(key, [])
+        this.cells.get(key).push(item)
+      }
+    }
+  }
+
+  *near(x, y, range, x2 = x, y2 = y) {
+    for (let i = cell(Math.min(x, x2) - range); i <= cell(Math.max(x, x2) + range); i++) {
+      for (let j = cell(Math.min(y, y2) - range); j <= cell(Math.max(y, y2) + range); j++) {
+        yield* this.cells.get(i * SIDE + j) ?? []
+      }
+    }
+  }
+}

@@ -1,4 +1,12 @@
 const projectPreviews = new Map([
+  ["evolution-simulator", {
+    description: "Watch a population of blobs evolve over generations",
+    details: [
+      "Set the food supply and decide how much traits like size, speed, and sight can change.",
+      "Follow a blob through a day, skip ahead with Quick Sim, or replay a past generation.",
+      "Use charts to track changes and compare runs side by side.",
+    ].join(" "),
+  }],
   ["places-game", {
     description: "Name as many places as you can before time runs out",
     details: [

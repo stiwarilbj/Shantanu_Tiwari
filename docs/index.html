@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="./assets/site.css?v=3">
   <link rel="stylesheet" href="./assets/project-previews.css">
   <link rel="icon" href="assets/favicon.ico" sizes="16x16 32x32 48x48 64x64">
-  <script type="module" src="./navbar/navbar.js?v=32" blocking="render"></script>
-  <script type="module" src="./assets/project-previews.js"></script>
+  <script type="module" src="./navbar/navbar.js?v=33" blocking="render"></script>
+  <script type="module" src="./assets/project-previews.js?v=2"></script>
 </head>
 <body>
   <header data-site-navbar></header>
@@ -30,10 +30,14 @@
               </span>
             </a>
           </article>
-          <a class="tile project-tile" href="projects/project-2/">
-            <span class="tile-title">Project 2</span>
-            <span class="tile-arrow" aria-hidden="true">→</span>
-          </a>
+          <article class="tile project-tile project-preview" data-project-preview="evolution-simulator">
+            <a class="project-preview-link" href="experiments/evolution-simulator/">
+              <span class="project-preview-heading">
+                <span class="tile-title">Evolution Simulator</span>
+                <span class="tile-arrow" aria-hidden="true">→</span>
+              </span>
+            </a>
+          </article>
           <a class="tile project-tile" href="projects/project-3/">
             <span class="tile-title">Project 3</span>
             <span class="tile-arrow" aria-hidden="true">→</span>
