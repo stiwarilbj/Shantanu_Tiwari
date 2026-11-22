@@ -16,6 +16,8 @@ const GuidedWorld=defineAsyncComponent(()=>import('./components/GuidedWorld.vue'
 
 const lab = useLab()
 const pages = { viewer:'World', stats:'Trends', about:'About', compare:'Compare' }
+const projectLab = document.body.classList.contains('project-lab-page')
+const views = projectLab ? ['viewer','stats','about'] : ['about','viewer','stats']
 const runAddress = /^#\/r\/([^/]+)\/s\/(\d+)\/(viewer|stats|about|compare)(\?.*)?$/
 const initialAddress = location.hash.match(runAddress)
 const initialPage = initialAddress?.[3] ?? 'viewer'
@@ -71,8 +73,14 @@ function skipToContent() { document.getElementById("main-surface")?.focus() }
 function dismissMenu(event) {
   if (!event.target.closest('.run-center')) menu.value = false
 }
+function leaveMenu(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) menu.value = false
+}
 function escapeMenu(event) {
-  if (event.key==='Escape' && menu.value) { menu.value=false; menuButton.value?.focus() }
+  if (!menu.value) return
+  event.stopPropagation()
+  menu.value = false
+  menuButton.value?.focus()
 }
 function show(view) {
   if (page.value===view) return
@@ -257,7 +265,6 @@ onMounted(async () => {
   ready.value = true
   window.addEventListener('popstate',handlePopState)
   document.addEventListener('pointerdown',dismissMenu)
-  document.addEventListener('keydown',escapeMenu)
   if (location.hash) {
     await applyAddress()
   } else {
@@ -268,7 +275,6 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate',handlePopState)
   document.removeEventListener('pointerdown',dismissMenu)
-  document.removeEventListener('keydown',escapeMenu)
 })
 </script>
 
@@ -276,18 +282,18 @@ onUnmounted(() => {
   <a class="skip-link" href="#main-surface" @click.prevent="skipToContent">Skip to content</a>
   <header class="app-header">
     <nav aria-label="Evolution Simulator navigation" :inert="!ready">
-      <a class="brand" :href="address('viewer',lab.viewing,lab.settings,null)" aria-label="Evolution Simulator home" @click.prevent="go('viewer')">
+      <a v-if="!projectLab" class="brand" :href="address('viewer',lab.viewing,lab.settings,null)" aria-label="Evolution Simulator home" @click.prevent="go('viewer')">
         <svg viewBox="0 0 30 30" width="30" height="30" fill="none" aria-hidden="true">
           <path d="M8.1 11.1C9.3 5.5 12.1 2.9 16.3 3.8c3 .6 4.5 2.8 4.8 5.2.2 1.4 1 2.5 2.7 4.7 4.6 6.1.6 12.4-7.4 12.6C7.3 26.5 3.9 22.4 5.6 17.1c.6-1.8 1.9-4.2 2.5-6Z" stroke="currentColor" stroke-width="1.6"/>
           <circle cx="16" cy="11.2" r="1.05" fill="currentColor"/><circle cx="20" cy="13.2" r=".85" fill="currentColor"/>
         </svg>
       </a>
-      <a v-for="view in ['about','viewer','stats']" :key="view" :href="address(view,lab.viewing,lab.settings,null)" :aria-current="page===view?'page':undefined"
+      <a v-for="view in views" :key="view" :href="address(view,lab.viewing,lab.settings,null)" :aria-current="page===view?'page':undefined"
         @click.prevent="go(view)">{{ pages[view] }}</a>
       <a v-if="page==='compare'" :href="address('compare')" aria-current="page" @click.prevent>Compare</a>
     </nav>
-    <div v-if="lab.run" class="run-center" :inert="!ready">
-      <button class="primary settings-pill" aria-label="Simulation Settings" @click="settings()">settings</button>
+    <div v-if="lab.run" class="run-center" :inert="!ready" @focusout="leaveMenu" @keydown.esc="escapeMenu">
+      <button class="primary settings-pill" aria-label="Simulation Settings" @click="settings()">Settings</button>
       <button ref="menuButton" class="run-status" aria-label="Run options" :aria-expanded="menu" :title="lab.run.setup.name" @click="menu=!menu">
         {{ statusText }} <ChevronDown :size="12"/>
       </button>

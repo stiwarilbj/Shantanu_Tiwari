@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
@@ -15,6 +15,8 @@ const lab = useLab()
 const emit = defineEmits(['reroll', 'fullscreen-change'])
 const board = ref(), surface = ref(), fullscreenActive = ref(false)
 const tool = ref(null), camera = ref('board'), quality = ref('auto'), details = ref(false)
+const moreLayers = ref(null), backToLayers = ref(null)
+let toolTrigger
 const eventFilter = ref('all')
 const dim = ref(false), hud = ref(false), rateReadout = ref(false), wasPlaying = ref(false)
 const layers = ref({ sense:false, speed:false, energy:false, credits:false, homes:false, selected:false, vision:false, cohortSense:false })
@@ -77,7 +79,21 @@ function follow() {
   if (candidate) select(candidate.id)
   else details.value = true
 }
-function toggle(name) { tool.value = tool.value === name ? null : name }
+function toggle(name, event) {
+  const open = tool.value === name || (name==='layers' && tool.value==='layer-options')
+  tool.value = open ? null : name
+  toolTrigger = event.currentTarget
+}
+function closeTool() {
+  tool.value = null
+  toolTrigger?.focus({ preventScroll:true })
+}
+async function changeLayerPanel(name) {
+  tool.value = name
+  await nextTick()
+  const control = name === 'layers' ? moreLayers.value : backToLayers.value
+  control?.focus()
+}
 function toggleLayer(key) {
   layers.value[key]=!layers.value[key]
   if (key==='sense') layers.value.cohortSense=false
@@ -108,9 +124,15 @@ function updateFullscreen() {
 onMounted(() => document.addEventListener('fullscreenchange', updateFullscreen))
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', updateFullscreen))
 function shortcuts(event) {
-  if (lab.settings || lab.modal || /INPUT|BUTTON|SELECT|TEXTAREA|A/.test(event.target.tagName)) return
+  if (lab.settings || lab.modal || event.defaultPrevented) return
+  if (event.key === 'Escape' && tool.value) {
+    event.stopPropagation()
+    closeTool()
+    return
+  }
+  if (event.target.closest('input,button,select,textarea,a')) return
   if (event.code === 'Space') { event.preventDefault(); lab.play() }
-  if (event.key === 'Escape') { tool.value=null; details.value=false }
+  if (event.key === 'Escape') details.value=false
 }
 function endDay() {
   if (lab.replay) { lab.stopPlayback(); lab.seek(lab.displayDuration) }
@@ -149,16 +171,18 @@ defineExpose({ select, overhead })
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @fallback="fallback=true"/>
       <div class="view-tools">
-        <button class="icon" aria-label="Layers" title="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
+        <button class="icon" aria-label="Layers" title="Layers" :aria-expanded="tool==='layers' || tool==='layer-options'" @click="toggle('layers',$event)"><Layers :size="23"/></button>
         <button class="icon" aria-label="Follow creature" title="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
-        <button class="icon view-menu-button" aria-label="View options" title="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
+        <button class="icon view-menu-button" aria-label="View options" title="View options" :aria-expanded="tool==='view'" @click="toggle('view',$event)"><Ellipsis :size="21"/></button>
       </div>
       <div v-if="tool==='layers'" class="layer-panel pop">
-        <button class="icon" aria-label="Close layers" @click="tool=null"><ChevronUp :size="20"/></button>
+        <button class="icon close-layers" aria-label="Close layers" @click="closeTool"><ChevronUp :size="20"/></button>
         <button v-for="[key,Icon,label,tip] in layerNames" :key="key" class="icon layer" :aria-label="label" :aria-pressed="layers[key]" @click="toggleLayer(key)">
           <component :is="Icon" :size="22"/><span class="layer-name">{{ label }}</span><span class="layer-tip">{{ label }}<small>{{ key==='sense' && layers.cohortSense ? 'Show living creatures in the species filter' : tip }}</small></span>
         </button>
-        <button class="icon" aria-label="More layer options" @click="toggle('layer-options')"><ChevronDown :size="17"/></button>
+        <button ref="moreLayers" class="icon more-layers" aria-label="More layer options" @click="changeLayerPanel('layer-options')">
+          <ChevronDown :size="17"/><span class="layer-name">More options</span>
+        </button>
       </div>
       <div v-if="tool==='view' || tool==='layer-options'" class="pop view-menu">
         <template v-if="tool==='view'">
@@ -171,7 +195,7 @@ defineExpose({ select, overhead })
           <label><input v-model="hud" type="checkbox"> HUD</label>
         </template>
         <template v-else>
-          <button @click="tool='layers'">Back to layers</button>
+          <button ref="backToLayers" @click="changeLayerPanel('layers')">Back to layers</button>
           <label><input v-model="layers.selected" type="checkbox" :disabled="!visible"> Selected creature only</label>
           <label><input v-model="layers.homes" type="checkbox"> Show refuges</label>
         </template>
@@ -213,8 +237,8 @@ defineExpose({ select, overhead })
       </div>
       <div class="player-actions">
         <button class="quick" :disabled="!!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch ? 'quick-progress' : 'quick'"><FastForward :size="15" fill="currentColor"/>{{ quickLabel }}</button>
-        <button class="icon" aria-label="Playback actions" title="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
-        <button class="icon" aria-label="Viewing speed" :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" @click="toggle('rate')"><Clock :size="21"/></button>
+        <button class="icon" aria-label="Playback actions" title="Playback actions" :aria-expanded="tool==='player'" @click="toggle('player',$event)"><Ellipsis :size="20"/></button>
+        <button class="icon" aria-label="Viewing speed" :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" @click="toggle('rate',$event)"><Clock :size="21"/></button>
       </div>
       <div v-if="tool==='rate'" class="pop rate-panel">
         <label for="play-rate">Viewing speed</label>
@@ -223,7 +247,7 @@ defineExpose({ select, overhead })
           <div class="rate-ticks" aria-hidden="true"><span>8×</span><span :class="{ normal:lab.rate===6 }">1×</span><span>⅛×</span></div>
         </div>
         <button class="rate-value" title="Reset to 1×" :aria-label="'Reset to 1×; viewing speed '+rateText" @click="lab.rate=6">{{ rateText }}</button>
-        <button class="icon compact" aria-label="Close speed controls" @click="tool=null"><ChevronDown :size="16"/></button>
+        <button class="icon compact" aria-label="Close speed controls" @click="closeTool"><ChevronDown :size="16"/></button>
       </div>
       <div v-if="tool==='player'" class="pop player-menu">
         <button :disabled="!canAdvanceDay" @click="endDay">{{ lab.replay ? 'Go to end' : 'Finish Day' }}</button>

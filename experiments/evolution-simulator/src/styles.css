@@ -600,7 +600,7 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .layer-panel{gap:0;align-items:stretch;min-width:143px}
   .layer-panel .layer{width:100%;justify-content:start;padding:0 6px;gap:6px}
   .layer[aria-pressed=true]::before{top:7px;bottom:7px}
-  .layer-name{display:inline;font-size:13px}.layer:hover .layer-tip,.layer:focus-visible .layer-tip{display:none}
+  .layer .layer-name{display:inline;font-size:13px}.layer:hover .layer-tip,.layer:focus-visible .layer-tip{display:none}
   .layer-panel>.icon:not(.layer){height:27px}
   .world-hud{top:58px;left:11px;font-size:10px;gap:1px;padding:6px}
   .creature-flower{top:115px;right:12px;width:100px}.creature-flower.layers-open{right:161px}.creature-flower.rate-open{right:124px}

@@ -28,6 +28,28 @@ test('the keyboard skip link clears the shared navbar and the project links back
   await expect(page.getByRole('heading', { name: 'Experiments', exact: true })).toBeVisible()
 })
 
+test('simulator popups close on Escape without stealing focus from other controls @pages', async ({ page }) => {
+  const run = page.getByRole('button', { name: 'Run options' })
+  await run.press('Enter')
+  await expect(run).toHaveAttribute('aria-expanded', 'true')
+  await page.getByRole('button', { name: 'Run Library', exact: true }).press('Escape')
+  await expect(run).toBeFocused()
+  await expect(run).toHaveAttribute('aria-expanded', 'false')
+
+  await run.press('Enter')
+  const trends = page.getByRole('link', { name: 'Trends', exact: true })
+  await trends.focus()
+  await expect(run).toHaveAttribute('aria-expanded', 'false')
+  await page.keyboard.press('Escape')
+  await expect(trends).toBeFocused()
+
+  const view = page.getByRole('button', { name: 'View options' })
+  await view.press('Enter')
+  await page.getByRole('button', { name: 'Fit board' }).press('Escape')
+  await expect(view).toHaveAttribute('aria-expanded', 'false')
+  await expect(view).toBeFocused()
+})
+
 test.describe('short touch viewports', () => {
   test.use({ isMobile: true, hasTouch: true, viewport: { width: 320, height: 420 } })
 
@@ -52,5 +74,30 @@ test.describe('short touch viewports', () => {
     await expect(project).toBeHidden()
     await page.getByRole('button', { name: 'View options' }).tap()
     await expect(page.getByRole('button', { name: /^Overhead/ })).toBeVisible()
+  })
+
+  test('layer options stay in the tabletop and can be reached on a short screen @pages', async ({ page }) => {
+    const layers = page.getByRole('button', { name: 'Layers', exact: true })
+    await layers.tap()
+    const dimensions = await page.locator('.layer-panel').evaluate(panel => ({
+      top: panel.getBoundingClientRect().top,
+      bottom: panel.getBoundingClientRect().bottom,
+      toolbarBottom: document.querySelector('.run-status').getBoundingClientRect().bottom,
+      playbackTop: panel.closest('.stage').querySelector('.player-actions').getBoundingClientRect().top,
+      visibleHeight: panel.clientHeight,
+      scrollHeight: panel.scrollHeight,
+    }))
+    expect(dimensions.top).toBeGreaterThanOrEqual(dimensions.toolbarBottom)
+    expect(dimensions.bottom).toBeLessThanOrEqual(dimensions.playbackTop)
+    expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.visibleHeight)
+    await expect(page.getByRole('button', { name: 'Sense range', exact: true })).toBeInViewport({ ratio: 0.8 })
+
+    await page.getByRole('button', { name: 'More layer options' }).tap()
+    const back = page.getByRole('button', { name: 'Back to layers' })
+    await expect(back).toBeFocused()
+    await expect(layers).toHaveAttribute('aria-expanded', 'true')
+    await back.press('Escape')
+    await expect(layers).toHaveAttribute('aria-expanded', 'false')
+    await expect(layers).toBeFocused()
   })
 })
