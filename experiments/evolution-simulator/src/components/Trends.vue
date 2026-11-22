@@ -1,11 +1,12 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { Dices, Download, FastForward, Layers, RotateCcw } from 'lucide-vue-next'
 import { METRICS, metricValue, format, openingTrends } from '../engine/stats.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
 import TrendPlot from './TrendPlot.vue'
 import TraitSpace from './TraitSpace.vue'
+import AgeCohorts from './AgeCohorts.vue'
 
 const props = defineProps({ active: Boolean })
 const emit = defineEmits(['watch','example','reroll','restart'])
@@ -14,9 +15,9 @@ const range=ref('all'), from=ref(1), to=ref(50), pin=ref(null), focused=ref(null
 const focusDialog=ref()
 const spread=ref('sd'), cohort=ref('dawn'), hidden=ref([]), order=ref('classic'), tab=ref('Trends')
 const separate=ref(false), otherPopulation=ref(false), compareSpecies=ref(false), causes=ref(false), transition=ref(false)
-const ageDemoVisible=ref(false), ageDemoPhase=ref('long'), ageDemoRuns=ref({}), ageDemoProgress=ref(null), ageDemoError=ref(''), ageDemoRetryPhase=ref('long')
+const ageDemoVisible=ref(false), ageDemoPhase=ref('long'), ageDemoRuns=shallowRef({}), ageDemoProgress=ref(null), ageDemoError=ref(''), ageDemoRetryPhase=ref('long')
 const ageDemoRestore=ref(null)
-const ageWalkthrough=ref(null)
+const ageWalkthrough=ref(null), ageEntry=ref(null)
 let ageDemoController
 const ageDemoPair=computed(()=>ageDemoVisible.value ? ageDemoRuns.value[ageDemoPhase.value] ?? null : null)
 const activeRun=computed(()=>ageDemoPair.value?.[0] ?? lab.run)
@@ -41,6 +42,20 @@ const rows=computed(()=>{
     wide:ageDemoPair.value ? d.rows[lab.scope] : null,
     narrow:partnerSource?.[d.day-1]?.rows[lab.scope] ?? null,
   }))
+})
+const ageDays=computed(()=>rows.value.map(row=>row.day))
+const ageRow=computed(()=>rows.value.find(row=>row.day===pin.value) ?? rows.value.at(-1))
+const ageEndpoints=computed(()=>Object.values(ageDemoRuns.value)
+  .map(pair=>{
+    const day=Math.min(...pair.map(run=>run.summaries.length))
+    return {day,values:pair.map(run=>(atDawn.value ? openingTrends(run) : run.summaries)[day-1]?.rows[lab.scope]?.age?.mean)}
+  }).sort((a,b)=>b.day-a.day))
+const ageScaleMax=computed(()=>{
+  let oldest=0
+  for (const pair of Object.values(ageDemoRuns.value)) for (const run of pair) {
+    for (const { rows } of run.summaries) oldest=Math.max(oldest,rows.all?.age.max ?? 0)
+  }
+  return Math.max(4,Math.ceil(oldest/4)*4)
 })
 const pinned=computed(()=>rows.value.find(row=>row.day===pin.value)?.scopes[lab.scope])
 const sightComparison=computed(()=>{
@@ -101,19 +116,20 @@ function distribution(key) {
 function pairedDistribution(key) {
   const metric=m(key), ink=basic.includes(key)?metric.petal:metric.color
   const series=[]
-  for (const [side,label,color] of [['wide','Wide · σ 1.00',ink],['narrow','Narrow · σ 0.50',metric.heading ?? metric.inner]]) {
+  const pairedInk=key==='age' ? '#AFE0FA' : metric.heading ?? metric.inner
+  for (const [side,label,color] of [['wide','Wide · σ 1.00',ink],['narrow','Narrow · σ 0.50',pairedInk]]) {
     const offset=series.length
     const value=(row,field)=>row?.[side]?.[key]?.[field]
     const bound=field=>row=>row?.[side]?.[key]?.n ?
       field==='max' ? row[side][key].max : row[side][key].min : null
     series.push(
-      line(label+' max',metric.outer+'40',bound('max'),{width:1,tooltip:false}),
+      line(label+' max',color+'4D',bound('max'),{width:1,tooltip:false,key:false,group:label}),
       line(label+' mean + SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.min(row[side][key].max,row[side][key].mean+row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false}),
-      line(label,color,row=>value(row,'mean'),{primary:true,width:1.8,spread:row=>value(row,'sd')}),
+        {width:1,area:offset+2,fill:color+'20',tooltip:false,key:false,group:label}),
+      line(label,color,row=>value(row,'mean'),{primary:true,width:2,zero:key==='age',dash:side==='narrow'?[6,4]:undefined,spread:row=>value(row,'sd')}),
       line(label+' mean − SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.max(row[side][key].min,row[side][key].mean-row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false}),
-      line(label+' min',metric.outer+'40',bound('min'),{width:1,tooltip:false})
+        {width:1,area:offset+2,fill:color+'20',tooltip:false,key:false,group:label}),
+      line(label+' min',color+'4D',bound('min'),{width:1,tooltip:false,key:false,group:label})
     )
   }
   return series
@@ -182,6 +198,7 @@ async function prepareAgePhase(phase) {
   if(ageDemoRuns.value[phase]?.length===2) {
     ageDemoPhase.value=phase
     range.value='all'
+    pin.value=null
     centerAgeChart()
     return
   }
@@ -200,14 +217,13 @@ async function prepareAgePhase(phase) {
       ageDemoProgress.value={phase,day,days,completed:progress[0]+progress[1]}
     })))
     if(controller.signal.aborted) return
-    if(!controller.signal.aborted) {
-      ageDemoRuns.value={...ageDemoRuns.value,[phase]:pair}
-      ageDemoPhase.value=phase
-      range.value='all'
-      from.value=1
-      to.value=days
-      centerAgeChart()
-    }
+    ageDemoRuns.value={...ageDemoRuns.value,[phase]:pair}
+    ageDemoPhase.value=phase
+    range.value='all'
+    pin.value=null
+    from.value=1
+    to.value=days
+    centerAgeChart()
   } catch(error) {
     if(!controller.signal.aborted) {
       ageDemoError.value=error.message || 'Could not prepare the age example.'
@@ -225,9 +241,9 @@ function startAgeDemo() {
   ageDemoRestore.value={range:range.value,from:from.value,to:to.value,cohort:cohort.value,scope:lab.scope,focused:focused.value,
     spread:spread.value,hidden:hidden.value,order:order.value,pin:pin.value}
   ageDemoVisible.value=true
-  focused.value='age'
+  focused.value=null
   centerAgePanel()
-  cohort.value='dusk'
+  cohort.value='dawn'
   spread.value='sd'
   hidden.value=hidden.value.filter(key=>!basic.includes(key))
   order.value='classic'
@@ -257,6 +273,7 @@ function closeAgeDemo() {
     pin.value=ageDemoRestore.value.pin
   }
   ageDemoRestore.value=null
+  if(props.active) nextTick(()=>ageEntry.value?.focus())
 }
 function changeAgePhase(phase) {
   if(ageDemoProgress.value) return
@@ -271,13 +288,6 @@ function cancelAgePreparation() {
   ageDemoProgress.value=null
   ageDemoError.value='Preparation canceled.'
 }
-const ageReadings=computed(()=>['long','short'].map(phase=>{
-  const run=ageDemoRuns.value[phase]?.[0]
-  const day=phase==='long'?SIZE_MUTATION_DAYS:100
-  const rowsForRun=run?(atDawn.value?openingTrends(run):run.summaries):[]
-  return {phase,day,wide:rowsForRun[day-1]?.rows.all?.age?.mean ?? null,
-    narrow:ageDemoRuns.value[phase]?.[1] ? ((atDawn.value?openingTrends(ageDemoRuns.value[phase][1]):ageDemoRuns.value[phase][1].summaries)[day-1]?.rows.all?.age?.mean ?? null) : null}
-}))
 function watchPlot(day) { if(!ageDemoVisible.value) emit('watch',day) }
 function downloadVisibleDays() {
   lab.openDownload({ start: rows.value[0]?.day ?? '', end: rows.value.at(-1)?.day ?? '' })
@@ -299,12 +309,12 @@ watch(focused, async key=>{
 onBeforeUnmount(()=>ageDemoController?.abort())
 </script>
 <template>
-  <main class="trends" @keydown.esc="focused=null">
+  <main class="trends" @keydown.esc="ageDemoVisible ? closeAgeDemo() : focused=null">
     <div class="trends-toolbar">
       <div class="trend-filters">
         <label>Filter By Species <select v-model="lab.scope"><option value="all">All species</option><option v-for="s in species" :key="s.id" :value="s.id">{{ s.name }}</option></select></label>
         <label>Range <select v-model="range"><option value="all">Full run</option><option value="25">Last 25</option><option value="100">Last 100</option><option value="custom">Custom</option></select></label>
-        <select v-if="tab==='Trends'" aria-label="Jump to chart" @change="jump"><option value="">Jump to chart</option><option v-for="plot in options" :key="plot.id" :value="plot.id">{{ plot.title }}</option></select>
+        <select v-if="tab==='Trends'" aria-label="Jump to chart" @change="jump"><option value="">Jump to chart</option><option v-for="plot in ageDemoVisible ? basic.map(key=>options[key]) : options" :key="plot.id" :value="plot.id">{{ plot.title }}</option></select>
       </div>
       <div class="trend-actions">
         <button class="secondary" :disabled="ageDemoVisible" :title="ageDemoVisible?'Close the age walkthrough to download your run':''" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
@@ -325,12 +335,12 @@ onBeforeUnmount(()=>ageDemoController?.abort())
     <template v-else>
       <div class="trend-options">
         <span>{{ cohortLabel }} · {{ spread==='sd' ? 'Mean ± SD' : 'Mean and percentiles' }}</span>
-        <button class="link age-demo-link" :aria-pressed="ageDemoVisible" @click="ageDemoVisible?closeAgeDemo():startAgeDemo()">{{ ageDemoVisible?'Close age walkthrough':'Walk through age' }}</button>
+        <button ref="ageEntry" class="link age-demo-link" :aria-pressed="ageDemoVisible" @click="ageDemoVisible?closeAgeDemo():startAgeDemo()">{{ ageDemoVisible?'Close age walkthrough':'Walk through age' }}</button>
         <button class="link sight-link" :disabled="ageDemoVisible" @click="emit('example','sight-comparison')">Watch the sight example</button>
-        <details><summary>Chart options</summary>
+        <details v-show="!ageDemoVisible"><summary>Chart options</summary>
           <div class="trend-option-fields">
             <label>Cohort <select v-model="cohort"><option value="dawn">Dawn</option><option value="dusk">Dusk</option></select></label>
-            <label>Spread <select v-model="spread" :disabled="ageDemoVisible"><option value="sd">Walkthrough spread</option><option value="percentile">Percentiles</option></select></label>
+            <label>Spread <select v-model="spread"><option value="sd">Walkthrough spread</option><option value="percentile">Percentiles</option></select></label>
             <label>Order <select v-model="order"><option value="classic">Walkthrough order</option><option value="overview">Overview first</option></select></label>
             <label><input type="checkbox" v-model="otherPopulation"> {{ atDawn?'Closing population':'Opening population' }}</label>
             <label><input type="checkbox" v-model="compareSpecies"> Compare species populations</label>
@@ -340,11 +350,11 @@ onBeforeUnmount(()=>ageDemoController?.abort())
           <p>Dawn counts every blob that starts the day. Dusk counts survivors and newborns. The shaded band shows one sample standard deviation on either side of the mean, within the faint min and max lines.</p>
         </details>
       </div>
-      <section v-if="ageDemoVisible" ref="ageWalkthrough" class="age-walkthrough" aria-label="Age walkthrough" aria-live="polite">
+      <section v-if="ageDemoVisible" ref="ageWalkthrough" class="age-walkthrough" aria-label="Age walkthrough">
         <header>
           <div><span class="age-step">{{ ageDemoPhase==='long'?'LONG RUN':'SHORT RUN' }} · SEED {{ SIZE_MUTATION_SEED }}</span>
-            <h2>Compare age across two run lengths</h2>
-            <p>The yellow Age plot moves into the center while the other four plots stay in view. Switch between the 600-day and 100-day seed 118 runs; both size mutation settings appear on each plot.</p>
+            <h2>How old are the blobs?</h2>
+            <p>Compare the solid wide-mutation line with the dashed narrow-mutation line. Pick a day to see the ages behind the average.</p>
           </div>
           <button class="icon" aria-label="Close age walkthrough" title="Close age walkthrough" @click="closeAgeDemo">×</button>
         </header>
@@ -353,20 +363,13 @@ onBeforeUnmount(()=>ageDemoController?.abort())
           <button class="secondary" :aria-pressed="ageDemoPhase==='short'" :disabled="!!ageDemoProgress" @click="changeAgePhase('short')">
             {{ ageDemoRuns.short?'Short run · 100 days':'Prepare short run · 100 days' }}
           </button>
+          <label class="age-cohort-picker">Count at <select v-model="cohort" aria-label="Age cohort"><option value="dawn">Dawn</option><option value="dusk">Dusk</option></select></label>
           <button v-if="ageDemoProgress" class="secondary" @click="cancelAgePreparation">Cancel preparation</button>
           <span v-if="ageDemoProgress" class="quiet" role="status">Preparing both {{ ageDemoProgress.phase==='long'?'600':'100' }}-day runs · {{ ageDemoProgress.completed }} / {{ ageDemoProgress.days*2 }} generations</span>
           <span v-else-if="ageDemoError" class="age-demo-error" role="alert">{{ ageDemoError }} <button class="link" @click="prepareAgePhase(ageDemoRetryPhase)">Retry</button></span>
         </div>
         <progress v-if="ageDemoProgress" class="age-demo-progress" :value="ageDemoProgress.completed" :max="ageDemoProgress.days*2" aria-label="Age walkthrough preparation"></progress>
-        <div v-if="ageDemoRuns.long?.length===2" class="age-demo-readouts">
-          <div v-for="[index,label,color] in [[0,'Wide · σ 1.00','#FDDE3B'],[1,'Narrow · σ 0.50','#FADE69']]" :key="label" :style="{'--age-ink':color}">
-            <strong>{{ label }}</strong>
-            <span>Long · Day 600: {{ format(index===0?ageReadings[0].wide:ageReadings[0].narrow) }} days</span>
-            <span v-if="ageDemoRuns.short?.length===2">Short · Day 100: {{ format(index===0?ageReadings[1].wide:ageReadings[1].narrow) }} days</span>
-            <small v-if="ageDemoRuns.short?.length===2">The short run uses the same seed and rules and ends after Day 100.</small>
-          </div>
-        </div>
-        <p class="age-demo-note">This temporary reference does not replace or save over your run. Age is measured at {{ cohortLabel.toLowerCase() }}; the results describe this seed and setup.</p>
+        <p class="age-demo-note">The reference runs use the same seed and food supply. The only difference within each pair is the amount of size mutation.</p>
       </section>
       <p v-if="annotations.length && !ageDemoVisible" class="trend-annotations quiet">
         <span v-for="a in annotations" :key="a.day+a.label" :style="{color:a.color}">┊ Day {{ a.day }} · {{ a.label }}</span>
@@ -400,7 +403,17 @@ onBeforeUnmount(()=>ageDemoController?.abort())
           </div>
         </template>
       </details>
-      <template v-if="!ageDemoVisible || ageDemoPair" v-for="section in sectionOrder" :key="section">
+      <div v-if="ageDemoPair" class="age-study walkthrough-plots">
+        <TrendPlot v-bind="options.age" class="age-study-plot" :hideable="false" spotlight inspect :rows="rows"
+          :pin="ageRow?.day" :y-max="ageScaleMax" :scope="scopeName" @pin="pin=$event" @range="customRange">
+          <p class="age-plot-note">Bands show one sample standard deviation around the mean. Faint lines show youngest and oldest.</p>
+        </TrendPlot>
+        <AgeCohorts v-if="ageRow" :pair="ageDemoPair" :row="ageRow" :days="ageDays" :endpoints="ageEndpoints" :cohort="cohort" :scope="lab.scope" @day="pin=$event"/>
+        <TrendPlot v-for="key in basic.filter(key=>key!=='age')" :key="key" v-bind="options[key]" class="age-context-plot"
+          :class="'age-context-'+key" :hideable="false" :legend="false" compact inspect :rows="rows"
+          :pin="ageRow?.day" :scope="scopeName" @pin="pin=$event" @range="customRange"/>
+      </div>
+      <template v-if="!ageDemoVisible" v-for="section in sectionOrder" :key="section">
         <div v-if="section==='compact'" class="compact-plots walkthrough-plots" :class="{'spotlight-layout':focused==='age'}">
           <TrendPlot v-for="key in basic.filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]"
             compact :spotlight="focused==='age' && focused===key" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations"

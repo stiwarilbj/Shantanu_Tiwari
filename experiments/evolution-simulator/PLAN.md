@@ -8,7 +8,7 @@ Start with one blob looking for food. Follow its choices into the population cha
 
 - **Video and captions.** Review the authored English captions from the opening sketches through the credits. Cross-check them against the original storyboard and sampled video frames, inspecting the settings, graph tooltips, and split-screen controls at full resolution. The timestamps below let an implementer replay each beat. The layout and interaction cross-check also follows the opening route, tutorial, Settings inputs, generation ribbon, trait plot, and overview plot in the public launch code. Camera holds and playback defaults in this plan are design decisions where the footage gives no exact setting. [Official video](https://www.youtube.com/watch?v=6nMo8T3T0L4)
 - **Code and behavior.** Audit Project Lab against the public April launch snapshot, which establishes the reference’s architecture and engine behavior as of that commit. Use the footage for what appeared on screen and Project Lab’s seeded output for what this site must display. The exact build used in each shot is unknown. [Launch snapshot](https://github.com/minutelabsio/evolution-simulator/tree/3b99f358b70a608f5fb3e34fe8f410ba85aec7f3), [Local rules](src/engine/config.js)
-- **Current status.** The staged player shows the recorded Days 6, 52, and 77, with the shared navbar above it. It plays the three chapters once and lets visitors jump to exact events or return to regular Compare. The larger opening-to-results walkthrough and the long-run handoff below remain design work. [Guided replay](src/components/ComparisonSequence.vue), [Wire-up](src/components/Compare.vue), [Current visual design](VISUAL-DESIGN.md)
+- **Current status.** The staged player shows the recorded Days 6, 52, and 77 and lets visitors jump to exact events or return to regular Compare. The Age walkthrough in Trends centers the age plot and lets visitors compare two run lengths and count how many blobs are each age at dawn or dusk. The larger opening-to-results walkthrough and the long-run handoff below remain design work. [Guided replay](src/components/ComparisonSequence.vue), [Age walkthrough](src/components/Trends.vue), [Current visual design](VISUAL-DESIGN.md)
 
 ## 1. Scene-by-scene walkthrough
 
@@ -171,14 +171,14 @@ The table below is the seed-118, rule-4 preview at dawn, over all blobs. A **pot
 
 ### Finish on the age question
 
-Show a small age distribution under the selected plot so a visitor can account for the mean. The source asks why the line settles near two even as some blobs live much longer. Turn that into a checkable observation, then give the visitor a new seed or food supply to try. These are single-day, dawn values. An average across days needs a separate label. Show age at death as its own field in a separate section of the readout. [Age question](https://www.youtube.com/watch?v=6nMo8T3T0L4&t=559s), [Local Trait Space](src/components/TraitSpace.vue)
+The video asks why the line sits near two even as some blobs live much longer. The Age walkthrough lets visitors check how much each age contributes to the mean for a selected day. Its final-day table shows the two endpoints on the chosen cohort. These examples are single-day dawn readings from a reference engine run. The walkthrough calculates the values from the runs it actually prepared. Age at death has its own readout in regular Trends. [Age question](https://www.youtube.com/watch?v=6nMo8T3T0L4&t=559s), [Age inspector](src/components/AgeCohorts.vue)
 
 | Seed 118 dawn reading | Wide run | Narrow run |
 | --- | --- | --- |
 | **Day 100 preview** | Mean 1.84 days, 14 newborns out of 38, oldest 12 days | Mean 2.38 days, 13 newborns out of 39, oldest 21 days |
 | **Day 600 experiment** | Mean 2.56 days, 15 newborns out of 45, oldest 12 days | Mean 1.88 days, 17 newborns out of 49, oldest 13 days |
 
-A newborn is age zero. Selecting age zero highlights those blobs on the chosen day, and opening the replay preserves that day’s cohort. Changing phase recomputes the counts and updates the displayed endpoint. A measured population of zero shows an empty histogram, zero newborns, and unavailable mean and oldest values. Use the extinct Day 4 fixture to verify the empty chart and endpoint behavior.
+A newborn is age zero, as are the founders on Day 1 before the simulation begins. Changing phase recomputes the counts and updates the displayed endpoints. A measured population of zero displays that count and shows a dash for the unavailable mean, oldest age, and age-zero share. The table shows an empty cohort message when both sides have no living blobs. A future handoff can highlight an age group inside the replay and offer a new seed or food supply to try.
 
 ### Keep navigation, statistics, and replay in sync
 

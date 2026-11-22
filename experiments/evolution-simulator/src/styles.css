@@ -261,22 +261,76 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .sight-days dl{display:flex;flex-wrap:wrap;gap:8px 20px;margin:8px 0 10px;font-size:13px}
 .sight-days dt{color:var(--muted)}.sight-days dd{text-align:left;color:#7EC1DF}
 .age-demo-link{color:#FADE69}
-.age-walkthrough{margin:8px 0 14px;padding:12px 15px;border:1px solid #514a31;border-radius:6px;background:linear-gradient(115deg,#303442,var(--input) 55%);color:var(--muted)}
-.age-walkthrough>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.age-walkthrough>header>div{min-width:0}
-.age-walkthrough .age-step{font:11px var(--mono);letter-spacing:.12em;color:#FADE69}
-.age-walkthrough h2{margin:3px 0;color:#FADE69;font-size:19px}
-.age-walkthrough p{margin:4px 0;font-size:14px}
-.age-demo-controls{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:9px}
-.age-demo-controls button[aria-pressed=true]{border-color:#FADE69;color:#FADE69;background:#FADE6910}
-.age-demo-controls .quiet{font-size:13px}
-.age-demo-progress{display:block;width:min(100%,560px);height:5px;margin-top:8px;accent-color:#FADE69}
-.age-demo-error{color:#F0A39B;font-size:13px}
-.age-demo-readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
-.age-demo-readouts>div{display:grid;gap:4px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--input);font-size:13px}
-.age-demo-readouts strong{color:var(--age-ink);font-size:14px}
-.age-demo-readouts small{color:var(--quiet)}
+.age-walkthrough,.age-cohorts{
+  margin:8px 0 14px;padding:14px clamp(11px,1.6vw,20px);border:1px solid var(--line);border-radius:8px;background:var(--input);color:var(--muted);
+}
+.age-walkthrough{background:linear-gradient(115deg,#202F3E,var(--input) 65%);border-top-color:#8B7543}
+.age-walkthrough>header,.age-cohorts>header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px 14px}
+.age-walkthrough .age-step{font:11px var(--mono);letter-spacing:.09em;color:#F1CE66}
+.age-walkthrough h2{margin:3px 0;color:var(--ink);font-size:clamp(20px,2.5vw,28px)}
+.age-walkthrough p,.age-cohorts p{margin:4px 0;font-size:14px;line-height:1.3}
+.age-demo-controls,.age-cohort-picker,.age-day-controls{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.age-demo-controls{margin-top:11px}
+.age-demo-controls button[aria-pressed=true]{border-color:#F1CE66;color:#FEE97F;background:#F1CE6612}
+.age-demo-controls .quiet,.age-cohort-picker,.age-day-controls label{font-size:13px}
+.age-cohort-picker{margin-inline-start:6px}
+.age-demo-progress{display:block;width:min(100%,560px);height:5px;margin-top:8px;accent-color:#F1CE66}
+.age-demo-error{color:#FFA89D;font-size:13px}
 .age-demo-note{margin-top:9px!important;color:var(--quiet);font-size:12px!important}
+.age-study{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.25fr) minmax(0,1fr);gap:12px 16px;
+  grid-template-areas:'population age speed' 'size age sense' 'counts counts counts';
+}
+.age-study-plot{
+  grid-area:age;display:flex;flex-direction:column;gap:3px;padding:12px clamp(8px,1.3vw,16px);
+  border:1px solid #8B7543;border-radius:8px;background:linear-gradient(180deg,#1A2C3D,var(--input) 76%);
+}
+.age-study-plot .plot-heading{justify-content:center}
+.age-study-plot .plot-heading h2{font-size:clamp(20px,2.2vw,27px)}
+.age-study-plot .chart-unit{padding:0;text-align:center}
+.age-study-plot .chart-canvas{flex:1;height:auto;min-height:clamp(225px,36dvh,400px)}
+.age-study-plot .chart-keys{justify-content:center;margin-top:4px;gap:2px 16px}
+.age-study-plot .chart-keys button{min-height:30px}
+.age-study-plot .focused-actions{justify-content:center;margin-top:3px}
+.age-study-plot .focused-actions button{font-size:12px;min-height:32px}
+.age-plot-note{margin:2px 0 0;color:var(--quiet);text-align:center;font-size:12px}
+.age-context-plot{padding:7px 3px;border-top:1px solid var(--subtle)}
+.age-context-plot .plot-heading{height:auto;min-height:29px}
+.age-context-plot .plot-heading h2{font-size:clamp(13px,1.2vw,17px)}
+.age-context-population{grid-area:population}.age-context-speed{grid-area:speed}
+.age-context-size{grid-area:size}.age-context-sense{grid-area:sense}
+.age-cohorts{grid-area:counts;margin:0}
+.age-cohorts h3{font-size:19px;color:var(--cream)}
+.age-cohorts h4{margin:0 0 7px;font:600 15px var(--sans);color:var(--cohort-ink)}
+.age-day-controls{flex-wrap:nowrap}
+.age-day-controls .icon{width:34px;height:34px;min-height:34px}
+.age-day-controls input{width:65px;margin-inline-start:3px;padding-inline:5px}
+.age-cohort-cards{display:flex;flex-wrap:wrap;gap:9px;margin:10px 0}
+.age-cohort-cards article{
+  flex:1 1 240px;min-width:0;padding:9px 10px;border:1px solid var(--line);border-inline-start:3px solid var(--cohort-ink);
+  border-radius:5px;background:var(--panel);
+}
+.age-wide{--cohort-ink:#F1CE66}.age-narrow{--cohort-ink:#AFE0FA}
+.age-cohort-cards dl{display:flex;flex-wrap:wrap;gap:8px 15px}
+.age-cohort-cards dl div{flex:1 1 62px}
+.age-cohort-cards dt{font-size:12px;color:var(--muted)}
+.age-cohort-cards dd{text-align:left;font:17px var(--mono)}
+.age-cohort-cards dd small{font:12px var(--sans);color:var(--muted)}
+.age-cohorts details{border-top:1px solid var(--subtle);padding-block:8px 1px}
+.age-cohorts summary{color:var(--cream);min-height:24px}
+.age-cohorts table{width:100%;margin-top:6px}
+.age-cohorts .age-count-bar{display:block;padding:3px 5px;background:linear-gradient(to left,
+  color-mix(in srgb,var(--cohort-ink) 21%, transparent) var(--count), transparent var(--count));color:var(--ink)}
+@media(max-width:1000px){
+  .age-study{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:'age age' 'counts counts' 'population speed' 'size sense'}
+  .age-study .age-study-plot .chart-canvas{flex:none;height:clamp(225px,42dvh,350px)}
+}
+@media(max-width:560px){
+  .age-study{grid-template-columns:minmax(0,1fr);grid-template-areas:'age' 'counts' 'population' 'speed' 'size' 'sense';gap:9px}
+  .age-cohorts>header{flex-wrap:wrap}
+  .age-cohort-cards article{flex-basis:100%}
+  .age-cohort-picker{margin-inline-start:0}
+}
 .focus-backdrop{position:fixed;inset:0;display:grid;align-items:center;justify-items:center;padding:18px;z-index:16;background:var(--scrim);backdrop-filter:blur(4px)}
 .focus-backdrop .trend-plot{width:min(1050px,100%);padding:17px;background:var(--stage);border-radius:7px;border:1px solid var(--line)}
 .focused-plot .chart-canvas{height:min(45vh,480px)}

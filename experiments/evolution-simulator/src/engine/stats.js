@@ -21,6 +21,12 @@ export function distribution(values) {
   return { n, mean, min: values[0], p25: quantile(0.25), p75: quantile(0.75), max: values[n - 1], sd }
 }
 
+export function countAges(blobs) {
+  const counts = new Map()
+  for (const { age } of blobs) counts.set(age, (counts.get(age) ?? 0) + 1)
+  return counts
+}
+
 export function summaries(day, config, opening, closing, events, supply, plantsLeft) {
   const rows = {}
   for (const id of ['all', ...config.species.filter(s => s.enabled).map(s => s.id)]) {
