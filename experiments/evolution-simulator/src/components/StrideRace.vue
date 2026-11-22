@@ -45,9 +45,10 @@ onBeforeUnmount(pause)
       <span>Step {{ steps }} · {{ clock }} s</span>
     </div>
     <details class="stride-code">
-      <summary>See how stride is calculated</summary>
-      <pre><code>distance per step = inherited speed × body size ÷ 10</code></pre>
-      <p>At the same inherited speed, a larger blob covers more ground in one step.</p>
+      <summary>See the original Rust rule</summary>
+      <pre><code>self.speed.0 * self.size.0 / 10.</code></pre>
+      <p>Inherited speed × body size ÷ 10 gives the distance per step.</p>
+      <a href="https://github.com/minutelabsio/evolution-simulator/blob/3b99f358b70a608f5fb3e34fe8f410ba85aec7f3/src/wasm/src/creature/mod.rs#L171-L175" target="_blank" rel="noreferrer">View the source</a>
     </details>
   </div>
 </template>

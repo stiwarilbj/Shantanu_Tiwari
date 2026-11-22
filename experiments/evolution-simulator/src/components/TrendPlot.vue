@@ -7,10 +7,10 @@ import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String,
-  pin:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, inspect:Boolean, yMax:Number })
+  pin:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean })
 const emit = defineEmits(['hide','focus','pin','watch','range'])
 const canvas = ref(), hovered = ref(null)
-let chart, brush, chartTheme, ignoreClick = false
+let chart, brush, ignoreClick = false
 const hidden = ref([])
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
@@ -21,7 +21,7 @@ function toggle(label) {
 }
 function move(event) {
   if(!props.rows.length) return
-  if(event.key==='Enter' && active.value) { event.preventDefault(); emit(props.inspect ? 'pin' : 'watch',active.value); return }
+  if(event.key==='Enter' && active.value) { event.preventDefault(); emit('watch',active.value); return }
   if(event.key===' ' && active.value) { event.preventDefault(); emit('pin',active.value); return }
   if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
   event.preventDefault()
@@ -72,7 +72,7 @@ const marker = {
     const ctx=instance.ctx
     ctx.save()
     if (brush) {
-      ctx.fillStyle=chartTheme.rail+'44'
+      ctx.fillStyle='#71D2C044'
       ctx.fillRect(dayX(Math.min(brush.start,brush.end)),area.top,
         Math.abs(dayX(brush.end)-dayX(brush.start)),area.bottom-area.top)
     }
@@ -89,7 +89,7 @@ const marker = {
       const i=props.rows.findIndex(row=>row.day===annotation.day)
       if(i>=0) mark(dayX(i),annotation.color,[3,4])
     }
-    if(index>=0) mark(dayX(index),props.pin===active.value ? chartTheme.focus : chartTheme.quiet)
+    if(index>=0) mark(dayX(index),props.pin===active.value?'#BDBAB0':'#777268')
     ctx.restore()
   },
   afterDatasetsDraw(instance) {
@@ -98,8 +98,8 @@ const marker = {
     if (!area || y<area.top || y>area.bottom) return
     const ctx=instance.ctx
     ctx.save()
-    ctx.strokeStyle=chartTheme.quiet
-    ctx.fillStyle=chartTheme.muted
+    ctx.strokeStyle='#99958a'
+    ctx.fillStyle='#BDBAB0'
     ctx.setLineDash([4,4])
     ctx.beginPath()
     ctx.moveTo(area.left,y)
@@ -109,6 +109,7 @@ const marker = {
     ctx.restore()
   }
 }
+const axis = { color:'#BDBAB0',font:{family:'Source Sans',size:12},maxTicksLimit:6 }
 function update() {
   if(!chart) return
   chart.data.labels=props.rows.map(r=>r.day)
@@ -116,21 +117,16 @@ function update() {
     type:s.bar?'bar':'line', label:s.label, data:props.rows.map(s.value), borderColor:s.color,
     backgroundColor:s.fill ?? s.color, borderDash:s.dash ?? [], borderWidth:s.width ?? (s.bar ? 0 : 2.2),
     pointRadius:!s.bar && (s.primary || (s.width ?? 2)>=2) && props.rows.length<=25 ? 1.8 : 0,
-    pointHoverRadius:s.bar || s.tooltip===false?0:3.8, spanGaps:false, hidden:hidden.value.includes(s.group ?? s.label), tension:0,
+    pointHoverRadius:s.bar || s.tooltip===false?0:3.8, spanGaps:false, hidden:hidden.value.includes(s.label), tension:0,
     yAxisID:s.axis ?? 'y', fill:s.area ?? false, categoryPercentage:.8, barPercentage:.84,
     grouped:!s.bar, order:s.bar?2:!s.primary && s.width && s.width<2?1:0
   }))
   chart.options.scales.y.beginAtZero=props.series.some(s=>s.bar || s.zero)
-  chart.options.scales.y.max = props.yMax
   chart.options.scales.y1.display=!!props.right
   chart.update('none')
 }
 function create() {
-  const style = getComputedStyle(canvas.value)
-  const themeNames = ['ink', 'cream', 'muted', 'quiet', 'line', 'subtle', 'panel', 'focus', 'rail']
-  chartTheme = Object.fromEntries(themeNames.map(name => [name, style.getPropertyValue('--'+name).trim()]))
-  const axis = { color:chartTheme.muted, font:{family:'Source Sans',size:12}, maxTicksLimit:6 }
-  const ticks = props.compact ? { ...axis, font:{...axis.font,size:11} } : axis
+  const ticks=props.compact ? { ...axis,color:'#8E8A80',font:{...axis.font,size:11} } : axis
   chart=new Chart(canvas.value,{
     type:'line', plugins:[marker],data:{labels:[],datasets:[]},
     options:{
@@ -141,16 +137,15 @@ function create() {
       },
       onClick(event,elements) {
         if(ignoreClick) return
-        const index=props.inspect ? chart.scales.x.getValueForPixel(event.x) : elements[0]?.index
-        const day=props.rows[index]?.day
+        const day=props.rows[elements[0]?.index]?.day
         if(day==null) return
-        if(props.inspect || event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
+        if(event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
         else emit('watch',day)
       },
       layout:{padding:{left:8,right:12,top:6}},
       plugins:{filler:{propagate:false},tooltip:{
-        enabled:true, backgroundColor:chartTheme.panel,titleColor:chartTheme.ink,bodyColor:chartTheme.muted,
-        padding:11, borderColor:chartTheme.line, borderWidth:1, cornerRadius:6,
+        enabled:true, backgroundColor:'#111110',titleColor:'#FFFDFC',bodyColor:'#BDBAB0',
+        padding:11, borderColor:'#56534A', borderWidth:1, cornerRadius:4,
         titleFont:{family:'Lab Mono',size:15},bodyFont:{family:'Lab Mono',size:12},
         displayColors:true,
         filter:item=>props.series[item.datasetIndex]?.tooltip!==false,
@@ -167,9 +162,9 @@ function create() {
         }
       }},
       scales:{
-        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:chartTheme.line} },
-        y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0 ? chartTheme.line : chartTheme.subtle},border:{color:chartTheme.line},grace:'7%' },
-        y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:chartTheme.cream},grid:{drawOnChartArea:false},border:{color:chartTheme.line} }
+        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:props.compact?'#3D3A35':'#56534A'} },
+        y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0?'#545147':'#33332F'},border:{color:props.compact?'#3D3A35':'#45433F'},grace:'7%' },
+        y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:'#EEEDD6'},grid:{drawOnChartArea:false},border:{color:'#45433F'} }
       }
     }
   })
@@ -177,7 +172,7 @@ function create() {
 }
 onMounted(create)
 onBeforeUnmount(()=>chart?.destroy())
-watch(()=>[props.rows,props.series,props.right,props.guide,props.yMax,hidden.value],update)
+watch(()=>[props.rows,props.series,props.right,props.guide,hidden.value],update)
 watch(()=>[props.pin,props.annotations],()=>chart?.draw())
 function downloadChart() {
   const source = canvas.value
@@ -197,18 +192,18 @@ function downloadChart() {
 }
 </script>
 <template>
-  <article class="trend-plot" :class="{ 'focused-plot':focus || spotlight, 'spotlight-plot':spotlight, 'compact-plot':compact }" :style="{'--plot':color || 'var(--cream)'}"
+  <article class="trend-plot" :class="{ 'focused-plot':focus || spotlight, 'spotlight-plot':spotlight, 'compact-plot':compact }" :style="{'--plot':color || '#EEEDD6'}"
     :aria-label="title+' chart'" :id="focus ? undefined : 'chart-'+title.toLowerCase().replaceAll(' ','-')">
     <header class="plot-heading">
       <button v-if="hideable && !focus && !spotlight" class="chart-hide" :aria-label="'Hide '+title" @click="emit('hide')"><Minus :size="13"/></button>
       <h2>{{ title }}</h2>
-      <button v-if="!inspect" class="icon plot-focus" :aria-label="focus || spotlight ? 'Close focus chart' : 'Focus '+title" @click="emit('focus')">
+      <button class="icon plot-focus" :aria-label="focus || spotlight ? 'Close focus chart' : 'Focus '+title" @click="emit('focus')">
         <Minimize2 v-if="focus || spotlight" :size="16"/><Maximize2 v-else :size="16"/>
       </button>
     </header>
     <div class="chart-unit">{{ unit }}</div>
     <div class="chart-canvas" @mouseleave="hovered=null; chart?.draw()">
-      <canvas ref="canvas" tabindex="0" role="img" :aria-label="title+' by generation. Arrow keys select a day. '+(inspect ? 'Enter or Space inspects it.' : 'Enter watches it and Space pins it.')"
+      <canvas ref="canvas" tabindex="0" role="img" :aria-label="title+' by generation. Arrow keys select a day. Enter watches it and Space pins it.'"
         @keydown="move" @pointerdown="startBrush" @pointermove="moveBrush" @pointerup="endBrush" @pointercancel="brush=null;chart?.draw()"></canvas>
       <span v-if="!hasSamples" class="chart-empty">{{ rows.length ? 'No samples in this range' : 'No completed days in this range' }}</span>
     </div>
@@ -217,9 +212,8 @@ function downloadChart() {
         <i :style="{borderColor:s.color,borderTopStyle:s.dash?'dashed':'solid'}"></i>{{ s.label }}
       </button>
     </div>
-    <slot/>
     <div v-if="focus || spotlight" class="focused-actions">
-      <button v-if="!inspect" class="secondary" :disabled="!active" @click="emit('pin',active)">Pin day</button>
+      <button class="secondary" :disabled="!active" @click="emit('pin',active)">Pin day</button>
       <button class="secondary" @click="downloadChart">Download chart PNG</button>
     </div>
   </article>

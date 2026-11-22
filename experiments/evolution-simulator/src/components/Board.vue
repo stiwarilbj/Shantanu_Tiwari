@@ -8,14 +8,16 @@ import CreatureThought from './CreatureThought.vue'
 
 const props = defineProps({
   frame: Object, species: Array, layers: Object, selected: Number, follow: Boolean, camera: String,
-  scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean, centeredField: Boolean,
+  scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean,
   playbackRun: String, liveRate: Number, liveFinished: Boolean
 })
 const emit = defineEmits(['select', 'fallback'])
 const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
+const stageColor = '#242424'
 const scene = new THREE.Scene()
+scene.background = new THREE.Color(stageColor)
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
 const overhead = new THREE.OrthographicCamera(-350, 350, 350, -350, 1, 4500)
 overhead.up.set(0, 0, -1)
@@ -32,27 +34,10 @@ const cast = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 const radiusGeometry = new THREE.CircleGeometry(1, 32)
-const field = {
-  surface: '#F3F7FB',
-  refuge: '#C9D5E1',
-  refugeLine: '#577488',
-  rim: '#A7B8CA',
-  litSide: '#849AB1',
-  shadedSide: '#697F96',
-  underside: '#5D7085',
-}
-const marks = {
-  food: '#83A51E',
-  sight: '#CEEAFE',
-  selected: '#285B89',
-  hovered: '#6A53A8',
-  plantCredit: '#A1C33F',
-  preyCredit: '#D38C80',
-}
+const homeColor = '#E5E5E5'
 const legacyOutlineSize = FIELD - 16
 const meshKinds = {}
 let renderer, canvas, ctx, orbit, resize, raf, down, previousFrame, height = 1, width = 1, dirty = true
-let stageColor
 let tabletop, refugeSurface, refugeOutline
 let contact, contactTexture
 let pickBody, bodyIds = [], screenBlobs = [], followed = false, manual = false, previousTime = 0
@@ -82,14 +67,14 @@ function makeContactShadow() {
 
 function placeBoard() {
   const slab = new THREE.Mesh(new THREE.BoxGeometry(540, 10, 540),
-    [field.shadedSide, field.litSide, field.rim, field.underside, field.shadedSide, field.litSide].map(fill => new THREE.MeshBasicMaterial({ color:fill })))
+    ['#9C9C9C','#AAAAAA','#CDCDCD','#888888','#A3A3A3','#AAAAAA'].map(fill => new THREE.MeshBasicMaterial({ color:fill })))
   slab.position.y = -6
   scene.add(slab)
   const plane = new THREE.PlaneGeometry(FIELD, FIELD)
-  refugeSurface = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: field.refuge }))
+  refugeSurface = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: homeColor }))
   refugeSurface.rotation.x = -Math.PI / 2
   refugeSurface.position.y = -0.8
-  tabletop = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: field.surface }))
+  tabletop = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: '#ffffff' }))
   tabletop.rotation.x = -Math.PI / 2
   tabletop.position.y = -0.7
   scene.add(refugeSurface, tabletop)
@@ -101,7 +86,7 @@ function placeBoard() {
   const edgeGeometry = new THREE.EdgesGeometry(corners)
   corners.dispose()
   refugeOutline = new THREE.LineSegments(edgeGeometry,
-    new THREE.LineDashedMaterial({ color: field.refugeLine, dashSize: 7, gapSize: 5, transparent: true, opacity: .65 }))
+    new THREE.LineDashedMaterial({ color: '#6C847C', dashSize: 7, gapSize: 5, transparent: true, opacity: .65 }))
   refugeOutline.rotation.x = -Math.PI / 2
   refugeOutline.position.y = 0.05
   refugeOutline.computeLineDistances()
@@ -274,21 +259,21 @@ function draw3d(blobs, frame, view, { min, max }) {
   }
   frame.plants.forEach((p, i) => {
     const x = p.x - 250, z = p.y - 250
-    write(pellets, i, marks.food, x, 2.2, z, 1)
+    write(pellets, i, '#83A51E', x, 2.2, z, 1)
     if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8, .045, z + .35, 3.2, 2.3, 1, -Math.PI / 2)
   })
-  sight.forEach((b,i)=>write(vision, i, marks.sight, b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
+  sight.forEach((b,i)=>write(vision, i, '#E4F5FE', b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
   indicators.forEach((b, i) => {
     if (energy.count) {
       color.copy(energyLow).lerp(energyFull, b.energy / b.capacity)
       write(energy, i, color, b.x - 250, .06, b.y - 250, b.r * 1.5, b.r * 1.5, 1, -Math.PI / 2)
     }
     if (credit.count) for (let j = 0; j < b.credits; j++) {
-      write(credit, pips++, j < b.preyCredits ? marks.preyCredit : marks.plantCredit,
+      write(credit, pips++, j < b.preyCredits ? '#D38C80' : '#A1C33F',
         b.x - 250 - b.r * 1.7 + j * 2.6, .1, b.y - 250 + b.r * 1.5, 1.15, 1.15, 1, -Math.PI / 2)
     }
   })
-  outlines.forEach((b,i)=>write(ring, i, b === chosen ? marks.selected : marks.hovered, b.x-250, .14, b.y-250, b.r*1.53, b.r*1.53, 1, -Math.PI/2))
+  outlines.forEach((b,i)=>write(ring, i, b===chosen?'#33786D':'#C92922', b.x-250, .14, b.y-250, b.r*1.53, b.r*1.53, 1, -Math.PI/2))
   const refugeWidth = frame.refugeWidth ?? 0
   const interior = FIELD - 2 * refugeWidth
   refugeSurface.visible = refugeWidth > 0
@@ -360,20 +345,20 @@ function draw2d(blobs, frame, view, { min, max }) {
   const top = corners(270).map(([x,z]) => p(x,-1,z)), bottom = corners(270).map(([x,z]) => p(x,-11,z))
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4
-    polygon([top[i],top[j],bottom[j],bottom[i]], i % 2 ? field.shadedSide : field.litSide)
+    polygon([top[i],top[j],bottom[j],bottom[i]], i % 2 ? '#969696' : '#AAAAAA')
   }
-  polygon(top, field.rim)
+  polygon(top, '#CDCDCD')
   const refugeWidth = frame.refugeWidth ?? 0
-  const fieldPolygon = corners(FIELD / 2).map(([x,z]) => p(x,0,z))
+  const field = corners(FIELD / 2).map(([x,z]) => p(x,0,z))
   const interior = FIELD / 2 - refugeWidth
-  polygon(fieldPolygon, refugeWidth ? field.refuge : field.surface)
+  polygon(field, refugeWidth ? homeColor : '#FFFFFF')
   ctx.save()
   ctx.clip()
-  if (refugeWidth) polygon(corners(interior).map(([x,z]) => p(x,0,z)), field.surface)
+  if (refugeWidth) polygon(corners(interior).map(([x,z]) => p(x,0,z)), '#FFFFFF')
   const eligible = b => !props.layers?.selected || b.id === props.selected
   if (props.layers?.homes) {
     const points = corners(refugeWidth ? interior : legacyOutlineSize / 2).map(([x,z]) => p(x,0,z))
-    ctx.strokeStyle = field.refugeLine
+    ctx.strokeStyle = '#6C847C'
     ctx.setLineDash([4,3])
     polygonPath(points)
     ctx.stroke()
@@ -394,14 +379,14 @@ function draw2d(blobs, frame, view, { min, max }) {
       const unit = p(b.x-250,2.35,b.y-250)
       const scale = overheadView ? width/(overhead.right-overhead.left) : Math.hypot(unit.x-q.x,unit.y-q.y)/2.15
       const senseRadius = b.sense * scale
-      ellipse(q.x,q.y,senseRadius,senseRadius*(overheadView ? 1 : .36),marks.sight)
+      ellipse(q.x,q.y,senseRadius,senseRadius*(overheadView ? 1 : .36),'#E4F5FE')
     }
     if (!simple || b.id === props.selected) softShadow(q.x+r*.42,q.y+r*.09,r*1.7,r*(overheadView?1.12:.51))
     if (props.layers?.energy && eligible(b)) ellipse(q.x,q.y,r*1.46,r*.43,b.energy/b.capacity>.45?'#F4DF86':'#CCCCCC')
     if (b.id === props.selected && !(props.tabletop && props.follow)) {
       ctx.beginPath()
       ctx.ellipse(q.x,q.y,r*1.47,r*.48,0,0,Math.PI*2)
-      ctx.strokeStyle=marks.selected
+      ctx.strokeStyle='#33786D'
       ctx.stroke()
     }
   })
@@ -414,7 +399,6 @@ function draw2d(blobs, frame, view, { min, max }) {
       const r = pelletRadius
       const gradient = ctx.createRadialGradient(t.x-r*.3,t.y-r*.4,0,t.x,t.y,r*1.15)
       gradient.addColorStop(0,'#A9BA4D')
-      gradient.addColorStop(.55, marks.food)
       gradient.addColorStop(1,'#647D22')
       ellipse(t.x,t.y,r,r,gradient)
       continue
@@ -443,14 +427,14 @@ function draw2d(blobs, frame, view, { min, max }) {
       ctx.fillStyle=grad
       ctx.fill()
       if (b.id === hovered.value) {
-        ctx.strokeStyle = marks.hovered
+        ctx.strokeStyle = '#C92922'
         ctx.lineWidth = 1.3
         ctx.stroke()
       }
       ctx.restore()
       ellipse(x+side*r*.53,y-h*.78,Math.max(.65,r*.08),Math.max(.65,r*.08),'#0A0A0A')
     }
-    if (props.layers?.credits && eligible(b)) for (let i=0;i<b.credits;i++) ellipse(x-r+i*4,y+4,1.8,1.5,i < b.preyCredits ? marks.preyCredit : marks.plantCredit)
+    if (props.layers?.credits && eligible(b)) for (let i=0;i<b.credits;i++) ellipse(x-r+i*4,y+4,1.8,1.5,i<b.preyCredits?'#D38C80':'#A1C33F')
     screenBlobs.push({ id:b.id,x,y:overheadView?y:y-h*.5,r:Math.max(r,4),h })
   }
 }
@@ -471,9 +455,8 @@ function fit() {
   const cameraScale = props.camera === 'close' && !followedBlob.value ? .7 : 1
   if (props.tabletop) {
     const compact = width < 400 && height < 330
-    const framing = props.centeredField ? .88 : compact ? 1.12 : 1
-    originalPosition.set(-300,520,720).multiplyScalar(zoom * framing * cameraScale)
-    originalTarget.set(0, props.centeredField ? 0 : compact ? 34 : width < 700 ? 60 : 20, 0)
+    originalPosition.set(-300,520,720).multiplyScalar((compact ? zoom * 1.12 : zoom) * cameraScale)
+    originalTarget.set(0, compact ? 34 : width < 700 ? 60 : 20, 0)
   } else {
     originalPosition.set(600,300,600).multiplyScalar(zoom * cameraScale)
     originalTarget.set(0, width < 700 ? 18 : height < 500 ? 13 : 26, 0)
@@ -626,9 +609,6 @@ function useCanvasFallback() {
 }
 
 function setupRenderer() {
-  const theme = getComputedStyle(host.value)
-  stageColor = theme.getPropertyValue('--board-background').trim() || theme.getPropertyValue('--stage').trim()
-  scene.background = new THREE.Color(stageColor)
   contact = makeContactShadow()
   placeBoard()
   meshes()

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useLab } from '../store.js'
-import { countAges, format } from '../engine/stats.js'
+import { format } from '../engine/stats.js'
 
 const props=defineProps({scope:String})
 const emit=defineEmits(['watch'])
@@ -78,6 +78,11 @@ const meanX = computed(() => {
   if (mean == null) return null
   return singleValue.value ? histogramCenter : 30 + 700 * (mean - min) / (max - min)
 })
+function countAges(blobs) {
+  const counts=new Map()
+  for (const { age } of blobs) counts.set(age,(counts.get(age) ?? 0)+1)
+  return counts
+}
 const ages=computed(()=>{
   const primary=countAges(cohort.value), comparison=countAges(second.value)
   const values=[...new Set([...primary.keys(),...comparison.keys()])].sort((a,b)=>a-b)

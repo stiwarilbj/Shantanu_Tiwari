@@ -1,10 +1,10 @@
 export const METRICS = [
-  { key: 'population', label: 'Population', short: 'Population', unit: 'blobs', color: '#F2EBD1', petal: '#F2EBD1' },
-  { key: 'age', label: 'Average Age', short: 'Age', unit: 'days', color: '#F1CE66', heading: '#FADE69', petal: '#F1CE66', inner: '#FEE97F', outer: '#FEF2B8' },
+  { key: 'population', label: 'Population', short: 'Population', unit: 'blobs', color: '#EEEDD6', petal: '#EEEDD6' },
+  { key: 'age', label: 'Average Age', short: 'Age', unit: 'days', color: '#FDDE3B', heading: '#FADE69', petal: '#FDDE3B', inner: '#FEE97F', outer: '#FEF2B8' },
   { key: 'deathAge', label: 'Average Age at Death', short: 'Age at Death', unit: 'days', color: '#DDDAD0', heading: '#FFFDFC', petal: '#FFFDFC', inner: '#E9E6DF', outer: '#F3F1ED' },
-  { key: 'speed', label: 'Average Speed', short: 'Speed', unit: 'points', color: '#F1847D', heading: '#FFA29C', petal: '#F1847D', inner: '#F1A29B', outer: '#F7CCC8' },
-  { key: 'size', label: 'Average Size', short: 'Size', unit: 'points', color: '#52CFAB', heading: '#79D7BF', petal: '#52CFAB', inner: '#6BD6C7', outer: '#B0E8DF' },
-  { key: 'sense', label: 'Average Sense Range', short: 'Sense Range', unit: 'world units', color: '#70CFFF', heading: '#98DDFF', petal: '#70CFFF', inner: '#5EDAFB', outer: '#A8EAFC' },
+  { key: 'speed', label: 'Average Speed', short: 'Speed', unit: 'points', color: '#E97167', heading: '#E78482', petal: '#D20F18', inner: '#F1A29B', outer: '#F7CCC8' },
+  { key: 'size', label: 'Average Size', short: 'Size', unit: 'points', color: '#1CC1AA', heading: '#70BAAB', petal: '#1CC1AA', inner: '#6BD6C7', outer: '#B0E8DF' },
+  { key: 'sense', label: 'Average Sense Range', short: 'Sense Range', unit: 'world units', color: '#07C7FB', heading: '#7EC1DF', petal: '#07C7FB', inner: '#5EDAFB', outer: '#A8EAFC' },
 ]
 
 export function distribution(values) {
@@ -19,12 +19,6 @@ export function distribution(values) {
   }
   const sd = n < 2 ? 0 : Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (n - 1))
   return { n, mean, min: values[0], p25: quantile(0.25), p75: quantile(0.75), max: values[n - 1], sd }
-}
-
-export function countAges(blobs) {
-  const counts = new Map()
-  for (const { age } of blobs) counts.set(age, (counts.get(age) ?? 0) + 1)
-  return counts
 }
 
 export function summaries(day, config, opening, closing, events, supply, plantsLeft) {

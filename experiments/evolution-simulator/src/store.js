@@ -83,7 +83,7 @@ export const useLab = defineStore('lab', () => {
   const settings = ref(false), draft = ref(null), modal = ref(null), targetDay = ref(null), branchFrom = ref(null)
   const branchRequest = shallowRef(null)
   const branchPreparing = computed(() => branchRequest.value?.day ?? null)
-  let openingDraft, retainedDraft
+  let openingDraft
   const draftChanged = computed(() => draft.value != null && JSON.stringify(draft.value) !== openingDraft)
   const downloadRange = shallowRef(null)
   const completed = computed(() => run.value ? last(run.value) : 0)
@@ -644,17 +644,7 @@ export const useLab = defineStore('lab', () => {
     if (run.value.setup.mode === 'prepare') simulate(days, 'Preparing')
   }
 
-  function restoreDraftAfterPreview() {
-    if (!retainedDraft) return
-    draft.value = retainedDraft.value
-    openingDraft = retainedDraft.opening
-    branchFrom.value = retainedDraft.branch
-    retainedDraft = null
-  }
-
-  function openSettings(setup, from = null, preview = false) {
-    restoreDraftAfterPreview()
-    if (preview) retainedDraft = { value:draft.value, opening:openingDraft, branch:branchFrom.value }
+  function openSettings(setup, from = null) {
     cancelBranch()
     if (!settings.value) restorePlay = playing.value
     stopPlayback()
@@ -679,14 +669,12 @@ export const useLab = defineStore('lab', () => {
   function closeSettings(resume = true) {
     cancelBranch()
     settings.value = false
-    restoreDraftAfterPreview()
     if (resume && restorePlay && !playing.value) play()
     restorePlay = false
   }
 
   function clearSettings() {
     settings.value = false
-    retainedDraft = null
     draft.value = null
     branchFrom.value = null
     restorePlay = false
@@ -708,7 +696,6 @@ export const useLab = defineStore('lab', () => {
   }
 
   async function switchRun(value, isCurrent, restoreDay) {
-    if (retainedDraft) closeSettings(false)
     cancelBranch()
     modal.value = null
     draft.value = null

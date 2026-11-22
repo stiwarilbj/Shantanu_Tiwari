@@ -1,5 +1,7 @@
 # Evolution Simulator visual and interaction design
 
+These notes record the earlier Project Lab design. The published app now follows the standalone simulator. [Current UI guide](https://github.com/stiwarilbj/Evolution_Simulator/blob/3a3d38572d2912e6262189ee2fffaf657d3a256e/outputs/evolution-simulator-implemented-ui.md)
+
 [Open the simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/) · [Walkthrough and implementation plan](PLAN.md)
 
 The field is the brightest object on the page. Leave dark space around it so a tiny pellet or a moving blob still catches the eye. In Trends, give that job to the data. Settings changes the experiment and Compare shows what those changes did. These four views use the same blue surfaces, labels, and focus colors.

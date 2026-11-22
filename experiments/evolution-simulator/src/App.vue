@@ -15,17 +15,14 @@ const Tour=defineAsyncComponent(()=>import('./components/Tour.vue'))
 const GuidedWorld=defineAsyncComponent(()=>import('./components/GuidedWorld.vue'))
 
 const lab = useLab()
-const pages = { viewer:'World', stats:'Trends', about:'About', compare:'Compare' }
 const projectLab = document.body.classList.contains('project-lab-page')
-const views = projectLab ? ['viewer','stats','about'] : ['about','viewer','stats']
+const pages = { viewer:'World', stats:'Trends', about:'About', compare:'Compare' }
 const runAddress = /^#\/r\/([^/]+)\/s\/(\d+)\/(viewer|stats|about|compare)(\?.*)?$/
 const initialAddress = location.hash.match(runAddress)
 const initialPage = initialAddress?.[3] ?? 'viewer'
 const initialQuery = new URLSearchParams(initialAddress?.[4])
 const page = ref(initialPage), ready = ref(false), menu = ref(false), world = ref(), menuButton = ref(), mainSurface = ref()
 const fullscreenSurface = ref(null)
-const settingTarget = ref(null)
-let settingOpener
 const comparison = ref(readComparison(initialQuery))
 const example = ref(initialPage==='viewer' ? knownExample(initialQuery.get('example')) : null)
 const lesson = ref(readLesson(initialQuery))
@@ -61,7 +58,7 @@ function address(view = page.value, day = lab.viewing, settings = lab.settings, 
   }
   if (view==='viewer' && guided) query.set('example',guided)
   if ((view==='about' || view==='viewer' && guided) && lesson.value!=='opening') query.set('lesson',lesson.value)
-  if (settings && !settingTarget.value) query.set('cfg','1')
+  if (settings) query.set('cfg','1')
   return '#/r/'+lab.run.id+'/s/'+day+'/'+view+(query.size ? '?'+query : '')
 }
 function syncAddress() {
@@ -75,14 +72,8 @@ function skipToContent() { document.getElementById("main-surface")?.focus() }
 function dismissMenu(event) {
   if (!event.target.closest('.run-center')) menu.value = false
 }
-function leaveMenu(event) {
-  if (!event.currentTarget.contains(event.relatedTarget)) menu.value = false
-}
 function escapeMenu(event) {
-  if (!menu.value) return
-  event.stopPropagation()
-  menu.value = false
-  menuButton.value?.focus()
+  if (event.key==='Escape' && menu.value) { menu.value=false; menuButton.value?.focus() }
 }
 function show(view) {
   if (page.value===view) return
@@ -122,10 +113,6 @@ function go(view, guided = null) {
 function changeLesson(id) {
   lesson.value = id
   if (page.value==='about') syncAddress()
-}
-function openClosingLesson() {
-  lesson.value = 'closing'
-  go('about')
 }
 async function applyAddress(hash = location.hash) {
   const token = beginNavigation()
@@ -233,17 +220,6 @@ function settings(setup) {
 function reroll() {
   settings({ ...lab.run.setup, seed:randomSeed(lab.run.setup.seed) })
 }
-function previewSetting(field, opener) {
-  beginNavigation()
-  menu.value = false
-  const current = lab.run.setup
-  const suffix = field==='seed' ? ' · new seed' : ' · food test'
-  const draft = { ...current, name:current.name.slice(0,60-suffix.length)+suffix }
-  if (field==='seed') draft.seed = randomSeed(current.seed)
-  settingTarget.value = field
-  settingOpener = opener
-  lab.openSettings(draft, null, true)
-}
 function task(key) {
   menu.value=false
   lab.modal=key
@@ -275,15 +251,6 @@ watch(() => [lab.run?.id,lab.viewing,lab.settings], ([id], [previousId]) => {
     history.pushState(null,'',address())
   } else syncAddress()
 })
-watch(() => lab.settings, open => {
-  if (open || !settingTarget.value) return
-  const opener = settingOpener
-  settingTarget.value = null
-  settingOpener = null
-  nextTick(() => {
-    if (page.value==='about' && !lab.settings && opener?.isConnected) opener.focus()
-  })
-})
 onMounted(async () => {
   let firstVisit=false
   try { firstVisit=!location.hash && !localStorage.getItem('evolution.active') && !localStorage.getItem('evolution.tour') } catch {}
@@ -291,6 +258,7 @@ onMounted(async () => {
   ready.value = true
   window.addEventListener('popstate',handlePopState)
   document.addEventListener('pointerdown',dismissMenu)
+  document.addEventListener('keydown',escapeMenu)
   if (location.hash) {
     await applyAddress()
   } else {
@@ -301,25 +269,26 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate',handlePopState)
   document.removeEventListener('pointerdown',dismissMenu)
+  document.removeEventListener('keydown',escapeMenu)
 })
 </script>
 
 <template>
   <a class="skip-link" href="#main-surface" @click.prevent="skipToContent">Skip to content</a>
   <header class="app-header">
-    <nav aria-label="Evolution Simulator navigation" :inert="!ready">
-      <a v-if="!projectLab" class="brand" :href="address('viewer',lab.viewing,lab.settings,null)" aria-label="Evolution Simulator home" @click.prevent="go('viewer')">
+    <nav :aria-label="projectLab ? 'Evolution Simulator navigation' : 'Main navigation'" :inert="!ready">
+      <a class="brand" :href="address('viewer',lab.viewing,lab.settings,null)" aria-label="Evolution Simulator home" @click.prevent="go('viewer')">
         <svg viewBox="0 0 30 30" width="30" height="30" fill="none" aria-hidden="true">
           <path d="M8.1 11.1C9.3 5.5 12.1 2.9 16.3 3.8c3 .6 4.5 2.8 4.8 5.2.2 1.4 1 2.5 2.7 4.7 4.6 6.1.6 12.4-7.4 12.6C7.3 26.5 3.9 22.4 5.6 17.1c.6-1.8 1.9-4.2 2.5-6Z" stroke="currentColor" stroke-width="1.6"/>
           <circle cx="16" cy="11.2" r="1.05" fill="currentColor"/><circle cx="20" cy="13.2" r=".85" fill="currentColor"/>
         </svg>
       </a>
-      <a v-for="view in views" :key="view" :href="address(view,lab.viewing,lab.settings,null)" :aria-current="page===view?'page':undefined"
+      <a v-for="view in ['about','viewer','stats']" :key="view" :href="address(view,lab.viewing,lab.settings,null)" :aria-current="page===view?'page':undefined"
         @click.prevent="go(view)">{{ pages[view] }}</a>
       <a v-if="page==='compare'" :href="address('compare')" aria-current="page" @click.prevent>Compare</a>
     </nav>
-    <div v-if="lab.run" class="run-center" :inert="!ready" @focusout="leaveMenu" @keydown.esc="escapeMenu">
-      <button class="primary settings-pill" aria-label="Simulation Settings" @click="settings()">Settings</button>
+    <div v-if="lab.run" class="run-center" :inert="!ready">
+      <button class="primary settings-pill" aria-label="Simulation Settings" @click="settings()">settings</button>
       <button ref="menuButton" class="run-status" aria-label="Run options" :aria-expanded="menu" :title="lab.run.setup.name" @click="menu=!menu">
         {{ statusText }} <ChevronDown :size="12"/>
       </button>
@@ -349,11 +318,11 @@ onUnmounted(() => {
       <World v-show="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
       <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'"
-        @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll" @try-run="openClosingLesson"/>
+        @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>
       <About v-if="page==='about'" :lesson="lesson" @lesson="changeLesson" @example="go('viewer',$event)"
-        @world="go('viewer')" @trends="go('stats')" @compare="openComparison" @try="previewSetting"/>
+        @world="go('viewer')" @trends="go('stats')" @compare="openComparison"/>
       <Compare v-if="page==='compare'" :key="comparisonVersion" :initial="comparison" @change="comparisonChanged" @library="task('library')"/>
-      <Settings v-if="lab.settings" :target="settingTarget"/>
+      <Settings v-if="lab.settings"/>
       <Tour v-if="lab.modal==='tour'" @close="lab.modal=null" @world="lab.modal=null; go('viewer')"
         @walkthrough="lab.modal=null; lesson='opening'; go('about')"/>
       <RunDialog v-else-if="lab.modal && !lab.settings" @compare="compare" @watch="watchDay"

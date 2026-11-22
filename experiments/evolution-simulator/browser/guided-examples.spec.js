@@ -22,7 +22,8 @@ test('the illustrated walkthrough opens a real family replay @pages', async ({ p
   await panel.getByRole('button', { name:'Primer', exact:true }).click()
   await expect(panel.getByRole('img')).toHaveCount(3)
   await expect.poll(() => panel.getByRole('img').evaluateAll(images => images.every(img => img.naturalWidth > 0))).toBe(true)
-  await expect(panel.getByRole('button')).toHaveText(['Finches', 'Primer'])
+  await panel.getByRole('button', { name:'The host', exact:true }).click()
+  await expect(panel.getByRole('img', { name:/science host/ })).toBeVisible()
 
   await page.getByRole('button', { name:'A newborn’s sight', exact:true }).click()
   const activeRun = page.getByRole('button', { name:'Run options' })
@@ -71,165 +72,12 @@ test('the illustrated walkthrough opens a real family replay @pages', async ({ p
   await expect(activeRun).toHaveText('Day 1 / 50 · Ready')
 })
 
-test('the final chapter opens isolated seed and food drafts @pages', async ({ page }) => {
-  await openWalkthrough(page, true)
-  const settings = page.getByRole('button', { name:'Simulation Settings' })
-  const run = new URL(page.url()).hash.split('/about')[0]
-  await settings.click()
-  await page.getByLabel('Run name').fill('Keep this unfinished draft')
-  await page.getByRole('button', { name:'Close settings' }).click()
-
-  await page.getByRole('button', { name:'Try an experiment', exact:true }).click()
-  const closing = page.getByRole('region', { name:'Try an experiment' })
-  await expect(closing.getByRole('heading', { name:'Try an experiment' })).toBeFocused()
-  await expect(closing.locator('canvas')).toBeVisible()
-  await expect(page).toHaveURL(/lesson=closing$/)
-
-  const seedChoice = closing.getByRole('button', { name:/Try another seed/ })
-  await seedChoice.press('Enter')
-  const seed = page.getByRole('spinbutton', { name:'Random seed' })
-  await expect(seed).toBeFocused()
-  await expect(seed).not.toHaveValue('18')
-  await expect(page.getByLabel('Run name')).toHaveValue('Guided replay check · new seed')
-  await seed.fill('123')
-  await seed.press('Escape')
-  await expect(seedChoice).toBeFocused()
-  await expect(page).toHaveURL(/lesson=closing$/)
-  expect(new URL(page.url()).hash.split('/about')[0]).toBe(run)
-
-  await settings.click()
-  await expect(page.getByLabel('Run name')).toHaveValue('Keep this unfinished draft')
-  await expect(seed).toHaveValue('18')
-  await page.getByRole('button', { name:'Close settings' }).click()
-
-  const foodChoice = closing.getByRole('button', { name:/Change the food supply/ })
-  await foodChoice.click()
-  const food = page.getByRole('spinbutton', { name:'Food', exact:true })
-  await expect(food).toBeFocused()
-  await expect(food).toHaveValue('50')
-  await expect(seed).toHaveValue('18')
-  await food.fill('45')
-  await page.getByRole('button', { name:'Evolve!' }).click()
-  await expect(page.getByRole('link', { name:'World', exact:true })).toHaveAttribute('aria-current','page')
-  expect(new URL(page.url()).hash.split('/viewer')[0]).not.toBe(run)
-  await settings.click()
-  await expect(page.getByLabel('Run name')).toHaveValue('Guided replay check · food test')
-  await expect(food).toHaveValue('45')
-})
-
-test('the final chapter keeps its tabletop visible above the actions on a phone', async ({ browser }) => {
-  const page = await browser.newPage({ viewport:{ width:390, height:844 }, hasTouch:true, isMobile:true,
-    baseURL:test.info().project.use.baseURL })
-  try {
-    await openWalkthrough(page)
-    await page.getByRole('button', { name:'Try an experiment', exact:true }).tap()
-    const closing = page.getByRole('region', { name:'Try an experiment' })
-    const canvas = closing.locator('.closing-board canvas')
-    await expect.poll(async () => (await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(170)
-    const board = await canvas.boundingBox()
-    const action = await closing.getByRole('button', { name:/Try another seed/ }).boundingBox()
-    expect(board.y + board.height).toBeLessThan(action.y)
-    await closing.getByRole('button', { name:/Try another seed/ }).tap()
-    await expect(page.getByRole('spinbutton', { name:'Random seed' })).toBeFocused()
-  } finally {
-    await page.close()
-  }
-})
-
-test('the size mutation preview plays the field and follows two recorded creatures @pages', async ({ page }) => {
-  await openWalkthrough(page, true)
-  const active = new URL(page.url()).hash.split('/about')[0]
-  await page.getByRole('button', { name:'Size mutation preview', exact:true }).click()
-  const preview = page.getByRole('region', { name:'Size mutation preview' })
-  await expect(preview.getByRole('heading', { name:'Size mutation preview' })).toBeFocused()
-  await expect(preview.getByText('Dawn · 50 founders')).toBeVisible()
-  await expect(preview.locator('canvas')).toBeVisible()
-  await preview.getByRole('button', { name:'Prepare 100-day preview' }).press('Enter')
-  const play = preview.getByRole('button', { name:'Play preview' })
-  await expect(play).toBeEnabled({timeout:20_000})
-  const speed = preview.getByRole('combobox', { name:'Preview playback speed' })
-  await expect(speed).toHaveValue('4')
-  await expect(preview.getByText(/Day 1 at dawn · 50 blobs · Mean size 10.00/)).toBeVisible()
-  const time = preview.getByRole('slider', { name:'Preview time' })
-  await play.click()
-  await expect.poll(async () => Number(await time.inputValue())).toBeGreaterThan(0.1)
-  await preview.getByRole('button', { name:'Restart preview' }).click()
-  await expect(time).toHaveValue('0')
-
-  const daySix = preview.getByRole('button', { name:'Day 6', exact:true })
-  const dayHundred = preview.getByRole('button', { name:'Day 100', exact:true })
-  await daySix.press('Enter')
-  await expect(preview.getByText(/Day 6 at dawn/)).toBeVisible()
-  await expect(daySix).toBeFocused({ timeout:1000 })
-  await page.keyboard.press('Tab')
-  await expect(dayHundred).toBeFocused()
-  await preview.getByRole('button', { name:'Follow hunter' }).click()
-  await expect(speed).toHaveValue('1')
-  await expect(time).toHaveValue('0')
-  const readout = preview.getByLabel('Creature readout')
-  await expect(readout.getByRole('heading', { name:/^Hunter/ })).toBeVisible()
-  await readout.getByRole('button', { name:/Catch prey/ }).click()
-  await expect(readout.getByRole('button', { name:/Catch prey/ })).toHaveAttribute('data-reached','true')
-  const hunterMeal = Number(await time.inputValue())
-  await preview.getByRole('button', { name:'Follow forager' }).click()
-  await expect(readout.getByRole('heading', { name:/Plant forager/ })).toBeVisible()
-  await expect(time).toHaveValue('0')
-  await readout.getByRole('button', { name:/Eat a plant/ }).first().click()
-  expect(Number(await time.inputValue())).toBeGreaterThan(hunterMeal)
-  await readout.getByRole('button', { name:/Reach refuge/ }).click()
-  await expect(readout.getByText('Home', { exact:true })).toBeVisible()
-
-  await dayHundred.click()
-  await expect(play).toBeEnabled()
-  await expect(speed).toHaveValue('4')
-  await expect(preview.getByText(/Day 100 at dawn/)).toBeVisible()
-  await preview.getByRole('button', { name:/Set up the 600-day comparison/ }).click()
-  await expect(page.getByRole('heading', { name:'Compare size mutation' })).toBeFocused()
-  await expect(page.getByLabel('Days per run')).toHaveValue('600')
-  expect(new URL(page.url()).hash.split('/about')[0]).toBe(active)
-})
-
-test('the size preview can be canceled or retried without losing keyboard focus', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.previewTestMode = 'hold'
-    const send = Worker.prototype.postMessage
-    Worker.prototype.postMessage = function(message, ...args) {
-      if (message.type !== 'init' || message.config?.name !== 'Size mutation preview' || window.previewTestMode === 'run') {
-        return send.call(this, message, ...args)
-      }
-      if (window.previewTestMode === 'fail') {
-        setTimeout(() => this.onmessage?.({ data:{ type:'error', message:'Fixture failure' } }), 0)
-      }
-    }
-  })
-  await openWalkthrough(page)
-  await page.getByRole('button', { name:'Size mutation preview', exact:true }).click()
-  const preview = page.getByRole('region', { name:'Size mutation preview' })
-  await expect(preview.getByRole('heading', { name:'Size mutation preview' })).toBeFocused()
-  const prepare = preview.getByRole('button', { name:'Prepare 100-day preview' })
-  const cancel = preview.getByRole('button', { name:'Cancel', exact:true })
-  await prepare.press('Enter')
-  await expect(cancel).toBeFocused()
-  await cancel.press('Enter')
-  await expect(prepare).toBeFocused()
-  await expect(preview.getByRole('status')).toHaveText('Preview canceled.')
-
-  await page.evaluate(() => { window.previewTestMode = 'fail' })
-  await prepare.press('Enter')
-  const retry = preview.getByRole('button', { name:'Retry preview' })
-  await expect(retry).toBeFocused()
-  await expect(preview.getByRole('status')).toHaveText('The preview could not be prepared.')
-  await page.evaluate(() => { window.previewTestMode = 'run' })
-  await retry.press('Enter')
-  await expect(preview.getByRole('button', { name:'Play preview' })).toBeFocused()
-})
-
 test('the stride race and energy lesson explain what bigger blobs spend', async ({ page }) => {
   await openWalkthrough(page)
   await page.getByRole('button', { name:'Size and stride', exact:true }).click()
   const panel = page.locator('.chapter-panel')
-  await panel.getByText('See how stride is calculated').click()
-  await expect(panel.locator('code')).toContainText('inherited speed × body size ÷ 10')
+  await panel.getByText('See the original Rust rule').click()
+  await expect(panel.locator('code')).toContainText('self.speed.0 * self.size.0 / 10.')
   await expect(panel.locator('.stride-flag')).toHaveCount(2)
   await page.clock.install()
   await panel.getByRole('button', { name:'Play race' }).click()
@@ -256,7 +104,7 @@ test('the stride race and energy lesson explain what bigger blobs spend', async 
   await expect(guide.getByRole('button', { name:'Pause example' })).toBeVisible()
 })
 
-test('guided boards stay visible in a short split window @pages', async ({ page }) => {
+test('guided boards stay visible in a short split window', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 420 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openWalkthrough(page)
@@ -273,7 +121,6 @@ test('guided boards stay visible in a short split window @pages', async ({ page 
     await expect(progress).toBeEnabled()
     await expect(board).toBeInViewport({ ratio: 1 })
     expect((await board.boundingBox()).height).toBeGreaterThanOrEqual(160)
-    await expect(guide.locator('.guided-controls')).toBeInViewport({ ratio: 1 })
     await expect(progress).toBeInViewport({ ratio: 1 })
     await progress.press('End')
     expect(Number(await progress.inputValue())).toBeGreaterThan(0)

@@ -97,10 +97,8 @@ async function share(run) {
   catch { message.value='The clipboard is unavailable. Use Export setup.' }
 }
 async function importSetup(event) {
-  const input=event.currentTarget
-  const picked=input.files[0]
+  const picked=event.target.files[0]
   if(!picked)return
-  input.value=''
   try {
     const data=JSON.parse(await picked.text())
     const setup=data.setup ?? data

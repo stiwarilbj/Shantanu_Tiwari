@@ -13,6 +13,13 @@ export default defineConfig(({ mode }) => {
       vue(),
       projectLab && {
         name: 'project-lab-page',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'project-lab.css',
+            source: readFileSync(new URL('project-lab.css', import.meta.url)),
+          })
+        },
         transformIndexHtml: {
           order: 'post',
           handler(html) {
@@ -22,12 +29,9 @@ export default defineConfig(({ mode }) => {
 
             return {
               html: html
-                .replace(/^[ \t]*<link rel="icon"[^>]*>\r?\n/m, '')
-                .replace('<meta name="theme-color" content="#132437">', '<meta name="theme-color" content="#cfe2ff">')
-                .replace('<title>Evolution Simulator</title>', '<title>Evolution Simulator | Project Lab</title>')
                 .replace('<body>', '<body class="project-lab-page">'),
               tags: [
-                { tag: 'link', attrs: { rel: 'icon', href: '../../assets/favicon.ico' }, injectTo: 'head' },
+                { tag: 'link', attrs: { rel: 'stylesheet', href: './project-lab.css' }, injectTo: 'head' },
                 { tag: 'script', attrs: { type: 'module', src: `../../navbar/${navbar}`, blocking: 'render' }, injectTo: 'head' },
                 { tag: 'header', attrs: { 'data-site-navbar': true }, injectTo: 'body-prepend' },
               ],

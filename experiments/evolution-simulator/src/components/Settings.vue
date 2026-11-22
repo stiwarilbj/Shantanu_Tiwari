@@ -8,7 +8,6 @@ import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import NumberField from './NumberField.vue'
 
 const lab = useLab()
-const props = defineProps({ target: String })
 const draft = lab.draft
 const fork = lab.branchFrom
 const standardDeviation = usesStandardDeviation(draft)
@@ -115,17 +114,7 @@ async function apply() {
   try { issue.value=await lab.evolve(setup) }
   finally { applying.value=false }
 }
-onMounted(() => {
-  dialog.value.showModal()
-  if (!props.target) return
-  const field = dialog.value.querySelector('#'+props.target)
-  if (!field) return
-  field.focus({ preventScroll:true })
-  const section = field.closest('.settings-target')
-  const bounds = section.getBoundingClientRect()
-  const form = dialog.value.querySelector('.settings-form').getBoundingClientRect()
-  if (bounds.top < form.top+42 || bounds.bottom > form.bottom-48) section.scrollIntoView({ block:'center' })
-})
+onMounted(()=>dialog.value.showModal())
 </script>
 <template>
   <dialog ref="dialog" class="settings-sheet" aria-labelledby="settings-title" @cancel.prevent="lab.closeSettings()">
@@ -192,8 +181,7 @@ onMounted(() => {
             <NumberField :id="selected.id+'.energy'" v-model="selected.energy" label="Energy" :min="10" :max="1000" :pace="100" tint="#8F8048" compact :disabled="fork!=null" :error="issue[selected.id+'.energy']"/>
             <button class="link gold" type="button" :aria-expanded="rewards" @click="rewards=!rewards">Refill rewards {{ rewards ? '▴' : '▾' }}</button>
           </div>
-          <div class="daily-card food-card" :class="{ 'settings-target':target==='food' }">
-            <p v-if="target==='food'" class="settings-target-note">Food test · Choose the Day 1 plant count</p>
+          <div class="daily-card food-card">
             <NumberField id="food" v-model="draft.food" label="Food" :min="10" :max="1000" tint="#6C7C3A" compact :error="issue.food"/>
             <label class="olive-label">Food schedule <select v-model="draft.scheduleMode" @change="delete issue.schedule"><option value="constant">Constant</option><option value="ramp">Ramp</option><option value="step">Step</option></select></label>
           </div>
@@ -226,9 +214,7 @@ onMounted(() => {
           <template v-if="!endsWhenSettled(draft)">
             <NumberField id="duration" v-model="seconds" label="Seconds per day" :min="1" :max="60" :step=".1" :error="issue.duration"/>
           </template>
-          <div v-if="target==='seed'" class="settings-target-note">Seed test · Use this seed or enter your own</div>
-          <NumberField id="seed" v-model="draft.seed" label="Random seed" :min="1" :max="MAX_SEED" :disabled="fork!=null" :error="issue.seed"
-            :class="{ 'settings-target':target==='seed' }"/>
+          <NumberField id="seed" v-model="draft.seed" label="Random seed" :min="1" :max="MAX_SEED" :disabled="fork!=null" :error="issue.seed"/>
           <template v-if="!endsWhenSettled(draft)">
             <div class="quick-picks"><button v-for="n in [1,5,10,20,30,60]" :key="n" type="button" class="secondary" :aria-pressed="seconds===n" @click="seconds=n">{{ n }} s</button></div>
             <small class="quiet">Up to {{ ((draft.days*seconds)/60).toFixed(1) }} min of playback at 1×</small>

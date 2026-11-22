@@ -1,5 +1,7 @@
 # Evolution Simulator walkthrough plan
 
+This plan records the earlier Project Lab design. The published app now follows the standalone simulator. [Current project plan](https://github.com/stiwarilbj/Evolution_Simulator/blob/3a3d38572d2912e6262189ee2fffaf657d3a256e/outputs/evolution-simulator-website-plan.md)
+
 [Open Evolution Simulator in Project Lab](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/) · [Visual and interaction design](VISUAL-DESIGN.md)
 
 Start with one blob looking for food. Follow its choices into the population charts, change one setting, then watch two worlds to see what happened. Finish with an experiment the visitor can run. Use the reference for the sequence, mechanics, camera choices, and teaching interactions. Draw the field, blobs, icons, and illustrations in Project Lab’s own style and keep its shared navbar. [Reference walkthrough](https://www.youtube.com/watch?v=6nMo8T3T0L4)

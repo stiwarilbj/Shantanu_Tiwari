@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useLab } from '../store.js'
 import { MAX_SEED } from '../engine/config.js'
 import { walkthroughStepCost } from '../engine/geometry.js'
@@ -9,18 +9,15 @@ import finches from '../assets/guide-finches.webp'
 import primer from '../assets/guide-primer.webp'
 import primerOverhead from '../assets/guide-primer-overhead.webp'
 import primerClose from '../assets/guide-primer-close.webp'
+import host from '../assets/guide-host.webp'
 import StrideRace from './StrideRace.vue'
-import ClosingLesson from './ClosingLesson.vue'
-import SizePreview from './SizePreview.vue'
 
 const lab=useLab()
 const props=defineProps({ lesson:String })
-const emit=defineEmits(['world','compare','lesson','example','trends','try'])
+const emit=defineEmits(['world','compare','lesson','example','trends'])
 const chapter=computed(()=>Math.max(0,lessons.findIndex(item=>item.id===props.lesson)))
 const current=computed(()=>lessons[chapter.value])
-const chapterPanel=ref(null)
-const comparisonTitle=ref(null)
-const slide=ref(0), video=ref(false)
+const slide=ref(0), video=ref('')
 const pairSeed=ref(SIZE_MUTATION_SEED), pairDays=ref(SIZE_MUTATION_DAYS), pairProgress=ref(null), pairMessage=ref('')
 let pairController
 const opening=[
@@ -32,30 +29,13 @@ const opening=[
       { image:primerClose, alt:'Three clay blobs reach for a pile of food' },
     ],
     caption:'Primer used simple animated creatures to show how natural selection works.' },
+  { image:host, title:'The host', alt:'Hand-drawn science host with round glasses and open hands',
+    caption:'Now try the idea yourself. Follow a creature and see what it takes to survive.' },
 ]
 const exampleCost = size => walkthroughStepCost({ size, speed:10, sense:20 }, { stride:'linked' }).toFixed(3)
 function selectChapter(index) {
   const entry = lessons[index]
   if (entry) emit('lesson',entry.id)
-}
-function revealChapter() {
-  if (!['closing','size-preview'].includes(current.value.id)) return
-  requestAnimationFrame(() => {
-    const title = chapterPanel.value?.querySelector('h3')
-    if (title) chapterPanel.value.scrollIntoView({ block:'start' })
-    title?.focus({ preventScroll:true })
-  })
-}
-watch(current, revealChapter, { flush:'post' })
-onMounted(revealChapter)
-
-function showLongComparison() {
-  if (!pairProgress.value) {
-    pairSeed.value = SIZE_MUTATION_SEED
-    pairDays.value = SIZE_MUTATION_DAYS
-  }
-  comparisonTitle.value.scrollIntoView({ block:'start' })
-  comparisonTitle.value.focus({ preventScroll:true })
 }
 
 async function runPair() {
@@ -91,12 +71,7 @@ onBeforeUnmount(() => pairController?.abort())
       <h2>Walkthrough</h2>
       <div class="chapter-list" aria-label="Walkthrough chapters"><button v-for="(entry,i) in lessons" :key="entry.id"
         class="secondary" :aria-pressed="chapter===i" @click="selectChapter(i)">{{ entry.title }}</button></div>
-      <article ref="chapterPanel" class="chapter-panel" :key="current.id">
-        <ClosingLesson v-if="current.id==='closing'" :title="current.title" :text="current.text"
-          @try="(field, opener)=>emit('try',field,opener)" @world="emit('world')"/>
-        <SizePreview v-else-if="current.id==='size-preview'" :title="current.title" :text="current.text"
-          @compare="showLongComparison"/>
-        <template v-else>
+      <article class="chapter-panel" :key="current.id">
         <header class="chapter-card"><h3>{{ current.title }}</h3></header>
         <div v-if="current.id==='opening'" class="opening-slides">
           <figure>
@@ -124,24 +99,25 @@ onBeforeUnmount(() => pairController?.abort())
           </div>
         </div>
         <p class="chapter-text">{{ current.text }}</p>
-        </template>
       </article>
       <div class="about-actions">
         <button class="secondary" :disabled="chapter===0" @click="selectChapter(chapter-1)">Back</button>
-        <button v-if="current.id!=='closing'" class="secondary" @click="selectChapter(chapter+1)">Next</button>
+        <button class="secondary" :disabled="chapter===lessons.length-1" @click="selectChapter(chapter+1)">Next</button>
         <button v-if="current.example" class="primary" @click="emit('example',current.example)">Try it in World</button>
-        <button v-else-if="!['closing','size-preview'].includes(current.id)" class="primary" @click="emit('trends')">Open Trends</button>
+        <button v-else class="primary" @click="emit('trends')">Open Trends</button>
         <a class="lesson-source" :href="videoAt(current.timestamp)" target="_blank" rel="noreferrer">Watch this part of the video</a>
       </div>
     </section>
     <section class="reference-videos">
-      <iframe v-if="video" src="https://www.youtube-nocookie.com/embed/0ZGbIKd0XrM?autoplay=1" title="Simulating Natural Selection" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-      <button v-else class="video-launch" @click="video=true"><span aria-hidden="true">▶</span>Simulating Natural Selection</button>
-      <p class="quiet">Primer · <a href="https://www.youtube.com/watch?v=0ZGbIKd0XrM" target="_blank" rel="noreferrer">Watch on YouTube</a></p>
+      <div v-for="[id,title,credit] in [['6nMo8T3T0L4','Interactive Evolution Simulator','MinuteLabs · Jasper Palfree · art direction by Sarah Berman'],['0ZGbIKd0XrM','Simulating Natural Selection','Primer']]" :key="id">
+        <iframe v-if="video===id" :src="'https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1'" :title="title" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <button v-else class="video-launch" @click="video=id"><span>▶</span>{{ title }}</button>
+        <p class="quiet">{{ credit }} <a :href="'https://www.youtube.com/watch?v='+id" target="_blank" rel="noreferrer">Watch on YouTube</a></p>
+      </div>
     </section>
     <section><h2>Experiments</h2>
       <article class="paired-experiment" aria-labelledby="variance-title">
-        <h3 id="variance-title" ref="comparisonTitle" tabindex="-1">Compare size mutation</h3>
+        <h3 id="variance-title">Compare size mutation</h3>
         <p>Repeat the 600-generation video experiment with size standard deviations of 1.00 and 0.50. Both runs start with 50 blobs of size 10 and get 50 plants each day. Compare how size changes and replay the hunts that take place.</p>
         <p><a href="https://www.youtube.com/watch?v=6nMo8T3T0L4&amp;t=459s" target="_blank" rel="noreferrer">Watch the experiment in the video</a></p>
         <form class="about-actions" @submit.prevent="runPair">
