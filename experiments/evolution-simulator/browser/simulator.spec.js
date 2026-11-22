@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { LEGACY_RULE_VERSION, REFUGE_RULE_VERSION, starter, WALKTHROUGH_RULE_VERSION } from '../src/engine/config.js'
 import { guideSource } from '../src/guide-replay.js'
@@ -1836,6 +1836,25 @@ test('viewing the active run results keeps Quick Sim running', async ({ page }) 
   await expect(batchStatus(page, 'Saved through')).toHaveText('Day 5')
   await page.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(page.getByText(/Browser test run .* Through Day 5/)).toBeVisible()
+})
+
+test('Run Library imports a corrected setup from the same file', async ({ page }, testInfo) => {
+  const path = testInfo.outputPath('evolution-setup.json')
+  await writeFile(path, '{')
+  await openSimulator(page)
+  await openRunLibrary(page)
+  const library = page.getByRole('dialog', { name: 'Run Library' })
+  const importButton = library.getByRole('button', { name: 'Import setup' })
+  const [firstFile] = await Promise.all([page.waitForEvent('filechooser'), importButton.click()])
+  await firstFile.setFiles(path)
+  await expect(library.getByRole('alert')).toHaveText('Choose a valid setup JSON file.')
+
+  await writeFile(path, JSON.stringify({ setup: { ...starter(), name: 'Corrected setup', seed: 118 } }))
+  const [correctedFile] = await Promise.all([page.waitForEvent('filechooser'), importButton.click()])
+  await correctedFile.setFiles(path)
+  const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+  await expect(settings.getByLabel('Run name')).toHaveValue('Corrected setup')
+  await expect(settings.getByRole('spinbutton', { name: 'Random seed' })).toHaveValue('118')
 })
 
 test('a copied setup link keeps the shared settings after reload', async ({ page, context, browser }) => {
