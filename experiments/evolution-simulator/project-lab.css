@@ -32,6 +32,12 @@
   min-block-size: 23.5rem;
 }
 
+.project-lab-page .world:fullscreen {
+  --tool-menu-top: 68px;
+  contain: layout;
+  container-type: size;
+}
+
 .project-lab-page .compare-page.cinematic-sequence {
   inline-size: 100%;
   block-size: 100%;
@@ -69,6 +75,12 @@
   inset-block-end: var(--playback-menu-bottom);
   max-block-size: calc(100% - var(--tool-menu-top) - var(--playback-menu-bottom));
   overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.project-lab-page .world:not(:fullscreen) .details {
+  inset-block-start: max(69px, var(--tool-menu-top));
+  inset-block-end: 2.75rem;
   overscroll-behavior: contain;
 }
 
@@ -117,6 +129,85 @@
   }
 }
 
+@container (height < 330px) {
+  .project-lab-page .details {
+    inset-block-end: 2.75rem;
+    padding-block: 4px;
+  }
+
+  .project-lab-page .world:fullscreen .details {
+    inset-block-start: var(--tool-menu-top);
+  }
+
+  .project-lab-page .details header .icon {
+    block-size: 32px;
+    min-block-size: 32px;
+    inline-size: 32px;
+  }
+
+  .project-lab-page .details > label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .project-lab-page .details > label select {
+    margin-block: 0;
+    min-inline-size: 0;
+  }
+
+  .project-lab-page .creature-flower {
+    inset-block-start: var(--tool-menu-top);
+    inline-size: 9.375rem;
+    grid-template-columns: 44px minmax(0, 1fr);
+    padding: 4px;
+    border-radius: 5px;
+    background: var(--panel);
+  }
+
+  .project-lab-page .creature-flower > svg {
+    grid-row: span 2;
+  }
+
+  .project-lab-page .creature-caption {
+    max-inline-size: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@container (height < 455px) {
+  /* A menu anchored above the timeline can run past the top of a short app. */
+  .project-lab-page .world :is(.ribbon-menu, .ribbon-detail) {
+    position: fixed;
+    inset-block: var(--tool-menu-top) auto;
+    max-block-size: calc(100cqh - var(--tool-menu-top) - 6.5rem);
+    background: #111110;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .project-lab-page .ribbon-detail {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .project-lab-page .ribbon-detail > dl {
+    grid-column: 1 / -1;
+  }
+
+  .project-lab-page .ribbon-detail > button {
+    grid-area: 1 / 2;
+    min-block-size: 24px;
+    border-block-start: 0;
+  }
+
+  .project-lab-page .ribbon-detail::after {
+    display: none;
+  }
+}
+
 @media (701px <= width <= 1080px) {
   .project-lab-page .app-header:has(a[aria-current="page"][href*="/compare"]) {
     --run-controls-top: 43px;
@@ -153,6 +244,10 @@
     --tool-menu-top: 96px;
     --playback-menu-bottom: 45px;
   }
+
+  .project-lab-page .world:fullscreen {
+    --tool-menu-top: 54px;
+  }
 }
 
 @media (max-width: 700px) and (max-height: 640px) {
@@ -176,6 +271,12 @@
     min-block-size: 20px;
     padding: 1px 3px;
     font-size: 11px;
+  }
+}
+
+@media (max-width: 465px) {
+  .project-lab-page .stage:has(.details) .creature-flower {
+    visibility: hidden;
   }
 }
 

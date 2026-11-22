@@ -83,7 +83,7 @@ watch(scroll, element => {
 })
 onBeforeUnmount(() => observer?.disconnect())
 watch(() => lab.viewing, day => { focusDay.value = day })
-watch(() => [lab.viewing, lab.scope, lab.run.id, fold.value, mode.value], () => { inspection.value = null })
+watch([() => lab.viewing, () => lab.scope, () => lab.run.id, fold, mode], () => { inspection.value = null })
 function select(day) {
   if (day <= lab.completed) lab.openDay(day)
   else if (day === lab.liveDay && !lab.batch) lab.goLive()
