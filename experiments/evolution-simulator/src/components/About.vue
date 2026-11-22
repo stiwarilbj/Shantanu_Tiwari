@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useLab } from '../store.js'
 import { MAX_SEED } from '../engine/config.js'
 import { walkthroughStepCost } from '../engine/geometry.js'
@@ -11,12 +11,14 @@ import primerOverhead from '../assets/guide-primer-overhead.webp'
 import primerClose from '../assets/guide-primer-close.webp'
 import host from '../assets/guide-host.webp'
 import StrideRace from './StrideRace.vue'
+import ClosingLesson from './ClosingLesson.vue'
 
 const lab=useLab()
 const props=defineProps({ lesson:String })
-const emit=defineEmits(['world','compare','lesson','example','trends'])
+const emit=defineEmits(['world','compare','lesson','example','trends','try'])
 const chapter=computed(()=>Math.max(0,lessons.findIndex(item=>item.id===props.lesson)))
 const current=computed(()=>lessons[chapter.value])
+const chapterPanel=ref(null)
 const slide=ref(0), video=ref('')
 const pairSeed=ref(SIZE_MUTATION_SEED), pairDays=ref(SIZE_MUTATION_DAYS), pairProgress=ref(null), pairMessage=ref('')
 let pairController
@@ -37,6 +39,16 @@ function selectChapter(index) {
   const entry = lessons[index]
   if (entry) emit('lesson',entry.id)
 }
+function revealClosing() {
+  if (current.value.id !== 'closing') return
+  requestAnimationFrame(() => {
+    const title = chapterPanel.value?.querySelector('#closing-title')
+    if (title) chapterPanel.value.scrollIntoView({ block:'start' })
+    title?.focus({ preventScroll:true })
+  })
+}
+watch(current, revealClosing, { flush:'post' })
+onMounted(revealClosing)
 
 async function runPair() {
   if (pairProgress.value) return
@@ -71,7 +83,10 @@ onBeforeUnmount(() => pairController?.abort())
       <h2>Walkthrough</h2>
       <div class="chapter-list" aria-label="Walkthrough chapters"><button v-for="(entry,i) in lessons" :key="entry.id"
         class="secondary" :aria-pressed="chapter===i" @click="selectChapter(i)">{{ entry.title }}</button></div>
-      <article class="chapter-panel" :key="current.id">
+      <article ref="chapterPanel" class="chapter-panel" :key="current.id">
+        <ClosingLesson v-if="current.id==='closing'" :title="current.title" :text="current.text"
+          @try="(field, opener)=>emit('try',field,opener)" @world="emit('world')"/>
+        <template v-else>
         <header class="chapter-card"><h3>{{ current.title }}</h3></header>
         <div v-if="current.id==='opening'" class="opening-slides">
           <figure>
@@ -99,12 +114,13 @@ onBeforeUnmount(() => pairController?.abort())
           </div>
         </div>
         <p class="chapter-text">{{ current.text }}</p>
+        </template>
       </article>
       <div class="about-actions">
         <button class="secondary" :disabled="chapter===0" @click="selectChapter(chapter-1)">Back</button>
-        <button class="secondary" :disabled="chapter===lessons.length-1" @click="selectChapter(chapter+1)">Next</button>
+        <button v-if="current.id!=='closing'" class="secondary" @click="selectChapter(chapter+1)">Next</button>
         <button v-if="current.example" class="primary" @click="emit('example',current.example)">Try it in World</button>
-        <button v-else class="primary" @click="emit('trends')">Open Trends</button>
+        <button v-else-if="current.id!=='closing'" class="primary" @click="emit('trends')">Open Trends</button>
         <a class="lesson-source" :href="videoAt(current.timestamp)" target="_blank" rel="noreferrer">Watch this part of the video</a>
       </div>
     </section>

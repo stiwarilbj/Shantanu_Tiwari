@@ -72,6 +72,71 @@ test('the illustrated walkthrough opens a real family replay @pages', async ({ p
   await expect(activeRun).toHaveText('Day 1 / 50 · Ready')
 })
 
+test('the final chapter opens isolated seed and food drafts @pages', async ({ page }) => {
+  await openWalkthrough(page, true)
+  const settings = page.getByRole('button', { name:'Simulation Settings' })
+  const run = new URL(page.url()).hash.split('/about')[0]
+  await settings.click()
+  await page.getByLabel('Run name').fill('Keep this unfinished draft')
+  await page.getByRole('button', { name:'Close settings' }).click()
+
+  await page.getByRole('button', { name:'Try an experiment', exact:true }).click()
+  const closing = page.getByRole('region', { name:'Try an experiment' })
+  await expect(closing.getByRole('heading', { name:'Try an experiment' })).toBeFocused()
+  await expect(closing.locator('canvas')).toBeVisible()
+  await expect(page).toHaveURL(/lesson=closing$/)
+
+  const seedChoice = closing.getByRole('button', { name:/Try another seed/ })
+  await seedChoice.press('Enter')
+  const seed = page.getByRole('spinbutton', { name:'Random seed' })
+  await expect(seed).toBeFocused()
+  await expect(seed).not.toHaveValue('18')
+  await expect(page.getByLabel('Run name')).toHaveValue('Guided replay check · new seed')
+  await seed.fill('123')
+  await seed.press('Escape')
+  await expect(seedChoice).toBeFocused()
+  await expect(page).toHaveURL(/lesson=closing$/)
+  expect(new URL(page.url()).hash.split('/about')[0]).toBe(run)
+
+  await settings.click()
+  await expect(page.getByLabel('Run name')).toHaveValue('Keep this unfinished draft')
+  await expect(seed).toHaveValue('18')
+  await page.getByRole('button', { name:'Close settings' }).click()
+
+  const foodChoice = closing.getByRole('button', { name:/Change the food supply/ })
+  await foodChoice.click()
+  const food = page.getByRole('spinbutton', { name:'Food', exact:true })
+  await expect(food).toBeFocused()
+  await expect(food).toHaveValue('50')
+  await expect(seed).toHaveValue('18')
+  await food.fill('45')
+  await page.getByRole('button', { name:'Evolve!' }).click()
+  await expect(page.getByRole('link', { name:'World', exact:true })).toHaveAttribute('aria-current','page')
+  expect(new URL(page.url()).hash.split('/viewer')[0]).not.toBe(run)
+  await settings.click()
+  await expect(page.getByLabel('Run name')).toHaveValue('Guided replay check · food test')
+  await expect(food).toHaveValue('45')
+})
+
+test('the final chapter keeps its tabletop visible above the actions on a phone', async ({ browser }) => {
+  const page = await browser.newPage({ viewport:{ width:390, height:844 }, hasTouch:true, isMobile:true,
+    baseURL:test.info().project.use.baseURL })
+  try {
+    await openWalkthrough(page)
+    await page.getByRole('button', { name:'Try an experiment', exact:true }).tap()
+    const closing = page.getByRole('region', { name:'Try an experiment' })
+    const canvas = closing.locator('.closing-board canvas')
+    await expect.poll(async () => (await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(170)
+    const board = await canvas.boundingBox()
+    const action = await closing.getByRole('button', { name:/Try another seed/ }).boundingBox()
+    expect(board.y + board.height).toBeLessThan(action.y)
+    await closing.getByRole('button', { name:/Try another seed/ }).tap()
+    await expect(page.getByRole('spinbutton', { name:'Random seed' })).toBeFocused()
+  } finally {
+    await page.close()
+  }
+})
+
 test('the stride race and energy lesson explain what bigger blobs spend', async ({ page }) => {
   await openWalkthrough(page)
   await page.getByRole('button', { name:'Size and stride', exact:true }).click()

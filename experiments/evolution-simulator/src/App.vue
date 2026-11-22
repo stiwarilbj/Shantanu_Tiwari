@@ -24,6 +24,8 @@ const initialPage = initialAddress?.[3] ?? 'viewer'
 const initialQuery = new URLSearchParams(initialAddress?.[4])
 const page = ref(initialPage), ready = ref(false), menu = ref(false), world = ref(), menuButton = ref(), mainSurface = ref()
 const fullscreenSurface = ref(null)
+const settingTarget = ref(null)
+let settingOpener
 const comparison = ref(readComparison(initialQuery))
 const example = ref(initialPage==='viewer' ? knownExample(initialQuery.get('example')) : null)
 const lesson = ref(readLesson(initialQuery))
@@ -59,7 +61,7 @@ function address(view = page.value, day = lab.viewing, settings = lab.settings, 
   }
   if (view==='viewer' && guided) query.set('example',guided)
   if ((view==='about' || view==='viewer' && guided) && lesson.value!=='opening') query.set('lesson',lesson.value)
-  if (settings) query.set('cfg','1')
+  if (settings && !settingTarget.value) query.set('cfg','1')
   return '#/r/'+lab.run.id+'/s/'+day+'/'+view+(query.size ? '?'+query : '')
 }
 function syncAddress() {
@@ -120,6 +122,10 @@ function go(view, guided = null) {
 function changeLesson(id) {
   lesson.value = id
   if (page.value==='about') syncAddress()
+}
+function openClosingLesson() {
+  lesson.value = 'closing'
+  go('about')
 }
 async function applyAddress(hash = location.hash) {
   const token = beginNavigation()
@@ -227,6 +233,17 @@ function settings(setup) {
 function reroll() {
   settings({ ...lab.run.setup, seed:randomSeed(lab.run.setup.seed) })
 }
+function previewSetting(field, opener) {
+  beginNavigation()
+  menu.value = false
+  const current = lab.run.setup
+  const suffix = field==='seed' ? ' · new seed' : ' · food test'
+  const draft = { ...current, name:current.name.slice(0,60-suffix.length)+suffix }
+  if (field==='seed') draft.seed = randomSeed(current.seed)
+  settingTarget.value = field
+  settingOpener = opener
+  lab.openSettings(draft, null, true)
+}
 function task(key) {
   menu.value=false
   lab.modal=key
@@ -257,6 +274,15 @@ watch(() => [lab.run?.id,lab.viewing,lab.settings], ([id], [previousId]) => {
     show('viewer')
     history.pushState(null,'',address())
   } else syncAddress()
+})
+watch(() => lab.settings, open => {
+  if (open || !settingTarget.value) return
+  const opener = settingOpener
+  settingTarget.value = null
+  settingOpener = null
+  nextTick(() => {
+    if (page.value==='about' && !lab.settings && opener?.isConnected) opener.focus()
+  })
 })
 onMounted(async () => {
   let firstVisit=false
@@ -323,11 +349,11 @@ onUnmounted(() => {
       <World v-show="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
       <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'"
-        @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>
+        @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll" @try-run="openClosingLesson"/>
       <About v-if="page==='about'" :lesson="lesson" @lesson="changeLesson" @example="go('viewer',$event)"
-        @world="go('viewer')" @trends="go('stats')" @compare="openComparison"/>
+        @world="go('viewer')" @trends="go('stats')" @compare="openComparison" @try="previewSetting"/>
       <Compare v-if="page==='compare'" :key="comparisonVersion" :initial="comparison" @change="comparisonChanged" @library="task('library')"/>
-      <Settings v-if="lab.settings"/>
+      <Settings v-if="lab.settings" :target="settingTarget"/>
       <Tour v-if="lab.modal==='tour'" @close="lab.modal=null" @world="lab.modal=null; go('viewer')"
         @walkthrough="lab.modal=null; lesson='opening'; go('about')"/>
       <RunDialog v-else-if="lab.modal && !lab.settings" @compare="compare" @watch="watchDay"

@@ -2802,6 +2802,10 @@ test('Age walkthrough keeps controls visible through failures, cancellation, and
   await expect(walkthrough).toHaveCount(0)
   await expect(page.getByRole('button',{name:'Walk through age',exact:true})).toBeFocused()
   await expect(page.getByText(/Starter field · Seed .* Through Day/)).toBeVisible()
+  await page.getByRole('button',{name:'Walk through age',exact:true}).click()
+  await walkthrough.getByRole('button',{name:'Try your own run'}).click()
+  await expect(page.getByRole('heading',{name:'Try an experiment'})).toBeFocused()
+  await expect(page).toHaveURL(/lesson=closing$/)
 })
 
 for (const failure of ['constructor', 'timeout']) {

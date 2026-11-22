@@ -9,7 +9,7 @@ import TraitSpace from './TraitSpace.vue'
 import AgeCohorts from './AgeCohorts.vue'
 
 const props = defineProps({ active: Boolean })
-const emit = defineEmits(['watch','example','reroll','restart'])
+const emit = defineEmits(['watch','example','reroll','restart','try-run'])
 const lab=useLab()
 const range=ref('all'), from=ref(1), to=ref(50), pin=ref(null), focused=ref(null)
 const focusDialog=ref()
@@ -364,6 +364,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
             {{ ageDemoRuns.short?'Short run · 100 days':'Prepare short run · 100 days' }}
           </button>
           <label class="age-cohort-picker">Count at <select v-model="cohort" aria-label="Age cohort"><option value="dawn">Dawn</option><option value="dusk">Dusk</option></select></label>
+          <button v-if="ageDemoPair" class="link" @click="emit('try-run')">Try your own run</button>
           <button v-if="ageDemoProgress" class="secondary" @click="cancelAgePreparation">Cancel preparation</button>
           <span v-if="ageDemoProgress" class="quiet" role="status">Preparing both {{ ageDemoProgress.phase==='long'?'600':'100' }}-day runs · {{ ageDemoProgress.completed }} / {{ ageDemoProgress.days*2 }} generations</span>
           <span v-else-if="ageDemoError" class="age-demo-error" role="alert">{{ ageDemoError }} <button class="link" @click="prepareAgePhase(ageDemoRetryPhase)">Retry</button></span>
