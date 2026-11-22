@@ -1156,7 +1156,10 @@
         function startTimer() {
             clearInterval(timer);
             timer = setInterval(function() {
-                if (timeLeft <= 0) {
+                timeLeft = Math.max(0, timeLeft - 1);
+                updateTimerDisplay();
+
+                if (timeLeft === 0) {
                     clearInterval(timer);
                     gameActive = false;
                     placeInput.disabled = true;
@@ -1170,12 +1173,8 @@
                     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                         chrome.storage.local.remove(['gameState']);
                     }
-                } else {
-                    timeLeft--;
-                    updateTimerDisplay();
-                    if (timeLeft % 5 === 0) {
-                        saveGameState();
-                    }
+                } else if (timeLeft % 5 === 0) {
+                    saveGameState();
                 }
             }, 1000);
         }
