@@ -1,7 +1,7 @@
 import { setupNavbarSearch } from "./search.js?v=1";
 
 const navbarContainer = document.querySelector("[data-site-navbar]");
-navbarContainer.style.setProperty("--nav-height", "clamp(3.125rem, calc(2.375rem + 1.75vw), 3.625rem)");
+navbarContainer.style.setProperty("--nav-height", "clamp(2.875rem, calc(2.125rem + 1.75vw), 3.375rem)");
 navbarContainer.style.minBlockSize = "var(--nav-height)";
 
 const navbarUrl = new URL(import.meta.url);
