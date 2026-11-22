@@ -29,7 +29,7 @@
 .project-lab-page .world:not(:fullscreen) {
   --tool-menu-top: 68px;
   --playback-menu-bottom: 60px;
-  min-block-size: 23.5rem;
+  min-block-size: calc(23.5rem + var(--time-readout-height));
 }
 
 .project-lab-page .world:fullscreen {

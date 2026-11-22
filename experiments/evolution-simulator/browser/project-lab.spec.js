@@ -261,6 +261,58 @@ test('playback actions stay below the run controls in a short split screen @page
   await expect(menu).toBeHidden()
 })
 
+test('playback readouts stay clear of the transport and scrubber @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getContext = function (kind, ...options) {
+      return kind === 'webgl2' ? null : getContext.call(this, kind, ...options)
+    }
+  })
+  await page.reload()
+  const clock = page.locator('.time-label')
+  const canvasNote = page.getByText('Canvas view', { exact: true })
+  await expect(canvasNote).toBeVisible()
+  await page.getByRole('button', { name: /^Day 1, population/ }).click()
+  const scrubber = page.getByRole('slider', { name: 'Replay time' })
+  await scrubber.press('Home')
+  await expect(scrubber).toHaveValue('0')
+  await expect(clock).toBeVisible()
+
+  for (const [width, height] of [[390, 844], [740, 320], [1440, 900]]) {
+    await page.setViewportSize({ width, height })
+    await scrubber.press('End')
+    await expect(scrubber).toHaveValue(await scrubber.getAttribute('max'))
+    const [clockBox, canvasBox, player, actions] = await Promise.all(
+      [clock, canvasNote, page.locator('.player'), page.locator('.player-actions')].map(locator => locator.boundingBox())
+    )
+    expect(Math.min(clockBox.y, canvasBox.y)).toBeGreaterThanOrEqual(Math.max(player.y + player.height, actions.y + actions.height))
+    expect(clockBox.x + clockBox.width).toBeLessThan(canvasBox.x)
+  }
+})
+
+test('settings remain reachable when validation fills a very short dialog @pages', async ({ page }) => {
+  await page.setViewportSize({ width: 740, height: 234 })
+  await page.getByRole('button', { name: 'Simulation Settings' }).press('Enter')
+  const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+  for (const name of ['Days to run', 'Random seed', 'Speed', 'Size', 'Energy']) {
+    await settings.getByRole('spinbutton', { name, exact: true }).fill('0')
+  }
+  const evolve = settings.getByRole('button', { name: 'Evolve!', exact: true })
+  await evolve.click()
+  await expect(settings.getByRole('alert')).toContainText('Days')
+  await settings.getByRole('button', { name: 'Discard changes' }).click()
+  await settings.evaluate(dialog => { dialog.scrollTop = dialog.scrollHeight })
+  await expect(evolve).toBeInViewport({ ratio: 1 })
+  await evolve.click({ trial: true })
+  await settings.getByRole('button', { name: 'Keep editing' }).click()
+  const days = settings.getByRole('spinbutton', { name: 'Days to run', exact: true })
+  await days.click()
+  await expect(days).toBeFocused()
+  await expect(days).toBeInViewport({ ratio: 1 })
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  await expect(settings).toBeHidden()
+})
+
 test('creature and generation panels clear the run controls in a short split screen @pages', async ({ page }) => {
   await page.setViewportSize({ width: 740, height: 320 })
   await page.getByRole('button', { name: 'View options' }).click()

@@ -247,7 +247,7 @@ test('the four gray home sides and corners stay visible during replay and in Can
   }
   const painted = { sides:[229,229,229,229], corners:[229,229,229,229], interior:255 }
   await overhead()
-  await expect(field.getByText('Canvas view', { exact:true })).toHaveCount(0)
+  await expect(page.getByText('Canvas view', { exact:true })).toHaveCount(0)
   await expect.poll(() => fieldColors(page, canvas)).toEqual(painted)
 
   await quickThrough(page, 1)
@@ -272,7 +272,7 @@ test('the four gray home sides and corners stay visible during replay and in Can
     return !!extension
   })
   expect(lost).toBe(true)
-  await expect(field.getByText('Canvas view', { exact:true })).toBeVisible()
+  await expect(page.getByText('Canvas view', { exact:true })).toBeVisible()
   await expect.poll(() => fieldColors(page, canvas)).toEqual(painted)
   await page.getByRole('button', { name:'Next day' }).click()
   await expect(page.getByRole('button', { name:'Run options' })).toHaveText('Day 2 / 10 · Ready')
@@ -497,7 +497,7 @@ test('World continues drawing live playback after losing WebGL', async ({ page }
     return !!extension
   })
   expect(lost).toBe(true)
-  await expect(field.getByText('Canvas view', { exact: true })).toBeVisible()
+  await expect(page.getByText('Canvas view', { exact: true })).toBeVisible()
   await expect.poll(() => canvas.evaluate(element => {
     const context = element.getContext('2d')
     const pixel = context?.getImageData(element.width / 2, element.height / 2, 1, 1).data
@@ -571,7 +571,7 @@ test('slow live playback draws intermediate poses and replay seeks directly to t
   expect((await canvas.screenshot()).equals(initial)).toBe(false)
 
   await canvas.evaluate(element => element.getContext('webgl2').getExtension('WEBGL_lose_context').loseContext())
-  await expect(field.getByText('Canvas view', { exact:true })).toBeVisible()
+  await expect(page.getByText('Canvas view', { exact:true })).toBeVisible()
   const speed = page.getByRole('button', { name:'Viewing speed', exact:true })
   await speed.click()
   const slider = page.getByRole('slider', { name:'Viewing speed multiplier' })

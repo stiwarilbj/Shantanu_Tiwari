@@ -197,7 +197,6 @@ defineExpose({ select, overhead })
         <div v-else><span>{{ format(speedRange.min) }}</span><span>{{ format(speedRange.max) }}</span></div>
       </div>
       <div v-if="lab.loading" class="stage-note" role="status">Building replay for Day {{ lab.replayDay }}…</div>
-      <span v-if="fallback" class="render-note" title="Canvas rendering is active">Canvas view</span>
       <div class="player">
         <div class="transport" role="group" aria-label="Day playback">
           <button class="icon" title="Previous day" aria-label="Previous day" :disabled="lab.viewing<=1 || lab.loading" @click="lab.moveDay(-1)"><ChevronLeft :size="19"/></button>
@@ -262,8 +261,13 @@ defineExpose({ select, overhead })
     </section>
     <div class="time-rail" :class="{ seekable:replayCanSeek, 'open-ended':lab.displayDuration == null }" :style="{ '--elapsed':fraction*100+'%' }"
       @mouseenter="rateReadout=true" @mouseleave="rateReadout=false">
-      <div v-if="rateReadout || lab.frame && lab.displayDuration == null" class="time-label">
-        {{ format(lab.frame?.time ?? 0) }} s {{ lab.displayDuration == null ? 'elapsed' : '/ '+format(lab.displayDuration)+' s' }}
+      <div class="time-readouts">
+        <div class="time-clock">
+          <div v-if="rateReadout || lab.frame && lab.displayDuration == null" class="time-label">
+            {{ format(lab.frame?.time ?? 0) }} s {{ lab.displayDuration == null ? 'elapsed' : '/ '+format(lab.displayDuration)+' s' }}
+          </div>
+        </div>
+        <span v-if="fallback" class="render-note" title="Canvas rendering is active">Canvas view</span>
       </div>
       <div class="time-fill"></div><div class="time-thumb"></div>
       <input v-if="replayCanSeek" :value="lab.frame?.time ?? 0" type="range" min="0" :max="lab.displayDuration" step=".05"
