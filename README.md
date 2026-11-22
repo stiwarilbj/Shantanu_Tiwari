@@ -1,6 +1,6 @@
 # [Project Lab](https://stiwarilbj.github.io/Shantanu_Tiwari/)
 
-Project Lab is a place to test ideas, learn by doing, play games, and revisit older projects. Try the Place Naming Game in the [Project Showcase](https://stiwarilbj.github.io/Shantanu_Tiwari/#showcase-title) or use [Explore](https://stiwarilbj.github.io/Shantanu_Tiwari/#explore-title) to browse the four sections.
+Project Lab is a place to test ideas, learn by doing, play games, and revisit older projects. Try the Place Naming Game in the [Project Showcase](https://stiwarilbj.github.io/Shantanu_Tiwari/#showcase-title) or use [Explore](https://stiwarilbj.github.io/Shantanu_Tiwari/#explore-title) to browse the four sections. Use the search bar to jump to a project or section by name.
 
 ## [Experiments](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/)
 

@@ -1,3 +1,5 @@
+import { setupNavbarSearch } from "./search.js?v=1";
+
 const navbarContainer = document.querySelector("[data-site-navbar]");
 navbarContainer.style.setProperty("--nav-height", "clamp(3.125rem, calc(2.375rem + 1.75vw), 3.625rem)");
 navbarContainer.style.minBlockSize = "var(--nav-height)";
@@ -5,7 +7,7 @@ navbarContainer.style.minBlockSize = "var(--nav-height)";
 const navbarUrl = new URL(import.meta.url);
 const siteRoot = new URL("../", navbarUrl);
 
-await Promise.all(["navbar.css", "dropdown.css"].map((filename) => {
+await Promise.all(["navbar.css", "dropdown.css", "search.css"].map((filename) => {
   const stylesheetUrl = new URL(filename, navbarUrl);
   stylesheetUrl.search = navbarUrl.search;
 
@@ -26,6 +28,14 @@ const sections = [
   ["old-projects", "Old Projects"],
 ];
 
+const searchablePages = sections.flatMap(([slug, name, projects = []]) => [
+  { name, url: new URL(`${slug}/`, siteRoot).href },
+  ...projects.map(([path, title]) => ({
+    name: title,
+    url: new URL(`${slug}/${path}/`, siteRoot).href,
+  })),
+]);
+
 const sectionLinks = sections.map(([slug, name, projects = []]) => `
       <li class="nav-item">
         <a class="category-link" href="${slug}/" aria-controls="${slug}-panel">
@@ -42,6 +52,17 @@ const sectionLinks = sections.map(([slug, name, projects = []]) => `
 navbarContainer.innerHTML = `
   <nav class="site-nav" aria-label="Main navigation">
     <a class="wordmark" href="./">Project Lab</a>
+    <div class="nav-search" role="search" aria-label="Project Lab">
+      <span class="nav-search-field">
+        <input type="search" role="combobox" aria-label="Search projects and sections"
+          aria-autocomplete="list" aria-expanded="false" aria-controls="nav-search-options"
+          placeholder="Search" autocomplete="off" spellcheck="false">
+      </span>
+      <div class="nav-search-results" hidden>
+        <ul id="nav-search-options" role="listbox" aria-label="Search results"></ul>
+        <p class="nav-search-empty" role="status">No matching pages</p>
+      </div>
+    </div>
     <div class="nav-menu">
       <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
         Menu <span class="chevron" aria-hidden="true"></span>
@@ -61,6 +82,8 @@ for (const link of navigation.querySelectorAll("a[href]")) {
 
 const menu = navigation.querySelector(".menu-toggle");
 const menuGroup = navigation.querySelector(".nav-menu");
+const searchGroup = navigation.querySelector(".nav-search");
+const closeSearch = setupNavbarSearch(searchGroup, searchablePages, closeMenu);
 const compactPanel = menuGroup.querySelector(".nav-links");
 const compactLayout = window.matchMedia("(width < 35rem), (hover: none)");
 const categories = Array.from(navigation.querySelectorAll(".nav-item"), (item) => ({
@@ -95,6 +118,7 @@ function closePanel() {
 function showPanel(category) {
   if (openCategory === category) return;
 
+  closeSearch();
   closePanel();
   openCategory = category;
   setExpanded(category.link, true);
@@ -125,6 +149,7 @@ menu.addEventListener("click", (event) => {
   } else if (menu.getAttribute("aria-expanded") === "true") {
     closeMenu();
   } else {
+    closeSearch();
     setExpanded(menu, true);
   }
 });
@@ -132,6 +157,7 @@ menu.addEventListener("click", (event) => {
 menu.addEventListener("pointerenter", (event) => {
   if (event.pointerType === "touch" || menu.getAttribute("aria-expanded") === "true") return;
 
+  closeSearch();
   menuOpenedOnHover = true;
   setExpanded(menu, true);
 });
@@ -181,10 +207,12 @@ for (const category of categories) {
 }
 
 document.addEventListener("click", (event) => {
+  if (!searchGroup.contains(event.target)) closeSearch();
   if (!navigation.contains(event.target)) closeMenu();
 });
 
 document.addEventListener("focusin", (event) => {
+  if (!searchGroup.contains(event.target)) closeSearch();
   if (!navigation.contains(event.target)) {
     closeMenu();
   } else if (openCategory && !openCategory.item.contains(event.target)) {
@@ -193,9 +221,11 @@ document.addEventListener("focusin", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
+  if (event.key !== "Escape" || event.isComposing) return;
 
-  if (openCategory) {
+  if (closeSearch()) {
+    event.preventDefault();
+  } else if (openCategory) {
     if (openCategory.panel.contains(document.activeElement)) openCategory.link.focus();
     closePanel();
     event.preventDefault();
