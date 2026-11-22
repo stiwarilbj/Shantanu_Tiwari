@@ -77,6 +77,14 @@ test('the video sequence fills the simulator without covering the shared navbar 
   await page.getByRole('link', { name: 'About', exact: true }).click()
   await page.getByRole('combobox', { name: 'Days per run' }).selectOption('100')
   await page.getByRole('button', { name: 'Run both and compare' }).click()
+  await page.getByRole('heading', { name: 'Compare runs' }).waitFor()
+  await page.setViewportSize({ width: 320, height: 420 })
+  for (const name of ['Left run', 'Right run']) {
+    const picker = page.getByRole('combobox', { name, exact: true })
+    const box = await picker.boundingBox()
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(320)
+  }
   await page.getByRole('button', { name: /Stage video moments/ }).click()
   const play = page.getByRole('button', { name: 'Play video sequence' })
   const stop = page.getByRole('button', { name: 'Stop video sequence' })
@@ -129,24 +137,69 @@ test.describe('short touch viewports', () => {
 
   test('layer options stay in the tabletop and can be reached on a short screen @pages', async ({ page }) => {
     const layers = page.getByRole('button', { name: 'Layers', exact: true })
-    await layers.tap()
-    const dimensions = await page.locator('.layer-panel').evaluate(panel => ({
-      top: panel.getBoundingClientRect().top,
-      bottom: panel.getBoundingClientRect().bottom,
-      toolbarBottom: document.querySelector('.run-status').getBoundingClientRect().bottom,
-      playbackTop: panel.closest('.stage').querySelector('.player-actions').getBoundingClientRect().top,
-      visibleHeight: panel.clientHeight,
-      scrollHeight: panel.scrollHeight,
-    }))
-    expect(dimensions.top).toBeGreaterThanOrEqual(dimensions.toolbarBottom)
-    expect(dimensions.bottom).toBeLessThanOrEqual(dimensions.playbackTop)
-    expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.visibleHeight)
-    await expect(page.getByRole('button', { name: 'Sense range', exact: true })).toBeInViewport({ ratio: 0.8 })
+    for (const [width, height] of [[320, 420], [390, 520]]) {
+      await page.setViewportSize({ width, height })
+      await layers.tap()
+      const dimensions = await page.locator('.layer-panel').evaluate(panel => ({
+        top: panel.getBoundingClientRect().top,
+        bottom: panel.getBoundingClientRect().bottom,
+        toolbarBottom: document.querySelector('.run-center').getBoundingClientRect().bottom,
+        playbackTop: panel.closest('.stage').querySelector('.player-actions').getBoundingClientRect().top,
+        visibleHeight: panel.clientHeight,
+        scrollHeight: panel.scrollHeight,
+      }))
+      expect(dimensions.top).toBeGreaterThanOrEqual(dimensions.toolbarBottom)
+      expect(dimensions.bottom).toBeLessThanOrEqual(dimensions.playbackTop)
+      expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.visibleHeight)
+      await expect(page.getByRole('button', { name: 'Sense range', exact: true })).toBeInViewport({ ratio: 0.8 })
 
-    await page.getByRole('button', { name: 'More layer options' }).tap()
-    const back = page.getByRole('button', { name: 'Back to layers' })
-    await expect(back).toBeInViewport()
-    await back.tap()
-    await expect(layers).toHaveAttribute('aria-expanded', 'true')
+      await page.getByRole('button', { name: 'More layer options' }).tap()
+      const back = page.getByRole('button', { name: 'Back to layers' })
+      await expect(back).toBeInViewport()
+      await back.tap()
+      await expect(layers).toHaveAttribute('aria-expanded', 'true')
+      await layers.tap()
+    }
   })
+
+  test('a long run name leaves room for every run action and the seed stays editable @pages', async ({ page }) => {
+    await page.getByRole('button', { name: 'Simulation Settings' }).tap()
+    const seed = page.getByRole('spinbutton', { name: 'Random seed' })
+    await seed.scrollIntoViewIfNeeded()
+    expect(await seed.evaluate(input => {
+      const field = input.getBoundingClientRect()
+      const shell = input.closest('.number-shell').getBoundingClientRect()
+      return field.left >= shell.left && field.right <= shell.right
+    })).toBe(true)
+    await seed.tap()
+    await seed.fill('42')
+    const name = 'W'.repeat(60)
+    await page.getByRole('textbox', { name: 'Run name' }).fill(name)
+    await page.getByRole('button', { name: 'Evolve!', exact: true }).tap()
+
+    const run = page.getByRole('button', { name: 'Run options' })
+    await expect(run).toHaveAttribute('title', name)
+    await run.tap()
+    const menu = page.locator('.run-menu')
+    await expect(menu).toContainText('Seed 42')
+    const box = await menu.boundingBox()
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(320)
+    expect(box.y + box.height).toBeLessThanOrEqual(420)
+    await menu.getByRole('button', { name: 'Show tour' }).tap()
+    await expect(page.getByRole('dialog', { name: 'Explore the tabletop' })).toBeVisible()
+  })
+})
+
+test('playback actions stay below the run controls in a short split screen @pages', async ({ page }) => {
+  await page.setViewportSize({ width: 740, height: 320 })
+  await page.getByRole('button', { name: 'Playback actions' }).click()
+  const menu = page.locator('.player-menu')
+  const [menuBox, controlsBox, playbackBox] = await Promise.all(
+    [menu, page.locator('.run-center'), page.locator('.player-actions')].map(locator => locator.boundingBox())
+  )
+  expect(menuBox.y).toBeGreaterThanOrEqual(controlsBox.y + controlsBox.height)
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(playbackBox.y)
+  await menu.getByRole('button', { name: 'Go to frontier' }).click()
+  await expect(menu).toBeHidden()
 })
