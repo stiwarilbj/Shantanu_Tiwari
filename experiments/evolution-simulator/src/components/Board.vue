@@ -8,7 +8,7 @@ import CreatureThought from './CreatureThought.vue'
 
 const props = defineProps({
   frame: Object, species: Array, layers: Object, selected: Number, follow: Boolean, camera: String,
-  scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean,
+  scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean, centeredField: Boolean,
   playbackRun: String, liveRate: Number, liveFinished: Boolean
 })
 const emit = defineEmits(['select', 'fallback'])
@@ -471,8 +471,9 @@ function fit() {
   const cameraScale = props.camera === 'close' && !followedBlob.value ? .7 : 1
   if (props.tabletop) {
     const compact = width < 400 && height < 330
-    originalPosition.set(-300,520,720).multiplyScalar((compact ? zoom * 1.12 : zoom) * cameraScale)
-    originalTarget.set(0, compact ? 34 : width < 700 ? 60 : 20, 0)
+    const framing = props.centeredField ? .88 : compact ? 1.12 : 1
+    originalPosition.set(-300,520,720).multiplyScalar(zoom * framing * cameraScale)
+    originalTarget.set(0, props.centeredField ? 0 : compact ? 34 : width < 700 ? 60 : 20, 0)
   } else {
     originalPosition.set(600,300,600).multiplyScalar(zoom * cameraScale)
     originalTarget.set(0, width < 700 ? 18 : height < 500 ? 13 : 26, 0)

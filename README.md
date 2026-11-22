@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs look for food, hunt, and pass on traits like size, speed, and sight. Set up your own species and food supply, then follow one creature or skip ahead to see which traits spread. Replay earlier generations and use charts to compare two runs side by side.
+Watch blobs look for food, hunt, and pass on traits like size, speed, and sight. Set up your own species and food supply, then follow one creature or skip ahead to see which traits spread. Replay earlier generations, watch three recorded days side by side, or compare two runs on a chart.
 
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 

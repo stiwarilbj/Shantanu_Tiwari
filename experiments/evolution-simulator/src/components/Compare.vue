@@ -1,7 +1,8 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, Pause, Play, Scan } from 'lucide-vue-next'
 import Board from './Board.vue'
+import ComparisonSequence from './ComparisonSequence.vue'
 import TrendPlot from './TrendPlot.vue'
 import { useLab } from '../store.js'
 import { trackFrame } from '../track.js'
@@ -37,10 +38,10 @@ const replayAvailable=computed(()=>leftId.value!==rightId.value && runs.value.ev
 const tracks=ref([null,null]), pending=ref([false,false]), errors=ref(['',''])
 const cameras=ref([props.initial?.leftCamera ?? 'board',props.initial?.rightCamera ?? 'board']), scope=ref('all'), layers=ref({sense:false}), focus=ref('')
 const reveal=ref(false), divider=ref(50), emphasis=ref('both')
-const sequence=ref(false), sequenceStep=ref(0), videoPairProgress=ref(null), videoPairError=ref('')
-const sequenceButton=ref(null), sequenceStopButton=ref(null)
+const sequence=ref(false), videoPairProgress=ref(null), videoPairError=ref('')
+const sequenceButton=ref(null), resultsHeading=ref(null), sizePlot=ref(null)
 const selections=ref([null,null]), boards=[]
-let jobs=[0,0], animations=[null,null], previous=[0,0], sequenceTimer, sequenceController
+let jobs=[0,0], animations=[null,null], previous=[0,0]
 let videoPairController
 const names=['Left run','Right run']
 const experimentSizes=computed(()=>{
@@ -73,13 +74,13 @@ const largestHuntGap=computed(()=>{
 const videoPair=computed(()=>{
   const match=(run,size)=>run.setup.seed===SIZE_MUTATION_SEED && run.setup.name.startsWith('Size mutation · '+(size===1?'Wide':'Narrow')) &&
     run.setup.food===50 && run.setup.foraging==='walkthrough' && run.setup.species.some(s=>s.enabled && s.standardDeviation?.size===size) &&
-    run.summaries.length>=77 && [6,77].every(day=>rulesFor(run.setup, run.revisions, day).version===WALKTHROUGH_RULE_VERSION)
+    run.summaries.length>=77 && [6,52,77].every(day=>rulesFor(run.setup, run.revisions, day).version===WALKTHROUGH_RULE_VERSION)
   const wide=available.value.find(run=>match(run,1))
   const narrow=available.value.find(run=>match(run,.5))
   return wide && narrow && wide.id!==narrow.id ? { wide,narrow } : null
 })
-const sequenceReady=computed(()=>days.value[0]===6 && days.value[1]===77 && tracks.value.every(Boolean))
-const sequenceButtonText=computed(()=>sequence.value ? 'Stop video sequence' : 'Play video sequence')
+const sequenceReady=computed(()=>videoPair.value?.wide.id===leftId.value &&
+  videoPair.value?.narrow.id===rightId.value)
 const huntMetric={ key:'hunts', label:'Successful hunts', color:'#D38C80', count:true }
 const comparisonMetrics=[
   ...METRICS,
@@ -115,11 +116,6 @@ function animate(index,time) {
   if (previous[index] && track) fractions.value[index]=Math.min(1,fractions.value[index]+Math.min(.1,(time-previous[index])/1000)/Math.max(track.duration,.001))
   previous[index]=time
   if (fractions.value[index]<1) animations[index]=requestAnimationFrame(next=>animate(index,next))
-  else if (sequence.value) {
-    fractions.value[index]=0
-    previous[index]=time
-    animations[index]=requestAnimationFrame(next=>animate(index,next))
-  }
   else stop(index)
 }
 function play(index=null) {
@@ -134,16 +130,13 @@ function play(index=null) {
   }
 }
 function toggleComparison() {
-  if (sequence.value) { stopVideoSequence(); return }
   playing.value.some(Boolean) ? stop() : play()
 }
 function toggleSidePlayback(index) {
-  if (sequence.value) stopVideoSequence()
   play(index)
 }
 function seekDay(value,index=null) {
   if (!Number.isInteger(value) || value<1) return
-  if (sequence.value) stopVideoSequence()
   if (index==null) {
     if (value>horizon.value) return
     days.value=[value,value]
@@ -185,10 +178,10 @@ function fit() {
 }
 function stageVideoDays(pair=videoPair.value) {
   if (!pair?.wide || !pair?.narrow) return
-  stopVideoSequence()
+  stop()
   leftId.value=pair.wide.id
   rightId.value=pair.narrow.id
-  days.value=[6,77]
+  days.value=[6,52]
   day.value=6
   fractions.value=[0,0]
   cameras.value=['close','overhead']
@@ -222,45 +215,18 @@ async function prepareVideoScene() {
 function cancelVideoPair() {
   if (!videoPairProgress.value?.saving) videoPairController?.abort()
 }
-function cutVideoScene() {
-  if (sequence.value) { stopVideoSequence(); return }
+function openVideoSequence() {
   if (!sequenceReady.value) return
   stop()
-  fractions.value=[0,0]
-  sequenceStep.value=0
   sequence.value=true
-  cameras.value=['close','overhead']
-  selections.value=[null,null]
-  emphasis.value='left'
-  reveal.value=false
-  divider.value=50
-  play()
-  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const interval=reduced ? 6000 : 4000
-  sequenceTimer=setInterval(()=>{
-    sequenceStep.value++
-    emphasis.value=sequenceStep.value%2 ? 'right' : 'left'
-    if (sequenceStep.value%3===1) cameras.value[0]=cameras.value[0]==='close' ? 'board' : 'close'
-    if (sequenceStep.value%3===2) cameras.value[1]=cameras.value[1]==='overhead' ? 'board' : 'overhead'
-    if (sequenceStep.value>=10) stopVideoSequence()
-  },interval)
 }
-function stopVideoSequence() {
-  const wasPlayingSequence=sequence.value
+async function closeVideoSequence(action) {
   sequence.value=false
-  clearInterval(sequenceTimer)
-  sequenceTimer=null
-  stop()
-  if (wasPlayingSequence) nextTick(()=>sequenceButton.value?.isConnected && sequenceButton.value.focus())
-}
-function stopSequenceOnEscape(event) {
-  if (event.key==='Escape' && sequence.value) {
-    event.preventDefault()
-    stopVideoSequence()
-  }
-}
-function interruptSequence() {
-  if (sequence.value) stopVideoSequence()
+  if (action==='align') seekDay(52)
+  await nextTick()
+  if (action==='align') resultsHeading.value?.focus()
+  else if (action==='trends') sizePlot.value?.focus()
+  else sequenceButton.value?.focus()
 }
 async function loadTrack(index) {
   const token=++jobs[index]
@@ -299,17 +265,13 @@ watch([leftId,rightId,()=>days.value[0],()=>days.value[1],day,()=>cameras.value[
 watch(horizon,limit=>{ if (day.value>limit) day.value=Math.max(1,limit) },{immediate:true})
 onBeforeUnmount(()=>{
   jobs=[jobs[0]+1,jobs[1]+1]
-  stopVideoSequence()
+  stop()
   videoPairController?.abort()
-  window.removeEventListener('keydown',stopSequenceOnEscape)
 })
-onMounted(()=>window.addEventListener('keydown',stopSequenceOnEscape))
-watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus()) })
 </script>
 
 <template>
-  <Teleport to="#app" :disabled="!sequence">
-  <main class="compare-page" :class="{ 'cinematic-sequence':sequence }" @keydown.esc="sequence ? stopVideoSequence() : focus=''">
+  <main class="compare-page" @keydown.esc="focus=''">
     <header><h1>Compare runs</h1><button class="secondary" @click="emit('library')">Run Library</button></header>
     <div class="compare-selects">
       <label v-for="(name,index) in names" :key="name" :class="index===0 ? 'run-left' : 'run-right'">{{ name }}
@@ -340,25 +302,30 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
         <label>Species <select v-model="scope"><option value="all">All species</option><option v-for="s in commonSpecies" :key="s.id" :value="s.id">{{ s.name }}</option></select></label>
         <button class="secondary" :aria-pressed="layers.sense" @click="layers.sense=!layers.sense">Sense circles</button>
         <button class="secondary" :aria-pressed="reveal" @click="reveal=!reveal;fit()">{{ reveal ? 'Reveal mode' : 'Side by side' }}</button>
-          <label>Emphasis <select v-model="emphasis" @change="interruptSequence"><option value="both">Both boards</option><option value="left">Left board</option><option value="right">Right board</option></select></label>
+          <label>Emphasis <select v-model="emphasis"><option value="both">Both boards</option><option value="left">Left board</option><option value="right">Right board</option></select></label>
         <button class="icon" aria-label="Fit both boards" @click="fit"><Scan :size="20"/></button>
       </div>
-      <section class="video-scene-tools" aria-label="Video scene controls">
-        <button class="secondary" :disabled="!!videoPairProgress" @click="prepareVideoScene">
-          {{ videoPair ? 'Stage video moments · Day 6 / 77' : 'Create seed 118 video pair · 100 days' }}
-        </button>
-        <button ref="sequenceButton" class="primary" :disabled="!sequenceReady" :aria-pressed="sequence" @click="cutVideoScene">{{ sequenceButtonText }}</button>
-        <button v-if="videoPairProgress && !videoPairProgress.saving" class="secondary" @click="cancelVideoPair">Cancel setup</button>
-        <span v-if="videoPairProgress" role="status">{{ videoPairProgress.saving ? 'Saving the two runs…' : `Building ${videoPairProgress.side===0 ? 'wide' : 'narrow'} run · Day ${videoPairProgress.day} / 100` }}</span>
-        <span v-else-if="videoPairError" role="status">{{ videoPairError }}</span>
-        <small>Use the seed 118 size pair for the Day 6 hunter and Day 77 forager scenes. Playback alternates the bright board and cuts camera angles.</small>
+      <section class="video-scene-tools" aria-labelledby="video-scenes-title">
+        <div>
+          <h2 id="video-scenes-title">Guided comparison</h2>
+          <p><span class="run-left">Day 6</span> early hunt · <span class="run-right">Day 52</span> plant foraging · <span class="run-right">Day 77</span> later field</p>
+        </div>
+        <div class="video-scene-actions">
+          <button class="secondary" :disabled="!!videoPairProgress" @click="prepareVideoScene">
+            {{ videoPair ? 'Stage video moments' : 'Create seed 118 video pair · 100 days' }}
+          </button>
+          <button ref="sequenceButton" class="primary" :disabled="!sequenceReady" @click="openVideoSequence">Play video sequence</button>
+          <button v-if="videoPairProgress && !videoPairProgress.saving" class="secondary" @click="cancelVideoPair">Cancel setup</button>
+        </div>
+        <p v-if="videoPairProgress" class="video-scene-status" role="status">{{ videoPairProgress.saving ? 'Saving the two runs…' : `Building ${videoPairProgress.side===0 ? 'wide' : 'narrow'} run · Day ${videoPairProgress.day} / 100` }}</p>
+        <p v-else-if="videoPairError" class="video-scene-status" role="status">{{ videoPairError }}</p>
       </section>
       <div class="paired-day-controls" aria-label="Independent board controls">
         <section v-for="(run,index) in runs" :key="index" :class="index===0?'run-left':'run-right'"
           :aria-label="index===0?'Left board controls':'Right board controls'">
           <strong>{{ index===0?'Left':'Right' }} · {{ run.setup.name }}</strong>
           <label>Day <input v-model.number="dayInputs[index]" type="number" min="1" :max="runDays[index]" :aria-label="(index===0?'Left':'Right')+' day'" @change="changeSideDay(index)"> of {{ runDays[index] }}</label>
-          <label>Camera <select v-model="cameras[index]" :aria-label="(index===0?'Left':'Right')+' camera angle'" @change="interruptSequence"><option value="board">Field view</option><option value="overhead">Overhead</option><option value="close">Close view</option></select></label>
+          <label>Camera <select v-model="cameras[index]" :aria-label="(index===0?'Left':'Right')+' camera angle'"><option value="board">Field view</option><option value="overhead">Overhead</option><option value="close">Close view</option></select></label>
           <button class="icon" :aria-label="playing[index]?'Pause '+(index===0?'left':'right')+' board':'Play '+(index===0?'left':'right')+' board'" :disabled="!tracks[index]" @click="toggleSidePlayback(index)">
             <Pause v-if="playing[index]" :size="19"/><Play v-else :size="19"/>
           </button>
@@ -379,7 +346,6 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
             :camera="cameras[index]" :scope="scope" :dim="scope!=='all'" :selected="selections[index]" :follow="selections[index]!=null" @select="selections[index]=$event"/>
           <h2>{{ run.setup.name }} <small>Day {{ days[index] }} · Seed {{ run.setup.seed }} · {{ format(frames[index]?.time,1) }} s</small></h2>
         </section>
-        <button v-if="sequence" ref="sequenceStopButton" class="primary sequence-stop" @click="stopVideoSequence">Stop video sequence</button>
       </div>
       <label v-if="reveal" class="compare-reveal">Reveal left and right <input v-model.number="divider" type="range" min="0" max="100"></label>
       <div class="comparison-clock">
@@ -398,7 +364,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
         </button>
         <span v-if="tracks.every(Boolean) && !firstHunts.some(Boolean)" class="quiet">No successful hunts on this day for this scope.</span>
       </div>
-      <section class="compare-metrics"><h2>{{ resultTitle }}</h2>
+      <section class="compare-metrics"><h2 ref="resultsHeading" tabindex="-1">{{ resultTitle }}</h2>
         <table><thead><tr><th>Metric</th><th>Left · Day {{ days[0] }}</th><th>Right · Day {{ days[1] }}</th><th>Right − Left</th></tr></thead><tbody>
           <tr v-for="m in comparisonMetrics" :key="m.key">
             <th scope="row" :style="{color:m.heading ?? m.color}">{{ m.label }}</th>
@@ -410,10 +376,11 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
       </section>
       <div class="compact-plots">
         <p class="quiet compare-trend-note">Trend charts line up the runs by generation. The two world views above can show different days.</p>
-        <TrendPlot v-for="m in [...METRICS,huntMetric]" :key="m.key" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows"
+        <TrendPlot v-for="m in [...METRICS,huntMetric]" :key="m.key"
+          :ref="instance=>{ if (m.key==='size') sizePlot=instance?.$el }" :tabindex="m.key==='size' ? -1 : undefined" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows"
           :pin="day" :series="series(m)" :focus="focus===m.key" legend @watch="seekDay" @pin="seekDay" @focus="focus=focus===m.key?'':m.key"/>
       </div>
     </template>
   </main>
-  </Teleport>
+  <ComparisonSequence v-if="sequence" :pair="videoPair" @exit="closeVideoSequence"/>
 </template>
