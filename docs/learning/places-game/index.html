@@ -963,28 +963,25 @@
 
         function findMatchingPlace(guess) {
             const lowerGuess = guess.toLowerCase();
+            const needsCountry = currentGameMode === 'placeAndCountry';
+            const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
+            if (needsCountry && parts.length !== 2) return null;
 
+            const [guessedCity, guessedCountry] = parts;
+            let typoMatch = null;
             for (const place of filteredPlaces) {
-                const placeCityLower = place.city.toLowerCase();
-                const placeCountryLower = place.country_name.toLowerCase();
+                const exactCity = place.city.toLowerCase() === guessedCity;
+                const exactCountry = !needsCountry || place.country_name.toLowerCase() === guessedCountry;
+                if (exactCity && exactCountry) return place;
 
-                if (currentGameMode === 'placeOnly') {
-                    if (placeCityLower === lowerGuess || isCloseMatch(placeCityLower, lowerGuess)) {
-                        return place;
-                    }
-                } else {
-                    const parts = lowerGuess.split(',').map(part => part.trim());
-                    if (parts.length === 2) {
-                        const guessedCity = parts[0];
-                        const guessedCountry = parts[1];
-                        if ((placeCityLower === guessedCity || isCloseMatch(placeCityLower, guessedCity)) &&
-                            (placeCountryLower === guessedCountry || isCloseMatch(placeCountryLower, guessedCountry))) {
-                            return place;
-                        }
-                    }
+                // Keep a typo match in case the filtered list has no exact answer.
+                if (!typoMatch &&
+                    (exactCountry || isCloseMatch(place.country_name, guessedCountry)) &&
+                    (exactCity || isCloseMatch(place.city, guessedCity))) {
+                    typoMatch = place;
                 }
             }
-            return null;
+            return typoMatch;
         }
 
         function isCloseMatch(str1, str2) {
