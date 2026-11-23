@@ -308,6 +308,8 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .trait-space header{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .trait-space h2,.trait-space h3{flex:1 0 165px}
 .trait-space select,.trait-space input{min-height:29px}
+.trait-id-search{width:12ch}
+#trait-id-result:not(:empty){margin-bottom:8px}
 .age-breakdown{max-width:760px;padding:10px 12px;border:1px solid var(--line);border-radius:5px;background:#1d1d1b}
 .age-breakdown table{margin-top:8px}.age-breakdown th:first-child{text-align:left}
 .age-breakdown thead,.age-breakdown tfoot{color:#FADE69}

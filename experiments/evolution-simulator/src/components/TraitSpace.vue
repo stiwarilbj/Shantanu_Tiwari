@@ -7,15 +7,36 @@ const props=defineProps({scope:String})
 const emit=defineEmits(['watch'])
 const lab=useLab()
 const day=ref(1), compare=ref(0), track=ref(null), other=ref(null), chosenId=ref(null)
+const idQuery=ref('')
 const loading=ref(false), issue=ref(''), compareIssue=ref('')
 const replayAttempt=ref(0), compareAttempt=ref(0), compareLoading=ref(false)
 const angle=ref(-.58), tilt=ref(.48), bins=ref(20), metric=ref('speed'), percent=ref(false)
 let request=0, compareRequest=0, gesture
-const scoped=frame=>frame?.final.blobs.filter(b=>b.alive && (props.scope==='all'||props.scope===b.species)) ?? []
-const cohort=computed(()=>scoped(track.value))
-const second=computed(()=>scoped(other.value))
-const chosen=computed(()=>cohort.value.find(b=>b.id===chosenId.value))
+const living=frame=>frame?.final.blobs.filter(b=>b.alive) ?? []
+const inScope=blob=>props.scope==='all'||props.scope===blob.species
+const dayBlobs=computed(()=>living(track.value))
+const cohort=computed(()=>dayBlobs.value.filter(inScope))
+const second=computed(()=>living(other.value).filter(inScope))
+const queryText=computed(()=>idQuery.value.trim())
+const searchedId=computed(()=>{
+  const digits=queryText.value.replace(/^#/,'')
+  const id=Number(digits)
+  return /^\d+$/.test(digits) && Number.isSafeInteger(id) && id>0 ? id : null
+})
+const chosen=computed(()=>{
+  const id=queryText.value ? searchedId.value : chosenId.value
+  return cohort.value.find(blob=>blob.id===id)
+})
 const species=computed(()=>Object.fromEntries(lab.run.setup.species.map(s=>[s.id,s])))
+const idResult=computed(()=>{
+  if (!queryText.value || queryText.value==='#') return ''
+  const id=searchedId.value
+  if (id===null) return 'Enter a creature ID like #142'
+  if (!track.value) return ''
+  if (chosen.value) return `Selected ${species.value[chosen.value.species].name} #${id} on Day ${day.value}`
+  if (dayBlobs.value.some(blob=>blob.id===id)) return `Creature #${id} is hidden by the species filter on Day ${day.value}`
+  return `Creature #${id} wasn’t found among the living creatures on Day ${day.value}`
+})
 const runId=()=>lab.run.id
 const dayAvailable=computed(()=>day.value<=lab.completed)
 watch(runId,()=>{ day.value=Math.max(1,lab.completed); compare.value=0 },{immediate:true})
@@ -53,7 +74,11 @@ function transform(x,y,z){
   return {x:310+155*(x*c-z*s),y:205-155*(y*v-(x*s+z*c)*w),z:x*s+z*c}
 }
 const scales=computed(()=>Object.fromEntries(['speed','size','sense'].map(key=>[key,cohort.value.reduce((m,b)=>Math.max(m,b[key]),1)])))
-const points=computed(()=>cohort.value.map(b=>({b,...transform(b.speed/scales.value.speed-.5,b.sense/scales.value.sense-.36,b.size/scales.value.size-.5)})).sort((a,b)=>a.z-b.z))
+const points=computed(()=>{
+  const selected=chosen.value?.id
+  return cohort.value.map(b=>({b,...transform(b.speed/scales.value.speed-.5,b.sense/scales.value.sense-.36,b.size/scales.value.size-.5)}))
+    .sort((a,b)=>Number(a.b.id===selected)-Number(b.b.id===selected) || a.z-b.z)
+})
 const axes=computed(()=>[
   ['Speed',transform(.66,-.36,-.5)],['Size',transform(-.5,-.36,.66)],['Sense',transform(-.5,.86,-.5)]
 ])
@@ -96,6 +121,10 @@ function agePercentage(count,total) {
 }
 function down(event){gesture={x:event.clientX,y:event.clientY};event.currentTarget.setPointerCapture?.(event.pointerId)}
 function move(event){if(!gesture)return;angle.value+=(event.clientX-gesture.x)*.012;tilt.value=Math.min(1.28,Math.max(-.8,tilt.value+(event.clientY-gesture.y)*.008));gesture={x:event.clientX,y:event.clientY}}
+function chooseCreature(id){
+  idQuery.value=''
+  chosenId.value=id
+}
 function watchCreature(){
   const { id, state }=chosen.value
   const newborn=state===7
@@ -106,7 +135,10 @@ function watchCreature(){
 <template>
   <section class="trait-space">
     <header><h2>Trait Space</h2><label>Day <input type="number" :value="day" min="1" :max="lab.completed || 1" @change="day=wholeNumber($event,day,1,lab.completed)"></label>
+      <label>Creature ID <input v-model="idQuery" class="trait-id-search" type="search" placeholder="#142" autocomplete="off" spellcheck="false"
+        aria-describedby="trait-id-result" @input="chosenId=null"></label>
       <button class="secondary" @click="angle=-.58;tilt=.48">Reset view</button></header>
+    <p id="trait-id-result" class="quiet" aria-live="polite" aria-atomic="true">{{ idResult }}</p>
     <div v-if="issue">
       <p class="issue" role="alert">Could not load Day {{ day }}. {{ issue }}</p>
       <button class="secondary" @click="replayAttempt++">Retry Day {{ day }}</button>
@@ -121,11 +153,12 @@ function watchCreature(){
           <text :x="end.x" :y="end.y-8" fill="#EEEDD6">{{ label }}</text>
         </g>
         <circle v-for="point in points" :key="point.b.id" :cx="point.x" :cy="point.y" :r="chosen?.id===point.b.id?6:3.5"
-          :fill="species[point.b.species]?.color || '#83B3CE'" :stroke="chosen?.id===point.b.id?'#FFFDFC':'none'" @click="chosenId=point.b.id">
+          :fill="species[point.b.species]?.color || '#83B3CE'" :stroke="chosen?.id===point.b.id?'#FFFDFC':'none'"
+          :stroke-width="chosen?.id===point.b.id?2:undefined" @click="chooseCreature(point.b.id)">
           <title>{{ species[point.b.species]?.name }} #{{ point.b.id }}</title>
         </circle>
       </svg>
-      <aside><label>Creature <select :value="chosenId ?? ''" @change="chosenId=$event.target.value ? Number($event.target.value) : null">
+      <aside><label>Creature <select :value="chosen?.id ?? ''" @change="chooseCreature($event.target.value ? Number($event.target.value) : null)">
         <option value="">Choose</option><option v-for="b in cohort" :key="b.id" :value="b.id">{{ species[b.species]?.name }} #{{ b.id }}</option>
       </select></label>
       <p v-if="chosen">{{ format(chosen.speed) }} speed · {{ format(chosen.size) }} size · {{ format(chosen.sense) }} sense</p>
