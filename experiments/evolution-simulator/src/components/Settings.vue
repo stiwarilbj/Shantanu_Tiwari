@@ -3,8 +3,9 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { CircleX, Copy, Dices, Plus, Check, Trash2 } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, speciesTemplate, usesRefugeBorder, usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
+  plantsForDay, randomSeed, rulesFor, speciesTemplate, usesRefugeBorder, usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
+import { format } from '../engine/stats.js'
 import NumberField from './NumberField.vue'
 
 const lab = useLab()
@@ -14,6 +15,23 @@ const standardDeviation = usesStandardDeviation(draft)
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), advanced = ref(false), rewards = ref(false), discarding = ref(false), applying = ref(false)
+const previewDay = ref((fork ?? 0) + 1)
+const previewDayValid = computed(() => Number.isInteger(previewDay.value) &&
+  Number.isInteger(draft.days) && previewDay.value >= 1 && previewDay.value <= draft.days)
+const foodPreview = computed(() => {
+  const day = previewDay.value
+  if (day === '') return 'Enter a day to see its plant count'
+  if (!Number.isInteger(draft.days) || draft.days < 1) return 'Set the run length first'
+  if (!previewDayValid.value) return `Enter a whole day from 1 to ${draft.days}`
+  const saved = fork != null && day <= fork
+  if (!saved) {
+    const { food, schedule } = validate(draft)
+    if (food) return food
+    if (schedule && draft.scheduleMode !== 'constant') return schedule
+  }
+  const rules = saved ? rulesFor(lab.run.setup, lab.run.revisions, day) : draft
+  return `Day ${day} · ${format(plantsForDay(rules, day), 0)} plants at dawn${saved ? ' (saved)' : ''}`
+})
 const selected = computed(() => draft.species.find(s => s.id===tab.value) ?? draft.species[0])
 const mutationProfile = computed({
   get() {
@@ -195,16 +213,26 @@ onMounted(()=>dialog.value.showModal())
             <p class="quiet">Each plant or prey gives one food credit. A refill of 0 leaves energy unchanged. Higher values restore energy up to the blob’s starting amount.</p>
             <button type="button" class="secondary" @click="draft.preyReward=draft.plantReward">Equal rewards</button>
           </div>
-          <div v-if="draft.scheduleMode!=='constant'" class="setting-inset">
-            <strong>Food schedule</strong><p class="quiet">Day 1 follows Starting plants · {{ draft.food }}</p>
-            <div class="schedule-row" v-for="(point,i) in draft.schedule" :key="i">
-              <label>Day <input v-model.number="point.day" type="number" min="2" :max="draft.days"></label>
-              <label>Plants <input v-model.number="point.food" type="number" min="10" max="1000"></label>
-              <button type="button" class="icon" aria-label="Remove schedule point" @click="draft.schedule.splice(i,1)"><Trash2 :size="17"/></button>
+          <div class="setting-inset">
+            <template v-if="draft.scheduleMode!=='constant'">
+              <strong>Food schedule</strong><p class="quiet">Day 1 follows Starting plants · {{ draft.food }}</p>
+              <div class="schedule-row" v-for="(point,i) in draft.schedule" :key="i">
+                <label>Day <input v-model.number="point.day" type="number" min="2" :max="draft.days"></label>
+                <label>Plants <input v-model.number="point.food" type="number" min="10" max="1000"></label>
+                <button type="button" class="icon" aria-label="Remove schedule point" @click="draft.schedule.splice(i,1)"><Trash2 :size="17"/></button>
+              </div>
+              <p v-if="issue.schedule" class="issue">{{ issue.schedule }}</p>
+              <button type="button" class="secondary" @click="addAnchor">Add point</button>
+              <button v-if="draft.schedule.length" type="button" class="link" @click="draft.schedule=[]">Clear</button>
+            </template>
+            <div class="schedule-preview">
+              <label>Preview day
+                <input id="food-preview-day" v-model.number="previewDay" type="number" min="1" :max="draft.days"
+                  :aria-invalid="previewDay!=='' && !previewDayValid ? 'true' : undefined"
+                  aria-describedby="food-preview-result" @keydown.enter.prevent>
+              </label>
+              <output id="food-preview-result" for="food-preview-day">{{ foodPreview }}</output>
             </div>
-            <p v-if="issue.schedule" class="issue">{{ issue.schedule }}</p>
-            <button type="button" class="secondary" @click="addAnchor">Add point</button>
-            <button v-if="draft.schedule.length" type="button" class="link" @click="draft.schedule=[]">Clear</button>
           </div>
         </section>
         <section class="setting-section">

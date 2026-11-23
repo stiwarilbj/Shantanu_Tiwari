@@ -418,8 +418,10 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .olive-label select{min-height:23px;padding:1px 4px;font-size:10px}
 .reset-note{margin:1px auto!important;font-size:9px;line-height:1.1}
 .setting-inset{max-width:760px;margin:4px auto;display:grid;gap:4px}
-.schedule-row,.run-name{display:flex;align-items:center;gap:8px;color:var(--muted);flex-wrap:wrap}
-.schedule-row label{display:flex;align-items:center;gap:4px}
+.schedule-row,.schedule-preview,.run-name{display:flex;align-items:center;gap:8px;color:var(--muted);flex-wrap:wrap}
+.schedule-row label,.schedule-preview label{display:flex;align-items:center;gap:4px}
+.schedule-preview{gap:4px 10px;padding:3px;font-size:13px}
+.schedule-preview output{color:var(--cream)}
 .run-name input{flex:1;min-width:100px}
 .final-fields{max-width:600px;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
 .final-fields>.run-name:first-child{grid-column:1/-1}
