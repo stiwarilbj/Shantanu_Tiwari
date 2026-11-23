@@ -1867,6 +1867,29 @@ test('Trait Space retries a failed comparison without losing the primary day', a
   await expect(creature).toHaveValue(creatureId)
 })
 
+test('Run Library ranks exact seed matches before partial seeds and run names @pages', async ({ page }) => {
+  await openSimulator(page)
+  for (const [name, seed] of [['Control field','118'], ['Repeat field','118'], ['Nearby seed','2118'], ['118 notes','70']]) {
+    await startRun(page, '10', async () => {
+      await page.getByLabel('Run name').fill(name)
+      await page.getByRole('spinbutton', { name: 'Random seed' }).fill(seed)
+    })
+  }
+  await openRunLibrary(page)
+  const library = page.getByRole('dialog', { name: 'Run Library' })
+  const search = library.getByRole('searchbox', { name: 'Search runs by name or seed' })
+  const names = library.locator('article strong')
+
+  await search.pressSequentially('118')
+  await expect(names).toHaveText(['Repeat field', 'Control field', '118 notes', 'Nearby seed'])
+  await search.fill('  cOnTrOl  ')
+  await expect(names).toHaveText(['Control field'])
+  await search.fill('9999')
+  await expect(library.getByText('No matching saved runs.')).toBeVisible()
+  await search.fill('')
+  await expect(names.first()).toHaveText('118 notes')
+})
+
 for (const [width, height] of [[320, 420], [1280, 900]]) {
   test(`Run Library actions fit at ${width} × ${height}${width === 320 ? ' @pages' : ''}`, async ({ page }) => {
     await openSimulator(page)

@@ -38,7 +38,13 @@ const quickPreview = computed(() => {
 })
 const scopeLabel=computed(()=>lab.run.setup.species.find(s=>s.id===lab.scope)?.name ?? 'All species')
 const rows=computed(()=>lab.run.summaries.map(s=>s.rows[lab.scope]).filter(Boolean))
-const matches=computed(()=>[...lab.library].sort((a,b)=>b.created-a.created).filter(r=>r.setup.name.toLowerCase().includes(search.value.toLowerCase())))
+const matches=computed(()=>{
+  const query=search.value.trim().toLowerCase()
+  const exactSeed=run=>String(run.setup.seed)===query
+  return lab.library
+    .filter(({setup})=>setup.name.toLowerCase().includes(query) || String(setup.seed).includes(query))
+    .sort((a,b)=>Number(exactSeed(b))-Number(exactSeed(a)) || b.created-a.created)
+})
 const canSim=computed(()=>Number.isInteger(finish.value)&&finish.value>=1&&finish.value<=(lab.extinctDay ? lab.completed : lab.run.setup.days)&&
   (mode.value==='absolute'||Number.isInteger(amount.value)&&amount.value>=0))
 const canExportCsv = computed(() => Number.isInteger(start.value) && Number.isInteger(end.value) &&
@@ -198,7 +204,7 @@ onMounted(()=>dialog.value.showModal())
       <footer><button class="secondary" @click="lab.openDownload()">Download</button><button class="primary" @click="close">Done</button></footer>
     </template>
     <template v-else-if="lab.modal==='library'">
-      <div class="library-tools"><input v-model="search" type="search" placeholder="Search runs" aria-label="Search runs">
+      <div class="library-tools"><input v-model="search" type="search" placeholder="Search name or seed" aria-label="Search runs by name or seed">
         <input ref="file" type="file" accept=".json,application/json" hidden @change="importSetup">
         <button class="secondary" @click="file.click()"><Upload :size="16"/> Import setup</button>
         <button class="primary" @click="lab.openSettings({...starter(),name:'New experiment',seed:randomSeed()})">New experiment</button>
