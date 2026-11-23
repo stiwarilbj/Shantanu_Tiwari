@@ -359,7 +359,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
           :aria-label="index===0?'Left board controls':'Right board controls'">
           <strong>{{ index===0?'Left':'Right' }} · {{ run.setup.name }}</strong>
           <label>Day <input v-model.number="dayInputs[index]" type="number" min="1" :max="runDays[index]" :aria-label="(index===0?'Left':'Right')+' day'" @change="changeSideDay(index)"> of {{ runDays[index] }}</label>
-          <label>Camera <select v-model="cameras[index]" :aria-label="(index===0?'Left':'Right')+' camera angle'" @change="interruptSequence"><option value="board">Field view</option><option value="overhead">Overhead</option><option value="close">Close view</option></select></label>
+          <label class="lane-camera">Camera <select v-model="cameras[index]" :aria-label="(index===0?'Left':'Right')+' camera angle'" @change="interruptSequence"><option value="board">Field view</option><option value="overhead">Overhead</option><option value="close">Close view</option></select></label>
           <button class="icon" :aria-label="playing[index]?'Pause '+(index===0?'left':'right')+' board':'Play '+(index===0?'left':'right')+' board'" :disabled="!tracks[index]" @click="toggleSidePlayback(index)">
             <Pause v-if="playing[index]" :size="19"/><Play v-else :size="19"/>
           </button>

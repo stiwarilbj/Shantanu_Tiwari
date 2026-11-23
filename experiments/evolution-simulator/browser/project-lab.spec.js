@@ -72,6 +72,55 @@ test('simulator popups remain keyboard accessible below the shared navbar @pages
   await expect(view).toHaveAttribute('aria-expanded', 'false')
 })
 
+test('Compare keeps camera options and reveal labels readable on narrow screens @pages', async ({ page }) => {
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Days per run' }).selectOption('100')
+  await page.getByRole('button', { name: 'Run both and compare' }).click()
+  await page.getByRole('heading', { name: 'Compare runs' }).waitFor()
+
+  for (const width of [270, 320, 521, 640, 701, 1280]) {
+    await page.setViewportSize({ width, height: 700 })
+    for (const side of ['Left', 'Right']) {
+      const camera = page.getByRole('combobox', { name: side + ' camera angle' })
+      await camera.selectOption('close')
+      const remainingSpace = await camera.evaluate(select => {
+        const style = getComputedStyle(select)
+        const canvas = document.createElement('canvas').getContext('2d')
+        canvas.font = style.font
+        const textWidth = canvas.measureText(select.selectedOptions[0].textContent).width
+        return select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - textWidth
+      })
+      expect(remainingSpace).toBeGreaterThanOrEqual(16)
+    }
+  }
+
+  await page.getByRole('button', { name: 'Side by side', exact: true }).click()
+  const boards = page.locator('.reveal-boards')
+  const divider = page.getByRole('slider', { name: 'Reveal left and right' })
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 700 })
+    for (const value of ['10', '50', '90']) {
+      await divider.fill(value)
+      await boards.scrollIntoViewIfNeeded()
+      const layout = await boards.evaluate(element => {
+        const { left, top, width, height } = element.getBoundingClientRect()
+        const divider = parseFloat(element.style.getPropertyValue('--divider')) / 100
+        const middle = left + width / 2
+        const stages = Array.from(element.querySelectorAll('section'))
+        const titles = stages.map(stage => stage.querySelector('h2').getBoundingClientRect())
+        const at = fraction => document.elementFromPoint(left + width * fraction, top + height / 2)
+        return {
+          titlesFit: titles[0].right <= middle && titles[1].left >= middle,
+          titlesUnclipped: stages.every(stage => getComputedStyle(stage).clipPath === 'none'),
+          leftBoardHit: stages[0].querySelector('.board').contains(at(divider / 2)),
+          rightBoardHit: stages[1].querySelector('.board').contains(at((1 + divider) / 2)),
+        }
+      })
+      expect(layout).toEqual({ titlesFit: true, titlesUnclipped: true, leftBoardHit: true, rightBoardHit: true })
+    }
+  }
+})
+
 test('the video sequence fills the simulator without covering the shared navbar @pages', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.getByRole('link', { name: 'About', exact: true }).click()
