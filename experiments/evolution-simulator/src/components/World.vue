@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Ellipsis,
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Copy, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { STATES } from '../engine/simulation.js'
@@ -15,6 +15,7 @@ const lab = useLab()
 const emit = defineEmits(['reroll', 'fullscreen-change'])
 const board = ref(), surface = ref(), fullscreenActive = ref(false)
 const tool = ref(null), camera = ref('board'), quality = ref('auto'), details = ref(false)
+const copyState = shallowRef(null)
 const eventFilter = ref('all')
 const dim = ref(false), hud = ref(false), rateReadout = ref(false), wasPlaying = ref(false)
 const layers = ref({ sense:false, speed:false, energy:false, credits:false, homes:false, selected:false, vision:false, cohortSense:false })
@@ -28,6 +29,10 @@ const layerNames = [
 const visible = computed(() => lab.frame?.blobs.find(b => b.id===lab.selected))
 const creatureState = computed(() => STATES[visible.value?.state])
 const species = computed(() => lab.run.setup.species.find(s => s.id===visible.value?.species))
+const traitStats = computed(() => {
+  const blob = visible.value
+  return blob ? [['Speed', format(blob.speed)], ['Size', format(blob.size)], ['Sense range', format(blob.sense)]] : []
+})
 const rules = computed(() => rulesFor(lab.run.setup,lab.run.revisions,lab.frame?.day ?? lab.viewing))
 const distanceHome = computed(() => {
   const blob = visible.value
@@ -124,6 +129,22 @@ function eventName(e) {
   if (e.type === 'home') return 'Reached refuge'
   return e.id===lab.selected ? 'Born to #'+e.parent : 'Offspring #'+e.id
 }
+async function copyStats() {
+  const blob = visible.value
+  if (!blob) return
+  const stats = [
+    ['ID', '#'+blob.id], ['Species', species.value?.name ?? blob.species], ['Day', lab.frame.day],
+    ...traitStats.value
+  ]
+  const text = stats.map(([label, value]) => `${label}: ${value}`).join('\n')
+  const attempt = { status:'pending', text }
+  copyState.value = attempt
+  let status = 'copied'
+  try { await navigator.clipboard.writeText(text) }
+  catch { status = 'manual' }
+  if (copyState.value === attempt) copyState.value = { status, text }
+}
+watch([details, () => lab.run.id, () => lab.frame?.day, () => visible.value?.id], () => { copyState.value = null })
 watch(() => lab.run.id, () => { details.value=false; tool.value=null; layers.value.cohortSense=false; fit() })
 watch(() => visible.value?.id, id => {
   if (id == null) layers.value.selected = false
@@ -238,13 +259,23 @@ defineExpose({ select, overhead })
           <option v-for="b in living" :key="b.id" :value="b.id">#{{ b.id }} · {{ lab.run.setup.species.find(s=>s.id===b.species)?.name }}</option>
         </select></label>
         <template v-if="visible">
+          <div class="creature-copy">
+            <button type="button" class="secondary" :disabled="copyState?.status==='pending'" @click="copyStats">
+              <Copy :size="14" aria-hidden="true"/> Copy stats
+            </button>
+            <span role="status" :class="copyState?.status==='copied' ? 'teal' : 'quiet'">
+              {{ copyState?.status==='copied' ? 'Stats copied' : copyState?.status==='manual' ? 'Clipboard unavailable. Copy the text below.' : '' }}
+            </span>
+          </div>
+          <textarea v-if="copyState?.status==='manual'" class="creature-copy-text" aria-label="Creature stats to copy"
+            rows="6" readonly :value="copyState.text" @focus="$event.target.select()"></textarea>
           <p>{{ creatureState }} <span v-if="!visible.alive">· {{ creatureEvents.find(e=>e.type==='death')?.cause }}</span></p>
           <p v-if="creatureState === 'Returning'" class="quiet">{{ format(distanceHome,1) }} units from the nearest refuge</p>
           <progress :value="visible.energy" :max="visible.capacity" aria-label="Remaining energy"></progress>
           <small>{{ format(visible.energy,1) }} / {{ visible.capacity }} energy</small>
           <dl><template v-for="[name,value] in [
-            ['Age',visible.age+' days'],['Food credits',visible.credits],['Speed',format(visible.speed)],['Size',format(visible.size)],
-            ['Sense range',format(visible.sense)],['Travel rate',format(travel(visible,rules),1)+' units/s'],
+            ['Age',visible.age+' days'],['Food credits',visible.credits],...traitStats,
+            ['Travel rate',format(travel(visible,rules),1)+' units/s'],
             ['Body radius',format(radius(visible.size),2)],['Energy cost',movementCost],
             ['Born', 'Day '+visible.born],['Parent',visible.parent ? '#'+visible.parent : 'Founder']
           ]" :key="name"><dt>{{ name }}</dt><dd>{{ value }}</dd></template></dl>

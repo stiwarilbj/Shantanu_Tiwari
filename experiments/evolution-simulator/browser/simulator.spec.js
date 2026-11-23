@@ -2103,6 +2103,59 @@ test('replay shows food credits without refills and refuge distance while return
   await expect(distance).toHaveCount(0)
 })
 
+test('Creature Details copies the selected creature and day as plain text @pages', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page, '5')
+    await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('400')
+  })
+  await page.getByRole('button', { name:'View options' }).click()
+  await page.getByRole('button', { name:'Creatures', exact:true }).click()
+  const details = page.getByRole('complementary', { name:'Creature details' })
+  const creature = details.getByRole('combobox', { name:'Creature', exact:true })
+  const copy = details.getByRole('button', { name:'Copy stats' })
+  const status = details.getByRole('status')
+  const readClipboard = () => page.evaluate(() => navigator.clipboard.readText())
+  const statsText = async (day, id) => {
+    const lines = ['ID: #'+id, 'Species: Blue', 'Day: '+day]
+    for (const label of ['Speed', 'Size', 'Sense range']) {
+      const stat = details.getByText(label, { exact:true }).locator('xpath=following-sibling::dd[1]')
+      lines.push(label+': '+await stat.innerText())
+    }
+    return lines.join('\n')
+  }
+
+  await expect(copy).toHaveCount(0)
+  await creature.selectOption('1')
+  await copy.press('Enter')
+  await expect(status).toHaveText('Stats copied')
+  expect(await readClipboard()).toBe(await statsText(1, '1'))
+
+  await quickThrough(page, 2)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 2')
+  await page.getByRole('button', { name:'Watch last day' }).click()
+  await expect(page.getByRole('button', { name:'Run options' })).toHaveText('Day 2 / 10 · Replay')
+  const nextId = await creature.locator('option').nth(2).getAttribute('value')
+  await creature.selectOption(nextId)
+  await expect(status).toBeEmpty()
+  await copy.click()
+  await expect(status).toHaveText('Stats copied')
+  const replayStats = await statsText(2, nextId)
+  expect(await readClipboard()).toBe(replayStats)
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', { value: async () => {
+      throw new DOMException('Clipboard permission denied', 'NotAllowedError')
+    } })
+  })
+  await copy.click()
+  await expect(status).toHaveText('Clipboard unavailable. Copy the text below.')
+  await expect(details.getByRole('textbox', { name:'Creature stats to copy' })).toHaveValue(replayStats)
+  await creature.selectOption('')
+  await expect(details.getByRole('textbox', { name:'Creature stats to copy' })).toHaveCount(0)
+})
+
 test('creature details use the movement and energy rules for the day being watched', async ({ page }) => {
   await openSimulator(page)
   await startRun(page, '10', async () => {
