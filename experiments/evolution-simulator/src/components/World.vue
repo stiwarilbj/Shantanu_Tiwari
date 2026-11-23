@@ -5,6 +5,7 @@ import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, Chevro
 import { useLab } from '../store.js'
 import { STATES } from '../engine/simulation.js'
 import { rulesFor, usesWalkthroughForaging } from '../engine/config.js'
+import { DECISION, tracksForagingDecisions } from '../engine/foraging-decisions.js'
 import { format, runSpeedRange } from '../engine/stats.js'
 import { cost, edgePoint, homePoints, radius, refugeDistance, travel, walkthroughStepCost } from '../engine/geometry.js'
 import Board from './Board.vue'
@@ -35,6 +36,34 @@ const traitStats = computed(() => {
   return blob ? [['Speed', format(blob.speed)], ['Size', format(blob.size)], ['Sense range', format(blob.sense)]] : []
 })
 const rules = computed(() => rulesFor(lab.run.setup,lab.run.revisions,lab.frame?.day ?? lab.viewing))
+const foragingDecision = computed(() => {
+  const blob = visible.value
+  if (!blob || !tracksForagingDecisions(rules.value)) return ''
+  if (!blob.alive) return 'Died'
+  if (blob.home) return 'Reached the refuge'
+  if (blob.state === 7) return 'Born at dusk'
+  const savings = blob.foragingSavings == null ? '' : format(blob.foragingSavings, 1).replace(/\.0$/, '') + '%'
+  switch (blob.foragingDecision) {
+    case DECISION.plant: return 'Heading for a reachable plant'
+    case DECISION.prey: return 'Pursuing reachable prey'
+    case DECISION.rememberedPlant: return 'Heading to where it last saw the plant'
+    case DECISION.keepMeal: return `Kept its meal target. The alternative saves ${savings} of the trip.`
+    case DECISION.switchPlant: return `Switched to a plant that saves ${savings} of the trip.`
+    case DECISION.switchPrey: return `Switched to prey that saves ${savings} of the trip.`
+    case DECISION.returnWithFood: return 'Heading home with two food credits'
+    case DECISION.returnForTime: {
+      const steps = blob.foragingSettings?.returnMargin ?? 0
+      return `Turned home to keep ${steps} ${steps === 1 ? 'step' : 'steps'} in reserve.`
+    }
+    case DECISION.escape: return 'Changed course to escape a predator'
+    case DECISION.retreat: return 'Headed for the refuge to escape a predator'
+    case DECISION.noSafeMeal: return 'Turned home when it found no meal it could reach and still get back in time.'
+    case DECISION.forgotPlant: return 'Looked for another meal after its plant memory expired'
+    case DECISION.pursuitLimit: return 'Gave up the chase when the prey moved beyond its pursuit limit'
+    case DECISION.missingPlant: return 'Looked for another meal after seeing the plant was gone'
+    default: return 'Searching for a reachable meal'
+  }
+})
 const distanceHome = computed(() => {
   const blob = visible.value
   if (lab.frame?.refugeWidth) return refugeDistance(blob, lab.frame.refugeWidth)
@@ -275,6 +304,7 @@ defineExpose({ select, overhead })
           <textarea v-if="copyState?.status==='manual'" class="creature-copy-text" aria-label="Creature stats to copy"
             rows="6" readonly :value="copyState.text" @focus="$event.target.select()"></textarea>
           <p>{{ creatureState }} <span v-if="!visible.alive">· {{ creatureEvents.find(e=>e.type==='death')?.cause }}</span></p>
+          <p v-if="foragingDecision" class="foraging-decision"><strong>Foraging decision</strong> {{ foragingDecision }}</p>
           <p v-if="creatureState === 'Returning'" class="quiet">{{ format(distanceHome,1) }} units from the nearest refuge</p>
           <progress :value="visible.energy" :max="visible.capacity" aria-label="Remaining energy"></progress>
           <small>{{ format(visible.energy,1) }} / {{ visible.capacity }} energy</small>

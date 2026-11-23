@@ -1,6 +1,8 @@
 import { dawn, founders, step, snapshot } from './simulation.js'
 import { rulesFor } from './config.js'
 import { simulateForecast } from '../forecast.js'
+import { tracksForagingDecisions } from './foraging-decisions.js'
+import { TRACK_FIELDS } from '../track.js'
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 let config, checkpoint, partial, records, committed = 0, stopped = false, busy = false
@@ -77,7 +79,9 @@ async function replay(message) {
   const startFrame = snapshot(state)
   const opening = structuredClone(startFrame.blobs)
   const plants = state.plants.map(p => ({ id: p.id, x: p.x, y: p.y }))
-  const width = opening.length * 7
+  const trackDecisions = tracksForagingDecisions(rules)
+  const fields = TRACK_FIELDS + (trackDecisions ? 2 : 0)
+  const width = opening.length * fields
   const maxSamples = Math.max(3, Math.floor(16 * 1024 * 1024 / (Math.max(1, width) * 4)))
   let stride = state.limit == null ? 1 : Math.max(1, Math.ceil(state.limit / (maxSamples - 1)))
   let capacity = Math.min(16, maxSamples)
@@ -93,6 +97,10 @@ async function replay(message) {
       frames[index++] = b.credits
       frames[index++] = b.state
       frames[index++] = b.preyCredits
+      if (trackDecisions) {
+        frames[index++] = b.foragingDecision
+        frames[index++] = b.foragingSavings
+      }
     }
     samples++
   }
@@ -118,7 +126,7 @@ async function replay(message) {
   const final = snapshot(state)
   const used = frames.slice(0, index)
   postMessage({ type: 'track', id, track: { day, duration: final.duration,
-    stepSeconds: state.stepSeconds, ticks: state.tick, stride,
+    stepSeconds: state.stepSeconds, ticks: state.tick, stride, fields,
     opening, plants, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
 }
 

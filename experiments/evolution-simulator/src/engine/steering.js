@@ -1,9 +1,11 @@
 import { FIELD, canHunt, clamp, contact, pathOf, refugeContact, turn } from './geometry.js'
+import { FORAGING_DEFAULTS } from './config.js'
+import { canPursuePrey, DECISION, keepsMeal, mealFitsBudget, remembersPlant, returnReserve,
+  shouldReturn, shouldReturnWithoutMeal, timeSavedPercent } from './foraging-decisions.js'
 import { random } from './random.js'
 
 const TURN_RATE = 2 * Math.PI
 const THREAT_TIME = .6
-const MEMORY_TIME = .6
 const SIDES = [0, 1, 2, 3]
 const bearing = (from, to) => Math.atan2(to.y - from.y, to.x - from.x)
 
@@ -113,9 +115,10 @@ function escapeHeading(blob, threat, threats, home, seconds, width) {
   return bestHeading
 }
 
-function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budget) {
+function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budget, settings) {
   let best, current
-  function score(kind, id, x, y, travelTime, reach, turning) {
+  let lostMeal = DECISION.searching
+  function score(kind, id, x, y, travelTime, reach, turning, remembered = false) {
     const dx = x - blob.x, dy = y - blob.y
     const dist = Math.hypot(dx, dy)
     const heading = dist ? Math.atan2(dy, dx) : blob.angle
@@ -125,8 +128,8 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
     const mealX = blob.x + dx * fraction, mealY = blob.y + dy * fraction
     const back = Math.min(...SIDES.map(side => homeTime(mealX, mealY, heading, blob.speedWorld,
       homePoint(side, mealX, mealY, width))))
-    if (time + back > budget) return
-    const meal = { kind, id, x, y, heading, time }
+    if (!mealFitsBudget(time, back, budget)) return
+    const meal = { kind, id, x, y, heading, time, remembered }
     if (memory.kind === kind && memory.id === id) current = meal
     if (!best || time < best.time || (time === best.time &&
         (kind === best.kind ? id < best.id : kind === 'plant'))) best = meal
@@ -141,12 +144,14 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
   if (known) {
     if ((known.x - blob.x) ** 2 + (known.y - blob.y) ** 2 <= blob.sense ** 2) {
       memory.plant = visiblePlants.some(plant => plant.id === known.id) ? { ...known, time: now } : null
-    } else if (now - known.time > MEMORY_TIME + 1e-9) {
+      if (!memory.plant && memory.kind === 'plant') lostMeal = DECISION.missingPlant
+    } else if (!remembersPlant(now - known.time, settings.plantMemory)) {
       memory.plant = null
+      lostMeal = DECISION.forgotPlant
     } else {
       const reach = blob.r + 2
       score('plant', known.id, known.x, known.y,
-        Math.max(0, Math.hypot(known.x - blob.x, known.y - blob.y) - reach) / blob.speedWorld, reach)
+        Math.max(0, Math.hypot(known.x - blob.x, known.y - blob.y) - reach) / blob.speedWorld, reach, undefined, true)
     }
   }
   for (const prey of nearby) {
@@ -155,18 +160,36 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
     const vx = prey.velocityX, vy = prey.velocityY
     const dx = prey.x - blob.x, dy = prey.y - blob.y
     const direct = intercept(dx, dy, vx, vy, blob.speedWorld, reach)
-    if (direct > 1 || direct > budget) continue
+    const isTarget = memory.kind === 'prey' && memory.id === prey.id
+    if (!canPursuePrey(direct, settings.preyPursuit)) {
+      if (isTarget) lostMeal = DECISION.pursuitLimit
+      continue
+    }
+    if (direct > budget) continue
     const turning = direct ? Math.abs(turn(blob.angle, Math.atan2(dy + vy * direct, dx + vx * direct))) / TURN_RATE : 0
     const travelTime = turning ? intercept(dx + vx * turning, dy + vy * turning, vx, vy, blob.speedWorld, reach) : direct
     const arrival = travelTime + turning
-    if (arrival > 1 || arrival > budget) continue
+    if (!canPursuePrey(arrival, settings.preyPursuit)) {
+      if (isTarget) lostMeal = DECISION.pursuitLimit
+      continue
+    }
+    if (arrival > budget) continue
     const x = clamp(prey.x + vx * arrival, prey.r, FIELD - prey.r)
     const y = clamp(prey.y + vy * arrival, prey.r, FIELD - prey.r)
     score('prey', prey.id, x, y, travelTime, reach, turning)
   }
-  const meal = current && best.time >= current.time * .8 ? current : best
-  if (meal?.kind === 'plant' && visiblePlants.some(plant => plant.id === meal.id)) {
+  const meal = current && keepsMeal(current.time, best.time, settings.switchSavings) ? current : best
+  if (meal?.kind === 'plant' && !meal.remembered) {
     memory.plant = { id: meal.id, x: meal.x, y: meal.y, time: now }
+  }
+  if (blob.foragingSettings) {
+    if (!meal) blob.foragingDecision = lostMeal
+    else if (current && current !== best) {
+      blob.foragingDecision = meal === current ? DECISION.keepMeal : meal.kind === 'plant' ? DECISION.switchPlant : DECISION.switchPrey
+      blob.foragingSavings = timeSavedPercent(current.time, best.time)
+    } else {
+      blob.foragingDecision = meal.remembered ? DECISION.rememberedPlant : meal.kind === 'plant' ? DECISION.plant : DECISION.prey
+    }
   }
   return meal
 }
@@ -196,24 +219,35 @@ export function improvedIntent(blob, ctx, config, plantGrid, blobGrid, timeLeft)
   const seconds = ctx.stepSeconds
   const now = ctx.tick * seconds
   const left = Math.min(timeLeft, blob.energy / blob.rate)
-  const reserve = 2 * seconds
+  const settings = blob.foragingSettings ?? FORAGING_DEFAULTS
+  const reserve = returnReserve(settings, seconds)
+  if (blob.foragingSettings) blob.foragingSavings = 0
   const visible = ({ x, y }) => (x - blob.x) ** 2 + (y - blob.y) ** 2 <= blob.sense ** 2
   const nearby = config.predation ? [...blobGrid.near(blob.x, blob.y, blob.sense)].filter(visible) : []
   const threats = findThreats(blob, nearby, config)
   const urgent = threats.find(threat => threat.hit !== null)
   const home = routeHome(blob, memory, ctx.refugeWidth, left, seconds, threats)
 
-  if (blob.credits >= 2 || (blob.credits && (left <= home.time + reserve ||
-      (urgent && home.safe && home.reachable &&
-        projectRoute(blob, home.heading, seconds, ctx.refugeWidth, threats, true).arrived)))) blob.returning = true
+  if (!blob.returning && blob.credits) {
+    let reason
+    if (blob.credits >= 2) reason = DECISION.returnWithFood
+    else if (shouldReturn(left, home.time, reserve)) reason = DECISION.returnForTime
+    else if (urgent && home.safe && home.reachable &&
+        projectRoute(blob, home.heading, seconds, ctx.refugeWidth, threats, true).arrived) reason = DECISION.retreat
+    if (reason !== undefined) {
+      blob.returning = true
+      if (blob.foragingSettings) memory.returnReason = reason
+    }
+  }
   if (urgent && !(blob.credits && home.time === 0) && !(blob.returning && home.safe && home.reachable)) {
     memory.searchUntil = null
     blob.state = 3
+    if (blob.foragingSettings) blob.foragingDecision = DECISION.escape
     return escapeHeading(blob, urgent, threats, home, seconds, ctx.refugeWidth)
   }
   if (!blob.returning) {
     const plants = [...plantGrid.near(blob.x, blob.y, blob.sense)].filter(visible)
-    const meal = findMeal(blob, memory, plants, nearby, config, now, ctx.refugeWidth, left - reserve)
+    const meal = findMeal(blob, memory, plants, nearby, config, now, ctx.refugeWidth, left - reserve, settings)
     if (meal) {
       memory.kind = meal.kind
       memory.id = meal.id
@@ -222,11 +256,15 @@ export function improvedIntent(blob, ctx, config, plantGrid, blobGrid, timeLeft)
       return meal.heading
     }
     memory.kind = null
-    if (blob.credits && left <= home.time + reserve + .75) blob.returning = true
+    if (blob.credits && shouldReturnWithoutMeal(left, home.time, reserve)) {
+      blob.returning = true
+      if (blob.foragingSettings) memory.returnReason = DECISION.noSafeMeal
+    }
   }
   if (blob.returning) {
     memory.home = home.side
     blob.state = 4
+    if (blob.foragingSettings) blob.foragingDecision = memory.returnReason
     return home.heading
   }
   blob.state = 0

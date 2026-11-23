@@ -1,18 +1,37 @@
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
-import { AGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
-  usesAgingRules, usesReproductionRules } from './engine/config.js'
+import { AGING_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
+  usesAgingRules, usesForagingDecisionRules, usesReproductionRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
   const entries = Object.entries(values ?? {}).filter(([key, value]) => value !== defaults[key])
   return entries.length ? Object.fromEntries(entries) : undefined
 }
 
+// These positions are part of the share-link format.
+const foragingLinkOrder = ['plantMemory', 'switchSavings', 'returnMargin', 'preyPursuit']
+function packForaging(settings) {
+  const values = foragingLinkOrder.map(key => settings?.[key] === FORAGING_DEFAULTS[key] ? null : settings?.[key] ?? null)
+  while (values.at(-1) === null) values.pop()
+  return values
+}
+
+function unpackForaging({ fd, ...setup }) {
+  if (!Array.isArray(fd)) return setup
+  setup.foragingDecisions = Object.fromEntries(
+    foragingLinkOrder.flatMap((key, index) => fd[index] == null ? [] : [[key, fd[index]]]),
+  )
+  return setup
+}
+
 export function setupLink(setup) {
   let compact = setup
   if (usesReproductionRules(setup)) {
+    const foraging = usesForagingDecisionRules(setup)
+    const fieldDecisions = foraging ? packForaging(setup.foragingDecisions) : []
     compact = {
       ...omitDefaults(setup, HABITAT_DEFAULTS),
       ...(usesAgingRules(setup) && { aging: omitDefaults(setup.aging, AGING_DEFAULTS) }),
+      ...(foraging && { foragingDecisions: undefined, fd: fieldDecisions.length ? fieldDecisions : undefined }),
       reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
       species: setup.species.map(item => {
         const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
@@ -20,7 +39,10 @@ export function setupLink(setup) {
         const aging = usesAgingRules(setup) && item.aging
           ? { aging: omitDefaults(item.aging, AGING_DEFAULTS) ?? {} }
           : {}
-        return { ...item, ...aging, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
+        const decisions = foraging && item.foragingDecisions
+          ? { foragingDecisions: undefined, fd: packForaging(item.foragingDecisions) }
+          : {}
+        return { ...item, ...aging, ...decisions, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
       }),
     }
   }
@@ -37,8 +59,10 @@ export function setupFromLink(hash) {
   const bytes=Uint8Array.from(atob(token.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0))
   const setup = JSON.parse(new TextDecoder().decode(bytes))
   // Share links omit defaults to keep common configurations within the URL limit.
-  return setup && usesReproductionRules(setup) && Array.isArray(setup.species) &&
-    setup.species.every(item => item && typeof item === 'object') ? setupWithRuleDefaults(setup) : setup
+  if (!setup || !usesReproductionRules(setup) || !Array.isArray(setup.species) ||
+      !setup.species.every(item => item && typeof item === 'object')) return setup
+  if (!usesForagingDecisionRules(setup)) return setupWithRuleDefaults(setup)
+  return setupWithRuleDefaults({ ...unpackForaging(setup), species: setup.species.map(unpackForaging) })
 }
 
 export function download(name, mime, content) {

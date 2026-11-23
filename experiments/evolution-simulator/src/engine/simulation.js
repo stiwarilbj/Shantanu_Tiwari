@@ -8,6 +8,7 @@ import { FIELD, DT, WALKTHROUGH_STEP, Grid, clamp, radius, travel, cost, walkthr
   canHunt, turn, edgePoint, homePoints, refugeContact, refugeDistance, pathOf, contact } from './geometry.js'
 import { openingHabitat } from './habitat.js'
 import { agingRules, oldAgeRisk, travelSpeedPercent } from './aging.js'
+import { DECISION, foragingDecisionsFor, tracksForagingDecisions } from './foraging-decisions.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -38,6 +39,7 @@ export function dawn(config, day, checkpoint) {
   const { roster, nextId } = checkpoint
   const walkthrough = config.metabolism === 'walkthrough'
   const foraging = usesWalkthroughForaging(config)
+  const trackDecisions = tracksForagingDecisions(config)
   const { refugeWidth, plants } = openingHabitat(config, day)
   const inheritedEdges = foraging && !refugeWidth
   const stepSeconds = walkthrough ? WALKTHROUGH_STEP : DT
@@ -57,7 +59,12 @@ export function dawn(config, day, checkpoint) {
     return { ...original, ...position, r, energy, capacity: energy, credits: 0, preyCredits: 0,
       state: 0, alive: true, home: false, returning: false, target: null,
       velocityX: 0, velocityY: 0, rate: walkthrough ? moveCost / stepSeconds : cost(original, config),
-      speedWorld: travel(original, config) * speedMultiplier, moveCost }
+      speedWorld: travel(original, config) * speedMultiplier, moveCost,
+      ...(trackDecisions && {
+        foragingSettings: foragingDecisionsFor(config, settings),
+        foragingDecision: DECISION.searching,
+        foragingSavings: 0,
+      }) }
   })
   if (!foraging) blobs.sort((a, b) => a.id - b.id)
   const limit = endsWhenSettled(config) ? null : Math.round(config.duration / 10 / stepSeconds)

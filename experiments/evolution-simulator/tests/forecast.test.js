@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { REPRODUCTION_RULE_VERSION, REFUGE_RULE_VERSION, rulesFor, setupForNewRun, starter } from '../src/engine/config.js'
+import { AGING_RULE_VERSION, REPRODUCTION_RULE_VERSION, REFUGE_RULE_VERSION, rulesFor, setupForNewRun, starter } from '../src/engine/config.js'
 import { dawn, founders, step } from '../src/engine/simulation.js'
 import { openingSummary, openingTrends } from '../src/engine/stats.js'
 import { forecastCheckpoint, forecastEndpoint, simulateForecast } from '../src/forecast.js'
@@ -86,4 +86,20 @@ test('predictions cross an aging revision and match subsequent generations', asy
   assert.ok(forecast.summaries[0].rows.all.causes['Old age'] > 0)
   assert.deepEqual(forecast.summaries, full.summaries.slice(3))
   assert.deepEqual(await preview(full, 3, 5), forecast)
+})
+
+test('a foraging revision affects only generations after the fork and forecasts match the new branch', async () => {
+  const setup = { ...starter(AGING_RULE_VERSION), seed:118, food:500, predation:false,
+    days:10, endMode:'timed', duration:100 }
+  setup.species[1].enabled = true
+  const branch = setupForNewRun(setup)
+  Object.assign(branch.foragingDecisions, { plantMemory:2, switchSavings:0, returnMargin:10, preyPursuit:2 })
+  branch.species[1].foragingDecisions = { ...branch.foragingDecisions, switchSavings:100 }
+  const revisions = [{ day:4, setup:branch }]
+  const sharedHistory = record(setup, revisions, 3)
+  const original = record(setup, [], 7)
+  const revised = record(setup, revisions, 7)
+  assert.deepEqual(revised.summaries.slice(0, 3), original.summaries.slice(0, 3))
+  assert.notDeepEqual(revised.summaries[3], original.summaries[3])
+  assert.deepEqual((await preview(sharedHistory, 3, 4)).summaries, revised.summaries.slice(3))
 })

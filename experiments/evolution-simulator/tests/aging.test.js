@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { agingRules, oldAgeRisk, travelSpeedPercent } from '../src/engine/aging.js'
-import { AGING_DEFAULTS, REPRODUCTION_RULE_VERSION, setupForNewRun, starter, validate } from '../src/engine/config.js'
+import { AGING_DEFAULTS, AGING_RULE_VERSION, REPRODUCTION_RULE_VERSION, setupForNewRun, starter, validate } from '../src/engine/config.js'
 import { random } from '../src/engine/random.js'
 import { dawn, dusk, founders, snapshot, step } from '../src/engine/simulation.js'
 import { csv } from '../src/export.js'
@@ -99,7 +99,7 @@ test('aging slows movement at the same energy cost in both foraging modes', () =
 test('aging stays off when upgrading older runs and the CSV counts absent historical causes as zero', () => {
   for (const foraging of [undefined, 'walkthrough']) {
     const before = { ...starter(REPRODUCTION_RULE_VERSION), foraging, food:150 }
-    const after = setupForNewRun(before)
+    const after = { ...setupForNewRun(before), version:AGING_RULE_VERSION }
     assert.deepEqual(after.aging, AGING_DEFAULTS)
     let checkpoint = founders(before)
     const summaries = []

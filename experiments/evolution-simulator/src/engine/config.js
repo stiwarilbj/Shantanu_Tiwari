@@ -8,7 +8,8 @@ export const STEERING_RULE_VERSION = 6
 export const HABITAT_RULE_VERSION = 7
 export const REPRODUCTION_RULE_VERSION = 8
 export const AGING_RULE_VERSION = 9
-export const VERSION = AGING_RULE_VERSION
+export const FORAGING_DECISION_RULE_VERSION = 10
+export const VERSION = FORAGING_DECISION_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -41,6 +42,18 @@ export const AGING_FIELDS = [
   { key: 'speedLoss', label: 'Travel speed lost per generation (%)', min: 0, max: 100, step: 0.1 },
   { key: 'speedFloor', label: 'Minimum travel speed (%)', min: 10, max: 100, step: 1 },
 ]
+export const FORAGING_DEFAULTS = Object.freeze({
+  plantMemory: 0.6,
+  switchSavings: 20,
+  returnMargin: 2,
+  preyPursuit: 1,
+})
+export const FORAGING_FIELDS = [
+  { key: 'plantMemory', label: 'Plant memory (seconds)', min: 0, max: 3, step: 0.1 },
+  { key: 'switchSavings', label: 'Time saved to switch meals (%)', min: 0, max: 100, step: 1 },
+  { key: 'returnMargin', label: 'Return safety margin (steps)', min: 0, max: 20, step: 1 },
+  { key: 'preyPursuit', label: 'Maximum prey pursuit (seconds)', min: 0, max: 3, step: 0.1 },
+]
 export const INHERITANCE_DEFAULTS = Object.freeze({
   mutationPattern: 'normal',
   mutationChance: Object.freeze({ speed: 100, size: 100, sense: 100 }),
@@ -53,12 +66,16 @@ export const usesImprovedSteering = config => config.version >= STEERING_RULE_VE
 export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
 export const usesReproductionRules = config => config.version >= REPRODUCTION_RULE_VERSION
 export const usesAgingRules = config => config.version >= AGING_RULE_VERSION
+export const usesForagingDecisionRules = config => config.version >= FORAGING_DECISION_RULE_VERSION
 export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
 export function setupWithRuleDefaults(setup) {
   if (usesHabitatRules(setup)) setup = { ...HABITAT_DEFAULTS, ...setup }
   if (usesAgingRules(setup)) setup = { ...setup, aging: { ...AGING_DEFAULTS, ...setup.aging } }
+  if (usesForagingDecisionRules(setup)) {
+    setup = { ...setup, foragingDecisions: { ...FORAGING_DEFAULTS, ...setup.foragingDecisions } }
+  }
   if (!usesReproductionRules(setup)) return setup
   return {
     ...setup,
@@ -66,6 +83,9 @@ export function setupWithRuleDefaults(setup) {
     species: setup.species.map(item => ({
       ...item,
       ...(usesAgingRules(setup) && item.aging !== undefined && { aging: { ...AGING_DEFAULTS, ...item.aging } }),
+      ...(usesForagingDecisionRules(setup) && item.foragingDecisions !== undefined && {
+        foragingDecisions: { ...FORAGING_DEFAULTS, ...item.foragingDecisions },
+      }),
       inheritance: {
         ...INHERITANCE_DEFAULTS, ...item.inheritance,
         mutationChance: { ...INHERITANCE_DEFAULTS.mutationChance, ...item.inheritance?.mutationChance },
@@ -156,7 +176,20 @@ export function validate(config) {
     if (rules?.maxAge !== null) number(prefix + 'maxAge', 'Maximum lifespan', rules?.maxAge, 1, 1000)
   }
 
+  function validateForaging(rules, prefix) {
+    for (const { key, label, min, max, step } of FORAGING_FIELDS) {
+      const value = rules?.[key]
+      number(prefix + key, label, value, min, max, step === 1)
+      if (step === 0.1 && Number.isFinite(value) && Math.abs(value * 10 - Math.round(value * 10)) > 1e-9) {
+        errors[prefix + key] = 'Use at most one decimal place.'
+      }
+    }
+  }
+
   if (usesAgingRules(config) && config.aging !== undefined) validateAging(config.aging, 'aging.')
+  if (usesForagingDecisionRules(config) && config.foragingDecisions !== undefined) {
+    validateForaging(config.foragingDecisions, 'foragingDecisions.')
+  }
   if (!Array.isArray(config.schedule) || !['constant', 'ramp', 'step'].includes(config.scheduleMode)) {
     errors.schedule = 'Choose a supported food schedule.'
   } else {
@@ -187,6 +220,9 @@ export function validate(config) {
     number(item.id + '.count', 'Starting creatures', item.count, 10, 1000)
     number(item.id + '.energy', 'Starting energy', item.energy, 10, 1000)
     if (usesAgingRules(config) && item.aging !== undefined) validateAging(item.aging, item.id + '.aging.')
+    if (usesForagingDecisionRules(config) && item.foragingDecisions !== undefined) {
+      validateForaging(item.foragingDecisions, item.id + '.foragingDecisions.')
+    }
     const inheritance = usesReproductionRules(config) ? item.inheritance : undefined
     if (inheritance !== undefined && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
       errors[item.id + '.mutationPattern'] = 'Choose a mutation pattern.'

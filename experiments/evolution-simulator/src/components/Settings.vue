@@ -7,6 +7,7 @@ import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_V
   usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
+import ForagingSettings from './ForagingSettings.vue'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
@@ -20,10 +21,11 @@ const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), discarding = ref(false), applying = ref(false)
 const agingSpecies = ref(null)
+const foragingSpecies = ref(null)
 const fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
 const groups = {
   habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
-  aging: 'Aging and lifespan', predictions: 'Graph predictions',
+  aging: 'Aging and lifespan', foraging: 'Foraging decisions', predictions: 'Graph predictions',
 }
 const forecastCycles = ref(String(forecastPreferences.cycles))
 const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
@@ -38,7 +40,7 @@ const advancedFields = {
   plantReward: 'movement', preyReward: 'movement', endMode: 'movement', duration: 'movement', rules: 'movement',
   parentMode: 'inheritance', minimumBreedingAge: 'inheritance', birthWait: 'inheritance',
   birthChance: 'inheritance', twinChance: 'inheritance',
-  aging: 'aging', mutation: 'inheritance', mutationChance: 'inheritance', mutationPattern: 'inheritance',
+  aging: 'aging', foragingDecisions: 'foraging', mutation: 'inheritance', mutationChance: 'inheritance', mutationPattern: 'inheritance',
 }
 const customHabitat = computed(() => usesHabitatRules(draft))
 const previewDay = ref((fork ?? 0) + 1)
@@ -111,6 +113,7 @@ function remove() {
   const index=draft.species.findIndex(s=>s.id===tab.value)
   const [value]=draft.species.splice(index,1)
   if (agingSpecies.value === value.id) agingSpecies.value = null
+  if (foragingSpecies.value === value.id) foragingSpecies.value = null
   savedSpecies.value={value,index}
   tab.value=draft.species[Math.max(0,index-1)].id
 }
@@ -142,6 +145,7 @@ function discard() {
   tab.value=draft.species[0].id
   savedSpecies.value=null
   agingSpecies.value=null
+  foragingSpecies.value=null
   issue.value={}
   discarding.value=false
 }
@@ -162,6 +166,7 @@ async function apply() {
     const key = (forSpecies ? first.slice(forSpecies.id.length + 1) : first).split('.')[0]
     const target = key === spreadKey ? 'inheritance' : advancedFields[key]
     if (target === 'aging') agingSpecies.value = forSpecies?.id ?? null
+    if (target === 'foraging') foragingSpecies.value = forSpecies?.id ?? null
     showPage(target ? 'advanced' : 'basic', target)
     await nextTick()
     const field = document.getElementById(first)
@@ -352,6 +357,9 @@ onMounted(()=>dialog.value.showModal())
           <template v-else-if="group === 'aging'">
             <AgingSettings v-if="usesAgingRules(draft)" v-model:species="agingSpecies" :draft="draft" :issue="issue"/>
             <p v-else class="quiet">This setup uses its original lifespan rules.</p>
+          </template>
+          <template v-else-if="group === 'foraging'">
+            <ForagingSettings v-model:mode="foraging" v-model:species="foragingSpecies" :draft="draft" :issue="issue"/>
           </template>
           <div v-else-if="group === 'predictions'" class="advanced-block" @keydown.enter.prevent>
             <h3>Graph predictions</h3>
