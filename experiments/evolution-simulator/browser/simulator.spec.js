@@ -2702,6 +2702,76 @@ test('Compare opens runs with results and fits both playback percentages', async
   }
 })
 
+test('Compare swaps the boards with their own days, camera angles, and playback positions @pages', async ({ page }) => {
+  await openSimulator(page)
+  for (const [name, days, seconds] of [['East archive', 3, '10'], ['West archive', 2, '5']]) {
+    await startRun(page, '10', async () => {
+      await fixedDay(page, seconds)
+      await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('400')
+      await page.getByLabel('Run name').fill(name)
+    })
+    await quickThrough(page, days)
+    await expect(batchStatus(page, 'Saved through')).toHaveText('Day '+days)
+    await page.getByRole('button', { name:'Close', exact:true }).click()
+  }
+  await openRunLibrary(page)
+  const east = page.getByRole('dialog', { name:'Run Library' }).locator('article').filter({ hasText:'East archive' })
+  await east.getByRole('button', { name:'Compare', exact:true }).click()
+
+  const side = name => {
+    const board = page.getByRole('region', { name:name+' run' })
+    return {
+      canvas:board.locator('canvas.world-canvas'),
+      heading:board.getByRole('heading'),
+      run:page.getByRole('combobox', { name:name+' run', exact:true }).locator('option:checked'),
+      day:page.getByRole('spinbutton', { name:name+' day', exact:true }),
+      camera:page.getByRole('combobox', { name:name+' camera angle' }),
+      progress:page.getByRole('slider', { name:name+' playback progress' }),
+    }
+  }
+  const left = side('Left'), right = side('Right')
+  await left.day.fill('2')
+  await left.day.press('Tab')
+  await right.day.fill('3')
+  await right.day.press('Tab')
+  await left.camera.selectOption('close')
+  await right.camera.selectOption('overhead')
+  const scope = page.getByRole('combobox', { name:'Species', exact:true })
+  await scope.selectOption('blue')
+  await left.progress.fill('0.4')
+  await right.progress.fill('0.7')
+  await expect(left.heading).toHaveText(/West archive.*Day 2.*2\.0 s/)
+  await expect(right.heading).toHaveText(/East archive.*Day 3.*7\.0 s/)
+  const westCanvas = await left.canvas.elementHandle()
+  const eastCanvas = await right.canvas.elementHandle()
+
+  const swap = page.getByRole('button', { name:'Swap sides' })
+  await swap.press('Enter')
+  await expect(swap).toBeFocused()
+  await expect(left.run).toContainText('East archive')
+  await expect(right.run).toContainText('West archive')
+  await expect(left.day).toHaveValue('3')
+  await expect(right.day).toHaveValue('2')
+  await expect(left.camera).toHaveValue('overhead')
+  await expect(right.camera).toHaveValue('close')
+  await expect(left.progress).toHaveValue('0.7')
+  await expect(right.progress).toHaveValue('0.4')
+  await expect(scope).toHaveValue('blue')
+  await expect(left.heading).toHaveText(/East archive.*Day 3.*7\.0 s/)
+  await expect(right.heading).toHaveText(/West archive.*Day 2.*2\.0 s/)
+  expect(await left.canvas.evaluate((canvas, previous) => canvas===previous, eastCanvas)).toBe(true)
+  expect(await right.canvas.evaluate((canvas, previous) => canvas===previous, westCanvas)).toBe(true)
+  await expect(page.getByRole('heading', { name:'Day 3 vs Day 2 results' })).toBeVisible()
+
+  await page.setViewportSize({ width:390, height:740 })
+  await page.getByRole('button', { name:'Play right board' }).click()
+  await swap.click()
+  await expect(page.getByRole('button', { name:'Pause left board' })).toBeEnabled()
+  await expect(page.getByRole('button', { name:'Play right board' })).toBeEnabled()
+  await expect.poll(async () => Number(await left.progress.inputValue())).toBeGreaterThan(0.4)
+  await expect(right.progress).toHaveValue('0.7')
+})
+
 test('Compare keeps the working board visible and retries only the failed replay', async ({ page }) => {
   await page.addInitScript(() => {
     const NativeWorker = window.Worker
@@ -2761,7 +2831,15 @@ test('Compare keeps the working board visible and retries only the failed replay
   await expect.poll(() => page.evaluate(() => typeof window.failComparisonReplay)).toBe('function')
   await expect(leftCanvas).toBeVisible()
   await expect(rightCanvas).toBeHidden()
+  const leftControls = page.getByRole('region', { name:'Left board controls' })
+  const swap = page.getByRole('button', { name:'Swap sides' })
+  await swap.click()
+  await expect(leftControls.getByRole('status')).toHaveText('Loading Day 2…')
+  await expect(rightCanvas).toBeVisible()
+  await expect(leftCanvas).toBeHidden()
   await page.evaluate(() => window.failComparisonReplay())
+  await expect(leftControls.getByRole('alert')).toContainText('Could not open Day 2 on the left.')
+  await swap.click()
   await expect(rightControls.getByRole('alert')).toContainText('Could not open Day 2 on the right.')
   await expect(leftCanvas).toBeVisible()
   await expect(leftBoard.getByRole('heading')).toHaveText(/Day 1.*4\.0 s/)

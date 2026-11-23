@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronLeft, ChevronRight, Pause, Play, Scan } from 'lucide-vue-next'
+import { ArrowLeftRight, ChevronLeft, ChevronRight, Pause, Play, Scan } from 'lucide-vue-next'
 import Board from './Board.vue'
 import TrendPlot from './TrendPlot.vue'
 import { useLab } from '../store.js'
@@ -41,7 +41,8 @@ const reveal=ref(false), divider=ref(50), emphasis=ref('both')
 const sequence=ref(false), sequenceStep=ref(0), videoPairProgress=ref(null), videoPairError=ref('')
 const sequenceButton=ref(null), sequenceStopButton=ref(null)
 const selections=ref([null,null]), boards=[]
-let jobs=[0,0], animations=[null,null], previous=[0,0], sequenceTimer, sequenceController
+const jobs=[null,null], animations=[null,null], previous=[0,0]
+let sequenceTimer, sequenceController
 let videoPairController
 const names=['Left run','Right run']
 const experimentSizes=computed(()=>{
@@ -141,6 +142,17 @@ function toggleComparison() {
 function toggleSidePlayback(index) {
   if (sequence.value) stopVideoSequence()
   play(index)
+}
+function swapSides() {
+  const resume=[...playing.value].reverse()
+  stop()
+  const previousLeft=leftId.value
+  leftId.value=rightId.value
+  rightId.value=previousLeft
+  for (const pair of [days.value,cameras.value,fractions.value,selections.value,tracks.value,pending.value,errors.value,jobs]) {
+    pair.reverse()
+  }
+  resume.forEach((active,index)=>{ if (active) play(index) })
 }
 function seekDay(value,index=null) {
   if (!Number.isInteger(value) || value<1) return
@@ -264,29 +276,41 @@ function interruptSequence() {
   if (sequence.value) stopVideoSequence()
 }
 async function loadTrack(index) {
-  const token=++jobs[index]
+  const run=runs.value[index]
+  const job={ id:run?.id, day:days.value[index], available:replayAvailable.value }
+  jobs[index]=job
   stop(index)
   fractions.value[index]=0
   selections.value[index]=null
   tracks.value[index]=null
   errors.value[index]=''
   pending.value[index]=false
-  const run=runs.value[index]
-  if (!replayAvailable.value || !run) return
+  if (!job.available || !run) return
   pending.value[index]=true
+  let track=null, message=''
   try {
-    const found=await lab.getTrack(run,days.value[index])
-    if (token===jobs[index]) tracks.value[index]=found
+    track=await lab.getTrack(run,job.day)
   } catch(error) {
-    if (token===jobs[index]) errors.value[index]=error.message
-  } finally {
-    if (token===jobs[index]) pending.value[index]=false
+    message=error.message
   }
+  const side=jobs.indexOf(job)
+  if (side<0) return
+  tracks.value[side]=track
+  errors.value[side]=message
+  pending.value[side]=false
 }
-watch([leftId,rightId],()=>{ scope.value='all' })
+function syncTrack(index) {
+  const job=jobs[index]
+  // A swap moves the existing replay request with the run.
+  if (job && job.id===runs.value[index]?.id && job.day===days.value[index] && job.available===replayAvailable.value) return
+  void loadTrack(index)
+}
+watch([leftId,rightId],([nextLeft,nextRight],[oldLeft,oldRight])=>{
+  if (nextLeft!==oldRight || nextRight!==oldLeft) scope.value='all'
+})
 watch([()=>days.value[0],()=>days.value[1]],values=>{ dayInputs.value=[...values] })
-watch([leftId,()=>days.value[0],replayAvailable],()=>{ void loadTrack(0) },{immediate:true})
-watch([rightId,()=>days.value[1],replayAvailable],()=>{ void loadTrack(1) },{immediate:true})
+watch([leftId,()=>days.value[0],replayAvailable],()=>syncTrack(0),{immediate:true})
+watch([rightId,()=>days.value[1],replayAvailable],()=>syncTrack(1),{immediate:true})
 watch(()=>[runDays.value[0],runDays.value[1]],limits=>{
   for (let index=0;index<2;index++) {
     if (!limits[index]) days.value[index]=1
@@ -299,7 +323,7 @@ watch([leftId,rightId,()=>days.value[0],()=>days.value[1],day,()=>cameras.value[
 }),{immediate:true})
 watch(horizon,limit=>{ if (day.value>limit) day.value=Math.max(1,limit) },{immediate:true})
 onBeforeUnmount(()=>{
-  jobs=[jobs[0]+1,jobs[1]+1]
+  jobs.fill(null)
   stopVideoSequence()
   videoPairController?.abort()
   window.removeEventListener('keydown',stopSequenceOnEscape)
@@ -341,6 +365,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
         <label>Species <select v-model="scope"><option value="all">All species</option><option v-for="s in commonSpecies" :key="s.id" :value="s.id">{{ s.name }}</option></select></label>
         <button class="secondary" :aria-pressed="layers.sense" @click="layers.sense=!layers.sense">Sense circles</button>
         <button class="secondary" :aria-pressed="reveal" @click="reveal=!reveal;fit()">{{ reveal ? 'Reveal mode' : 'Side by side' }}</button>
+        <button type="button" class="secondary" @click="swapSides"><ArrowLeftRight :size="16" aria-hidden="true"/> Swap sides</button>
           <label>Emphasis <select v-model="emphasis" @change="interruptSequence"><option value="both">Both boards</option><option value="left">Left board</option><option value="right">Right board</option></select></label>
         <button class="icon" aria-label="Fit both boards" @click="fit"><Scan :size="20"/></button>
       </div>
@@ -374,7 +399,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
         </section>
       </div>
       <div class="paired-boards" :class="{ 'reveal-boards':reveal }" :style="{ '--divider':divider+'%' }">
-        <section v-for="(run,index) in runs" :key="index" :aria-label="names[index]"
+        <section v-for="(run,index) in runs" :key="run.id" :aria-label="names[index]"
           :class="[index===0 ? 'run-left' : 'run-right', { 'quiet-board':emphasis!=='both' && emphasis!==(index===0 ? 'left' : 'right') }]">
           <Board v-show="frames[index]" :ref="element=>boards[index]=element" :frame="frames[index]" :species="run.setup.species" :layers="layers"
             :camera="cameras[index]" :scope="scope" :dim="scope!=='all'" :selected="selections[index]" :follow="selections[index]!=null" @select="selections[index]=$event"/>
