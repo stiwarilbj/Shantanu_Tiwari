@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Ellipsis,
-  Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepForward, Utensils, Video, X } from 'lucide-vue-next'
+  Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { STATES } from '../engine/simulation.js'
 import { rulesFor, usesWalkthroughForaging } from '../engine/config.js'
@@ -142,7 +142,7 @@ function overhead(cohortSense) {
 defineExpose({ select, overhead })
 </script>
 <template>
-  <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead' }" tabindex="-1" @keydown="shortcuts">
+  <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead', 'is-replay':replayCanSeek }" tabindex="-1" @keydown="shortcuts">
     <section class="stage" aria-label="Simulation field">
       <Board ref="board" :frame="lab.frame" :species="lab.run.setup.species" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
@@ -261,19 +261,29 @@ defineExpose({ select, overhead })
     </section>
     <div class="time-rail" :class="{ seekable:replayCanSeek, 'open-ended':lab.displayDuration == null }" :style="{ '--elapsed':fraction*100+'%' }"
       @mouseenter="rateReadout=true" @mouseleave="rateReadout=false">
-      <div class="time-readouts">
-        <div class="time-clock">
-          <div v-if="rateReadout || lab.frame && lab.displayDuration == null" class="time-label">
-            {{ format(lab.frame?.time ?? 0) }} s {{ lab.displayDuration == null ? 'elapsed' : '/ '+format(lab.displayDuration)+' s' }}
+      <div class="time-track">
+        <div class="time-readouts">
+          <div class="time-clock">
+            <div v-if="replayCanSeek || rateReadout || lab.frame && lab.displayDuration == null" class="time-label">
+              {{ format(lab.frame?.time ?? 0) }} {{ lab.displayDuration == null ? 's elapsed' : '/ '+format(lab.displayDuration)+' s' }}
+            </div>
           </div>
+          <span v-if="fallback" class="render-note" title="Canvas rendering is active">Canvas view</span>
         </div>
-        <span v-if="fallback" class="render-note" title="Canvas rendering is active">Canvas view</span>
+        <div class="time-fill"></div><div class="time-thumb"></div>
+        <input v-if="replayCanSeek" :value="lab.frame?.time ?? 0" type="range" min="0" :max="lab.displayDuration" step=".05"
+          aria-label="Replay time" :aria-valuetext="format(lab.frame?.time ?? 0)+' seconds of '+format(lab.displayDuration)"
+          @pointerdown="startSeek" @pointerup="finishSeek" @pointercancel="finishSeek" @input="lab.seek(Number($event.target.value))">
+        <span v-else-if="lab.displayDuration != null" role="progressbar" aria-label="Current day elapsed" :aria-valuenow="lab.frame?.time ?? 0" :aria-valuemax="lab.displayDuration"></span>
       </div>
-      <div class="time-fill"></div><div class="time-thumb"></div>
-      <input v-if="replayCanSeek" :value="lab.frame?.time ?? 0" type="range" min="0" :max="lab.displayDuration" step=".05"
-        aria-label="Replay time" :aria-valuetext="format(lab.frame?.time ?? 0)+' seconds of '+format(lab.displayDuration)"
-        @pointerdown="startSeek" @pointerup="finishSeek" @pointercancel="finishSeek" @input="lab.seek(Number($event.target.value))" @focus="rateReadout=true" @blur="rateReadout=false">
-      <span v-else-if="lab.displayDuration != null" role="progressbar" aria-label="Current day elapsed" :aria-valuenow="lab.frame?.time ?? 0" :aria-valuemax="lab.displayDuration"></span>
+      <div v-if="replayCanSeek" class="frame-controls" role="group" aria-label="Replay frame controls">
+        <button type="button" class="icon" aria-label="Previous frame" title="Previous frame" :disabled="lab.playing || !lab.frame?.time" @click="lab.stepReplayFrame(-1)">
+          <StepBack :size="18" aria-hidden="true"/>
+        </button>
+        <button type="button" class="icon" aria-label="Next frame" title="Next frame" :disabled="lab.playing || lab.dayEnded" @click="lab.stepReplayFrame(1)">
+          <StepForward :size="18" aria-hidden="true"/>
+        </button>
+      </div>
     </div>
     <Ribbon @reroll="emit('reroll')" @table="lab.modal='table'"/>
   </main>

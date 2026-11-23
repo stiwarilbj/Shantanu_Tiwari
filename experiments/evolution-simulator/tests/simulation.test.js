@@ -6,7 +6,7 @@ import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthrough
 import { normal } from '../src/engine/random.js'
 import { dawn, dusk, founders, snapshot, step } from '../src/engine/simulation.js'
 import { distribution, openingTrends } from '../src/engine/stats.js'
-import { prepareTrack, trackFrame } from '../src/track.js'
+import { adjacentFrameTime, prepareTrack, trackFrame } from '../src/track.js'
 import { createLivePlayback } from '../src/live-playback.js'
 import { csv } from '../src/export.js'
 import { sizeMutationPair } from '../src/experiments.js'
@@ -506,6 +506,23 @@ test('configuration bounds, food schedules, and quantiles use the documented def
   assert.equal(plantsForDay(config, 3), 50)
   assert.equal(plantsForDay(config, 5), 100)
   assert.deepEqual(distribution([1, 5, 9]), { n:3, mean:5, p25:3, p75:7, min:1, max:9, sd:4 })
+})
+
+test('replay frame steps use recorded samples and include an off-grid final frame', () => {
+  const track = { stepSeconds:.05, stride:3, duration:.65 }
+  const next = time => Number(adjacentFrameTime(track, time, 1).toFixed(9))
+  const previous = time => Number(adjacentFrameTime(track, time, -1).toFixed(9))
+
+  assert.equal(previous(0), 0)
+  assert.equal(next(0), .15)
+  assert.equal(next(.16), .3)
+  assert.equal(previous(.16), .15)
+  assert.equal(next(.3), .45)
+  assert.equal(previous(.3), .15)
+  assert.equal(next(.6), .65)
+  assert.equal(next(.65), .65)
+  assert.equal(previous(.65), .6)
+  assert.equal(adjacentFrameTime({ ...track, stride:9, duration:5 }, 2.7, 1), 63 * track.stepSeconds)
 })
 
 test('replay seeks across a bite and an exact death without smearing energy or plants', () => {

@@ -4,7 +4,7 @@ import { rulesFor, setupForNewRun, starter, validate, validateRevisions } from '
 import { dawn, founders, snapshot } from './engine/simulation.js'
 import { DT, clamp } from './engine/geometry.js'
 import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
-import { prepareTrack, trackFrame } from './track.js'
+import { adjacentFrameTime, prepareTrack, trackFrame } from './track.js'
 
 const createWorker = () => new Worker(new URL('./engine/worker.js', import.meta.url), { type: 'module' })
 const WORKER_STARTUP_TIMEOUT = 10_000
@@ -552,6 +552,12 @@ export const useLab = defineStore('lab', () => {
     frame.value = trackFrame(track, cursor)
   }
 
+  function stepReplayFrame(direction) {
+    if (!replay.value || loading.value || playing.value || !track) return
+    stopPlayback()
+    seek(adjacentFrameTime(track, frame.value.time, direction))
+  }
+
   function play() {
     if (playing.value || waiting) { stopPlayback(); return }
     if (loading.value || !frame.value || (!replay.value && (!workerReady.value || batch.value))) return
@@ -771,6 +777,6 @@ export const useLab = defineStore('lab', () => {
   return { run, library, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
     canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
-    stopPlayback, toggleThrough, stepOnce, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
+    stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
     remove, getTrack, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
 })

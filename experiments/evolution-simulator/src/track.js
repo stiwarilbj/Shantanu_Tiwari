@@ -1,4 +1,4 @@
-import { DT } from './engine/geometry.js'
+import { clamp, DT } from './engine/geometry.js'
 
 export function prepareTrack(track) {
   track.eaten = new Map(track.events.filter(e => e.type === 'plant').map(e => [e.target, e.time]))
@@ -8,6 +8,15 @@ export function prepareTrack(track) {
     track.changes.get(event.id).push(event)
   }
   return track
+}
+
+export function adjacentFrameTime({ stepSeconds = DT, stride, duration }, time, direction) {
+  const interval = stepSeconds * stride
+  const sample = time / interval
+  const nearest = Math.round(sample)
+  const position = Math.abs(time - nearest * interval) < 1e-8 ? nearest : sample
+  const index = direction < 0 ? Math.ceil(position) - 1 : Math.floor(position) + 1
+  return clamp(index * stride * stepSeconds, 0, duration)
 }
 
 export function trackFrame(track, time) {
