@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
+import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
 import Flower from './Flower.vue'
@@ -8,14 +8,17 @@ import ExtinctionIcon from './ExtinctionIcon.vue'
 
 const emit = defineEmits(['reroll', 'table'])
 const lab = useLab()
-const scroll = ref(null), fold = ref(false), legend = ref(false), options = ref(false), inspection = ref(null)
+const scroll = ref(null), fold = ref(false), legend = ref(false), panel = ref(null), inspection = ref(null)
 const mode = ref('classic'), rotation = ref(0), dayInput = ref(1)
 const focusDay = ref(lab.viewing), detail = ref(null), detailX = ref(null)
+const menu = ref(null), optionsButton = ref(null)
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 let observer
 legend.value = innerWidth >= 620
 const order = computed(() => mode.value === 'classic' ? [1,3,4,5,0] : [1,2,3,4,5,0])
 const rows = computed(() => lab.run.summaries.map(record => record.rows[lab.scope]))
+const bookmarks = computed(() => new Set(lab.run.bookmarks ?? []))
+const bookmarkAction = day => bookmarks.value.has(day) ? 'Remove bookmark for Day '+day : 'Bookmark Day '+day
 const bounds = computed(() => {
   const b = {}
   for (const metric of METRICS) {
@@ -84,10 +87,23 @@ watch(scroll, element => {
 onBeforeUnmount(() => observer?.disconnect())
 watch(() => lab.viewing, day => { focusDay.value = day })
 watch([() => lab.viewing, () => lab.scope, () => lab.run.id, fold, mode], () => { inspection.value = null })
+watch([() => lab.run.id, fold], () => { panel.value = null })
 function select(day) {
   if (day <= lab.completed) lab.openDay(day)
   else if (day === lab.liveDay && !lab.batch) lab.goLive()
   else lab.quickForDay(day)
+}
+function toggleOptions() {
+  panel.value = panel.value ? null : 'options'
+  inspection.value = null
+}
+function showBookmarks() {
+  panel.value = 'bookmarks'
+  nextTick(() => menu.value?.focus({ preventScroll:true }))
+}
+function closePanel(restoreFocus = false) {
+  panel.value = null
+  if (restoreFocus) optionsButton.value?.focus({ preventScroll:true })
 }
 function wheel(event) {
   if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return
@@ -138,6 +154,7 @@ function closeDetail(restore = false) {
 function inspect(day, keyboard = false) {
   if (!rows.value[day-1]) return
   if (inspection.value === day) { closeDetail(keyboard); return }
+  closePanel()
   inspection.value = day
   anchorDetail()
   nextTick(() => {
@@ -145,26 +162,28 @@ function inspect(day, keyboard = false) {
     if (keyboard) detail.value?.querySelector('button').focus({ preventScroll:true })
   })
 }
-function escapeDetail(event) {
-  if (!inspection.value) return
+function escapeRibbon(event) {
+  if (!panel.value && !inspection.value) return
   event.stopPropagation()
-  closeDetail(detail.value?.contains(document.activeElement))
+  if (panel.value) closePanel(true)
+  else closeDetail(detail.value?.contains(document.activeElement))
 }
 </script>
 <template>
   <section class="dock" aria-label="Current generation and timeline">
-    <div v-if="!fold" class="ribbon" @keydown.esc="escapeDetail">
+    <div v-if="!fold" class="ribbon" @keydown.esc="escapeRibbon">
       <div ref="scroll" class="ribbon-scroll" @wheel="wheel" @scroll.passive="anchorDetail">
         <div class="tile-track">
           <button v-for="tile in tiles" :key="tile.day" type="button" class="day-tile"
             :class="{ current:lab.viewing===tile.day, pending:!tile.row, 'line-tile':mode==='line' }" :data-day="tile.day"
-            :aria-current="lab.viewing===tile.day ? 'true' : undefined" :aria-label="'Day '+tile.day+(tile.row ? ', population '+tile.row.population : ', '+(tile.day===lab.liveDay && !lab.batch ? 'live' : 'pending'))"
+            :aria-current="lab.viewing===tile.day ? 'true' : undefined"
+            :aria-label="'Day '+tile.day+(tile.row ? ', population '+tile.row.population : ', '+(tile.day===lab.liveDay && !lab.batch ? 'live' : 'pending'))+(bookmarks.has(tile.day) ? ', bookmarked' : '')"
             :tabindex="tile.day===focusDay ? 0 : -1" :aria-keyshortcuts="tile.row ? 'I Shift+F10' : undefined"
             @focus="focusDay=tile.day" @click="clickTile($event,tile)" @keydown="keys($event,tile.day)"
             @contextmenu="tile.row && ($event.preventDefault(),inspect(tile.day))">
             <Flower v-if="mode!=='line'" :values="tile.values" :bounds="bounds" :rotation="rotation"
               :six="mode==='six'" :interactive="!!tile.row" compact/>
-            <span class="day-number">{{ tile.day }}</span>
+            <span class="day-number">{{ tile.day }}<Bookmark v-if="bookmarks.has(tile.day)" class="bookmark-mark" :size="11" aria-hidden="true"/></span>
             <small v-if="!tile.row">{{ tile.day===lab.liveDay && !lab.batch ? 'Live' : 'Pending' }}</small>
             <small v-else-if="!lab.extinctDay && tile.day===firstExtinct">Extinct</small>
           </button>
@@ -192,17 +211,39 @@ function escapeDetail(event) {
       <div class="ribbon-actions">
         <button class="icon compact" title="Reroll seed" aria-label="Reroll seed" @click="emit('reroll')"><Dices :size="16"/></button>
         <button v-if="!lab.extinctDay" class="icon compact" title="More Generations" aria-label="More Generations" @click="lab.modal='extend'"><Layers :size="16"/></button>
-        <button class="icon compact" title="Generation options" aria-label="Generation options" @click="options=!options"><Ellipsis :size="16"/></button>
+        <button ref="optionsButton" class="icon compact" title="Generation options" aria-label="Generation options"
+          :aria-expanded="!!panel" aria-controls="generation-panel" @click="toggleOptions"><Ellipsis :size="16"/></button>
         <button class="icon compact" title="Collapse generations" aria-label="Collapse generations" @click="fold=true"><ChevronDown :size="16"/></button>
       </div>
-      <div v-if="options" class="pop ribbon-menu">
-        <button v-for="[id,label] in [['classic','Walkthrough flower'],['six','All six metrics'],['line','Mini line']]" :key="id" @click="mode=id; rotation=0; options=false">{{ label }} <span v-if="mode===id">✓</span></button>
-        <button @click="emit('table'); options=false">Numeric table</button>
-        <form @submit.prevent="select(dayInput); options=false"><label>Go to day <input v-model.number="dayInput" type="number" min="1" :max="lab.extinctDay ? lab.completed : lab.run.setup.days" required></label><button class="secondary">Go</button></form>
+      <div v-if="panel" id="generation-panel" ref="menu" class="pop ribbon-menu" :class="{'bookmark-menu':panel==='bookmarks'}"
+        role="region" :aria-label="panel==='bookmarks' ? 'Bookmarked generations' : 'Generation options'" tabindex="-1">
+        <template v-if="panel==='options'">
+          <button v-if="lab.viewing<=lab.completed" type="button" @click="lab.toggleBookmark(lab.viewing)">{{ bookmarkAction(lab.viewing) }}</button>
+          <button type="button" @click="showBookmarks">Bookmarks</button>
+          <button v-for="[id,label] in [['classic','Walkthrough flower'],['six','All six metrics'],['line','Mini line']]" :key="id" @click="mode=id; rotation=0; closePanel()">{{ label }} <span v-if="mode===id">✓</span></button>
+          <button @click="emit('table'); closePanel()">Numeric table</button>
+          <form @submit.prevent="select(dayInput); closePanel()"><label>Go to day <input v-model.number="dayInput" type="number" min="1" :max="lab.extinctDay ? lab.completed : lab.run.setup.days" required></label><button class="secondary">Go</button></form>
+        </template>
+        <template v-else>
+          <h3>Bookmarks</h3>
+          <p v-if="!bookmarks.size" class="quiet">Select a completed day to bookmark it from Generation options.</p>
+          <ul v-else class="bookmark-list">
+            <li v-for="day in bookmarks" :key="day">
+              <button type="button" :aria-label="'Jump to Day '+day" :aria-current="lab.viewing===day ? 'true' : undefined"
+                @click="closePanel(true); select(day)">Day {{ day }}</button>
+            </li>
+          </ul>
+        </template>
       </div>
       <div v-if="inspection && rows[inspection-1]" ref="detail" class="pop ribbon-detail" role="region"
         :aria-label="'Day '+inspection+' readings'" :style="{ left: detailX == null ? undefined : detailX+'px' }">
-        <strong>Day {{ inspection }} <small>· Final</small></strong>
+        <div class="ribbon-detail-heading">
+          <strong>Day {{ inspection }} <small>· Final</small></strong>
+          <button type="button" class="icon compact" :class="{'bookmark-mark':bookmarks.has(inspection)}"
+            :aria-label="bookmarkAction(inspection)" :title="bookmarkAction(inspection)" @click="lab.toggleBookmark(inspection)">
+            <Bookmark :size="15" aria-hidden="true"/>
+          </button>
+        </div>
         <dl><template v-for="m in METRICS" :key="m.key"><dt :style="{ color:m.heading ?? m.petal }">{{ m.short }}</dt><dd>{{ format(metricValue(rows[inspection-1],m.key),m.key==='population'?0:2) }}</dd></template></dl>
         <button @click="closeDetail(true)">Close</button>
       </div>

@@ -728,6 +728,14 @@ export const useLab = defineStore('lab', () => {
     persist(updated)
   }
 
+  function toggleBookmark(day) {
+    if (!Number.isInteger(day) || day < 1 || day > completed.value) return
+    const days = run.value.bookmarks ?? []
+    const bookmarks = days.includes(day) ? days.filter(value => value !== day) : [...days, day].sort((a, b) => a - b)
+    run.value = { ...run.value, bookmarks }
+    persist()
+  }
+
   async function remove(id) {
     if (run.value?.id === id) return
     try {
@@ -778,5 +786,5 @@ export const useLab = defineStore('lab', () => {
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
     canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
     stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
-    remove, getTrack, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
+    remove, toggleBookmark, getTrack, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
 })

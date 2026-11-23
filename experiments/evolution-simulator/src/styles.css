@@ -185,7 +185,8 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .day-tile:hover::after{content:'';position:absolute;inset:8px 3px 2px;border:1px solid #62887c;border-radius:6px;pointer-events:none}
 .day-tile:focus-visible{outline-offset:-4px;z-index:1}
 .day-tile :is(.flower,.extinction-icon){width:100%;height:auto;max-width:57px}
-.day-number{margin-top:0}.day-tile small{font-size:10px;color:var(--quiet);margin-top:3px}
+.day-number{display:inline-flex;align-items:center;gap:3px}.day-tile small{font-size:10px;color:var(--quiet);margin-top:3px}
+.bookmark-mark{color:#e6cf79}svg.bookmark-mark,.bookmark-mark svg{fill:currentColor}
 .day-tile.pending .flower{opacity:.55}.day-tile.pending.current .flower{opacity:.8}
 .more-tile{justify-content:center;gap:7px;color:var(--quiet)}
 .extinction-tile{color:var(--cream)}
@@ -203,9 +204,18 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .legend-open{position:absolute;top:29px;left:4px;background:#111e}
 .ribbon-actions{display:flex;position:absolute;z-index:3;right:14px;bottom:2px;background:#111110e8}
 .ribbon-menu{right:14px;bottom:calc(100% + 4px);min-width:204px}.ribbon-menu form{display:flex;gap:6px;padding:7px 3px;align-items:center;font-size:13px}.ribbon-menu input{width:65px}
+.bookmark-menu{width:214px;max-height:min(240px,40vh);overflow:auto;overscroll-behavior:contain}
+.bookmark-menu h3,.bookmark-menu p{padding:6px 9px}
+.bookmark-menu h3{font-size:14px}
+.bookmark-menu p{font-size:13px}
+.bookmark-list{list-style:none;margin:0;padding:0}
+.bookmark-list button{width:100%;min-height:34px;padding:6px 9px;border-radius:4px;text-align:left}
+.bookmark-list button:hover,.bookmark-list button[aria-current=true]{background:var(--select);color:var(--ink)}
 .ribbon-detail{bottom:calc(100% - 11px);left:50%;transform:translateX(-50%);min-width:214px;padding:10px 13px 7px;font:13px var(--mono);border-color:#62887c}
 .ribbon-detail::after{content:'';position:absolute;left:50%;bottom:-5px;width:9px;height:9px;background:#111110;border:solid #62887c;border-width:0 1px 1px 0;transform:translateX(-50%) rotate(45deg);pointer-events:none}
 .ribbon-detail small{color:var(--quiet)}.ribbon-detail dl{margin:8px 0}
+.ribbon-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.ribbon-detail-heading .icon{min-height:27px}
 .ribbon-detail>button{border-top:1px solid var(--subtle)}
 .ribbon-label{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font:11px var(--mono);letter-spacing:.13em;color:var(--cream);pointer-events:none}
 
