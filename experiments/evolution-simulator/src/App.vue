@@ -17,6 +17,7 @@ const GuidedWorld=defineAsyncComponent(()=>import('./components/GuidedWorld.vue'
 const lab = useLab()
 const projectLab = document.body.classList.contains('project-lab-page')
 const pages = { viewer:'World', stats:'Trends', about:'About', compare:'Compare' }
+const walkthroughKey = 'evolution.walkthroughChapter'
 const runAddress = /^#\/r\/([^/]+)\/s\/(\d+)\/(viewer|stats|about|compare)(\?.*)?$/
 const initialAddress = location.hash.match(runAddress)
 const initialPage = initialAddress?.[3] ?? 'viewer'
@@ -25,7 +26,8 @@ const page = ref(initialPage), ready = ref(false), menu = ref(false), world = re
 const fullscreenSurface = ref(null)
 const comparison = ref(readComparison(initialQuery))
 const example = ref(initialPage==='viewer' ? knownExample(initialQuery.get('example')) : null)
-const lesson = ref(readLesson(initialQuery))
+const lesson = ref(knownLesson(initialQuery.get('lesson')) ?? 'opening')
+const lastLesson = ref(readWalkthroughProgress())
 const comparisonVersion = ref(0), visited = ref({ viewer:true,[initialPage]:true })
 const batchRange = ref(null)
 const scrolls = new Map()
@@ -43,7 +45,15 @@ function readComparison(query) {
   }
 }
 function knownExample(id) { return Object.hasOwn(guidedExamples,id) ? id : null }
-function readLesson(query) { return lessons.find(item=>item.id===query.get('lesson'))?.id ?? 'opening' }
+function knownLesson(id) { return lessons.find(item=>item.id===id)?.id ?? null }
+function readWalkthroughProgress() {
+  try { return knownLesson(localStorage.getItem(walkthroughKey)) }
+  catch { return null }
+}
+function rememberLesson(id) {
+  lastLesson.value = id
+  try { localStorage.setItem(walkthroughKey,id) } catch {}
+}
 function address(view = page.value, day = lab.viewing, settings = lab.settings, guided = example.value) {
   if (!lab.run) return '#/'
   const query = new URLSearchParams()
@@ -106,6 +116,7 @@ function go(view, guided = null) {
   beginNavigation()
   if (guided) lab.stopPlayback()
   example.value = guided
+  if (view==='about' && lesson.value!=='opening') rememberLesson(lesson.value)
   show(view)
   menu.value = false
   if (changed) history.pushState(null,'',address())
@@ -113,6 +124,7 @@ function go(view, guided = null) {
 }
 function changeLesson(id) {
   lesson.value = id
+  rememberLesson(id)
   if (page.value==='about') syncAddress()
 }
 async function applyAddress(hash = location.hash) {
@@ -156,7 +168,11 @@ async function applyAddress(hash = location.hash) {
     }
     example.value = match[3]==='viewer' ? knownExample(query.get('example')) : null
     if (example.value) lab.stopPlayback()
-    if (match[3]==='about' || example.value) lesson.value = readLesson(query)
+    if (match[3]==='about' || example.value) {
+      const chapter = knownLesson(query.get('lesson'))
+      lesson.value = chapter ?? 'opening'
+      if (match[3]==='about' && chapter) rememberLesson(chapter)
+    }
     show(match[3])
     if (query.get('cfg')==='1' && !lab.settings) lab.openSettings()
     else if (query.get('cfg')!=='1' && lab.settings) lab.closeSettings()
@@ -330,7 +346,7 @@ onUnmounted(() => {
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
       <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'" :batch-range="batchRange"
         @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>
-      <About v-if="page==='about'" :lesson="lesson" @lesson="changeLesson" @example="go('viewer',$event)"
+      <About v-if="page==='about'" :lesson="lesson" :last-lesson="lastLesson" @lesson="changeLesson" @example="go('viewer',$event)"
         @world="go('viewer')" @trends="go('stats')" @compare="openComparison"/>
       <Compare v-if="page==='compare'" :key="comparisonVersion" :initial="comparison" @change="comparisonChanged" @library="task('library')"/>
       <Settings v-if="lab.settings"/>

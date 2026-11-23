@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useLab } from '../store.js'
 import { MAX_SEED } from '../engine/config.js'
 import { walkthroughStepCost } from '../engine/geometry.js'
@@ -13,10 +13,11 @@ import host from '../assets/guide-host.webp'
 import StrideRace from './StrideRace.vue'
 
 const lab=useLab()
-const props=defineProps({ lesson:String })
+const props=defineProps({ lesson:String, lastLesson:String })
 const emit=defineEmits(['world','compare','lesson','example','trends'])
 const chapter=computed(()=>Math.max(0,lessons.findIndex(item=>item.id===props.lesson)))
 const current=computed(()=>lessons[chapter.value])
+const chapterHeading=ref()
 const slide=ref(0), video=ref('')
 const pairSeed=ref(SIZE_MUTATION_SEED), pairDays=ref(SIZE_MUTATION_DAYS), pairProgress=ref(null), pairMessage=ref('')
 let pairController
@@ -36,6 +37,11 @@ const exampleCost = size => walkthroughStepCost({ size, speed:10, sense:20 }, { 
 function selectChapter(index) {
   const entry = lessons[index]
   if (entry) emit('lesson',entry.id)
+}
+async function continueWalkthrough() {
+  emit('lesson',props.lastLesson ?? lessons[0].id)
+  await nextTick()
+  chapterHeading.value?.focus()
 }
 
 async function runPair() {
@@ -66,13 +72,17 @@ onBeforeUnmount(() => pairController?.abort())
     <div class="about-mark" aria-hidden="true">◇</div>
     <h1>Evolution Simulator</h1>
     <p>Watch a population change as small inherited differences meet the same field, the same clock, and a limited food supply.</p>
-    <div class="about-actions"><button class="primary" @click="emit('world')">Open World</button><button class="secondary" @click="lab.modal='tour'">Show tour</button></div>
+    <div class="about-actions">
+      <button class="primary" @click="emit('world')">Open World</button>
+      <button class="secondary" @click="lab.modal='tour'">Show tour</button>
+      <button class="secondary" @click="continueWalkthrough">Continue walkthrough</button>
+    </div>
     <section class="lesson">
       <h2>Walkthrough</h2>
       <div class="chapter-list" aria-label="Walkthrough chapters"><button v-for="(entry,i) in lessons" :key="entry.id"
         class="secondary" :aria-pressed="chapter===i" @click="selectChapter(i)">{{ entry.title }}</button></div>
       <article class="chapter-panel" :key="current.id">
-        <header class="chapter-card"><h3>{{ current.title }}</h3></header>
+        <header class="chapter-card"><h3 ref="chapterHeading" tabindex="-1">{{ current.title }}</h3></header>
         <div v-if="current.id==='opening'" class="opening-slides">
           <figure>
             <img :src="opening[slide].image" :alt="opening[slide].alt" width="1200" height="263">

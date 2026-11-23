@@ -13,6 +13,38 @@ async function openWalkthrough(page, live = false) {
   await page.getByRole('link', { name:'About', exact:true }).click()
 }
 
+test('Continue walkthrough reopens the last chapter after a refresh @pages', async ({ page }) => {
+  await openWalkthrough(page, true)
+  const about = page.getByRole('link', { name:'About', exact:true })
+  const panel = page.locator('.chapter-panel')
+  const resume = page.getByRole('button', { name:'Continue walkthrough' })
+  const opening = panel.getByRole('heading', { name:'Natural selection' })
+
+  await resume.click()
+  await expect(opening).toBeFocused()
+  await page.getByRole('button', { name:'Predation', exact:true }).click()
+  await page.getByRole('button', { name:'Next', exact:true }).click()
+  const stride = panel.getByRole('heading', { name:'Size and stride' })
+  await expect(stride).toBeVisible()
+
+  await page.getByRole('button', { name:'Open World', exact:true }).click()
+  await page.reload()
+  await about.click()
+  await expect(opening).toBeVisible()
+  await resume.press('Enter')
+  await expect(stride).toBeFocused()
+  await expect(stride).toBeInViewport()
+  await expect(page).toHaveURL(/\/about\?lesson=stride$/)
+
+  await page.goto(page.url().replace('lesson=stride', 'lesson=home'))
+  const home = panel.getByRole('heading', { name:'Getting home' })
+  await expect(home).toBeVisible()
+  await page.goto('./')
+  await about.click()
+  await resume.click()
+  await expect(home).toBeFocused()
+})
+
 test('the illustrated walkthrough opens a real family replay @pages', async ({ page }) => {
   await page.emulateMedia({ reducedMotion:'reduce' })
   await openWalkthrough(page, true)
