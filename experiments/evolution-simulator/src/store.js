@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { rulesFor, setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
-import { dawn, founders, snapshot } from './engine/simulation.js'
+import { setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
+import { dawnForRun, founders, snapshot } from './engine/simulation.js'
 import { DT, clamp } from './engine/geometry.js'
 import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
 import { adjacentFrameTime, prepareTrack, trackFrame } from './track.js'
@@ -331,7 +331,7 @@ export const useLab = defineStore('lab', () => {
     viewing.value = day
     frame.value = null
     if (day > last(value)) {
-      frame.value = snapshot(value.partial ?? dawn(rulesFor(value.setup,value.revisions,day), day, value.latest))
+      frame.value = snapshot(value.partial ?? dawnForRun(value.setup, value.revisions, day, value.latest))
     }
     liveFrame.value = frame.value
     if (restoredTrack) {
@@ -450,6 +450,11 @@ export const useLab = defineStore('lab', () => {
     })
   }
 
+  async function checkpointAt(value, day) {
+    if (day === last(value)) return value.latest
+    return value.checkpoints.find(point => point.day === day) ?? (await getTrack(value, day)).checkpoint
+  }
+
   function cancelReplay() {
     ++request
     waiting = null
@@ -523,7 +528,7 @@ export const useLab = defineStore('lab', () => {
     if (restart && liveFrame.value?.day > completed.value && liveFrame.value.time > 0) {
       const day = completed.value + 1
       const { setup, revisions, latest } = run.value
-      liveFrame.value = snapshot(dawn(rulesFor(setup, revisions, day), day, latest))
+      liveFrame.value = snapshot(dawnForRun(setup, revisions, day, latest))
     }
     if (liveFrame.value?.day > completed.value) {
       frame.value = liveFrame.value
@@ -763,8 +768,7 @@ export const useLab = defineStore('lab', () => {
     let activated = false
     const current = () => branchRequest.value === operation && (fromSettings ? settings.value : modal.value === 'branch')
     try {
-      const opening = [...base.checkpoints].reverse().find(c => c.day <= day)
-      const after = opening.day === day ? opening : (await getTrack(base, day)).checkpoint
+      const after = await checkpointAt(base, day)
       if (!current() || run.value?.id !== base.id) return
       const value = { ...makeRun(setup), source: base.id, forkDay: day, latest: after,
         summaries: base.summaries.filter(r => r.day <= day),
@@ -790,5 +794,5 @@ export const useLab = defineStore('lab', () => {
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
     canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
     stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
-    remove, toggleBookmark, getTrack, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
+    remove, toggleBookmark, getTrack, checkpointAt, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
 })

@@ -804,6 +804,11 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .stats-heading h2{font-size:12px}
   .player .icon{width:28px}.player-actions .icon{width:28px}
 }
+@media(max-height:500px){
+  .advanced-groups{display:flex;flex-wrap:nowrap;overflow-x:auto;padding-block:2px 5px;
+    scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .advanced-groups button{flex:none;white-space:nowrap}
+}
 @media(max-height:300px){
   .settings-sheet{overflow:auto}
   .settings-form{flex:none}

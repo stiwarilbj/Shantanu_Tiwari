@@ -1,6 +1,6 @@
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
 import { AGING_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
-  usesAgingRules, usesForagingDecisionRules, usesReproductionRules } from './engine/config.js'
+  TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesForagingDecisionRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
   const entries = Object.entries(values ?? {}).filter(([key, value]) => value !== defaults[key])
@@ -23,15 +23,45 @@ function unpackForaging({ fd, ...setup }) {
   return setup
 }
 
+// Share links use an edge bitmask, band center, band width, and two field-only flags.
+function packTerritory(placement, field = false) {
+  const mask = TERRITORY_EDGES.reduce((bits, edge, index) =>
+    placement.edges.includes(edge) ? bits | (1 << index) : bits, 0)
+  const values = [
+    mask === (1 << TERRITORY_EDGES.length) - 1 ? null : mask,
+    placement.center === TERRITORY_DEFAULTS.center ? null : placement.center,
+    placement.width === TERRITORY_DEFAULTS.width ? null : placement.width,
+  ]
+  if (field) values.push(placement.enabled ? 1 : null, placement.timing === 'daily' ? 1 : null)
+  while (values.at(-1) === null) values.pop()
+  return values
+}
+
+function unpackTerritory({ tt, ...setup }, field = false) {
+  if (!Array.isArray(tt)) return setup
+  const [mask, center, width, enabled, daily] = tt
+  const placement = {
+    ...(mask != null && { edges: TERRITORY_EDGES.filter((_, index) => mask & (1 << index)) }),
+    ...(center != null && { center }),
+    ...(width != null && { width }),
+  }
+  if (field) setup.territories = { ...placement, enabled: enabled === 1, timing: daily === 1 ? 'daily' : 'opening' }
+  else setup.territory = placement
+  return setup
+}
+
 export function setupLink(setup) {
   let compact = setup
   if (usesReproductionRules(setup)) {
     const foraging = usesForagingDecisionRules(setup)
     const fieldDecisions = foraging ? packForaging(setup.foragingDecisions) : []
+    const territories = usesTerritoryRules(setup)
+    const fieldTerritory = territories && setup.territories ? packTerritory(setup.territories, true) : []
     compact = {
       ...omitDefaults(setup, HABITAT_DEFAULTS),
       ...(usesAgingRules(setup) && { aging: omitDefaults(setup.aging, AGING_DEFAULTS) }),
       ...(foraging && { foragingDecisions: undefined, fd: fieldDecisions.length ? fieldDecisions : undefined }),
+      ...(territories && { territories: undefined, tt: fieldTerritory.length ? fieldTerritory : undefined }),
       reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
       species: setup.species.map(item => {
         const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
@@ -42,7 +72,8 @@ export function setupLink(setup) {
         const decisions = foraging && item.foragingDecisions
           ? { foragingDecisions: undefined, fd: packForaging(item.foragingDecisions) }
           : {}
-        return { ...item, ...aging, ...decisions, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
+        const placement = territories && item.territory ? { territory: undefined, tt: packTerritory(item.territory) } : {}
+        return { ...item, ...aging, ...decisions, ...placement, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
       }),
     }
   }
@@ -62,7 +93,9 @@ export function setupFromLink(hash) {
   if (!setup || !usesReproductionRules(setup) || !Array.isArray(setup.species) ||
       !setup.species.every(item => item && typeof item === 'object')) return setup
   if (!usesForagingDecisionRules(setup)) return setupWithRuleDefaults(setup)
-  return setupWithRuleDefaults({ ...unpackForaging(setup), species: setup.species.map(unpackForaging) })
+  const decoded = { ...unpackForaging(setup), species: setup.species.map(unpackForaging) }
+  if (!usesTerritoryRules(setup)) return setupWithRuleDefaults(decoded)
+  return setupWithRuleDefaults({ ...unpackTerritory(decoded, true), species: decoded.species.map(item => unpackTerritory(item)) })
 }
 
 export function download(name, mime, content) {

@@ -9,7 +9,8 @@ export const HABITAT_RULE_VERSION = 7
 export const REPRODUCTION_RULE_VERSION = 8
 export const AGING_RULE_VERSION = 9
 export const FORAGING_DECISION_RULE_VERSION = 10
-export const VERSION = FORAGING_DECISION_RULE_VERSION
+export const TERRITORY_RULE_VERSION = 11
+export const VERSION = TERRITORY_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -54,6 +55,12 @@ export const FORAGING_FIELDS = [
   { key: 'returnMargin', label: 'Return safety margin (steps)', min: 0, max: 20, step: 1 },
   { key: 'preyPursuit', label: 'Maximum prey pursuit (seconds)', min: 0, max: 3, step: 0.1 },
 ]
+export const TERRITORY_EDGES = Object.freeze(['top', 'right', 'bottom', 'left'])
+export const TERRITORY_DEFAULTS = Object.freeze({ edges: TERRITORY_EDGES, center: 50, width: 100 })
+export const TERRITORY_FIELDS = [
+  { key: 'center', label: 'Band center (%)', min: 0, max: 100 },
+  { key: 'width', label: 'Band width (%)', min: 5, max: 100 },
+]
 export const INHERITANCE_DEFAULTS = Object.freeze({
   mutationPattern: 'normal',
   mutationChance: Object.freeze({ speed: 100, size: 100, sense: 100 }),
@@ -67,6 +74,7 @@ export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
 export const usesReproductionRules = config => config.version >= REPRODUCTION_RULE_VERSION
 export const usesAgingRules = config => config.version >= AGING_RULE_VERSION
 export const usesForagingDecisionRules = config => config.version >= FORAGING_DECISION_RULE_VERSION
+export const usesTerritoryRules = config => config.version >= TERRITORY_RULE_VERSION
 export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
@@ -75,6 +83,9 @@ export function setupWithRuleDefaults(setup) {
   if (usesAgingRules(setup)) setup = { ...setup, aging: { ...AGING_DEFAULTS, ...setup.aging } }
   if (usesForagingDecisionRules(setup)) {
     setup = { ...setup, foragingDecisions: { ...FORAGING_DEFAULTS, ...setup.foragingDecisions } }
+  }
+  if (usesTerritoryRules(setup)) {
+    setup = { ...setup, territories: { ...TERRITORY_DEFAULTS, enabled: false, timing: 'opening', ...setup.territories } }
   }
   if (!usesReproductionRules(setup)) return setup
   return {
@@ -85,6 +96,9 @@ export function setupWithRuleDefaults(setup) {
       ...(usesAgingRules(setup) && item.aging !== undefined && { aging: { ...AGING_DEFAULTS, ...item.aging } }),
       ...(usesForagingDecisionRules(setup) && item.foragingDecisions !== undefined && {
         foragingDecisions: { ...FORAGING_DEFAULTS, ...item.foragingDecisions },
+      }),
+      ...(usesTerritoryRules(setup) && item.territory !== undefined && {
+        territory: { ...TERRITORY_DEFAULTS, ...item.territory },
       }),
       inheritance: {
         ...INHERITANCE_DEFAULTS, ...item.inheritance,
@@ -190,6 +204,20 @@ export function validate(config) {
   if (usesForagingDecisionRules(config) && config.foragingDecisions !== undefined) {
     validateForaging(config.foragingDecisions, 'foragingDecisions.')
   }
+  function validateTerritory(placement, prefix) {
+    const edges = placement?.edges
+    if (!Array.isArray(edges) || !edges.length || new Set(edges).size !== edges.length ||
+        edges.some(edge => !TERRITORY_EDGES.includes(edge))) errors[prefix + 'edges'] = 'Choose at least one starting edge.'
+    for (const { key, label, min, max } of TERRITORY_FIELDS) {
+      number(prefix + key, label, placement?.[key], min, max)
+    }
+  }
+  if (usesTerritoryRules(config) && config.territories !== undefined) {
+    const settings = config.territories
+    if (typeof settings?.enabled !== 'boolean') errors['territories.enabled'] = 'Choose whether to use starting territories.'
+    if (!['opening', 'daily'].includes(settings?.timing)) errors['territories.timing'] = 'Choose when territories apply.'
+    validateTerritory(settings, 'territories.')
+  }
   if (!Array.isArray(config.schedule) || !['constant', 'ramp', 'step'].includes(config.scheduleMode)) {
     errors.schedule = 'Choose a supported food schedule.'
   } else {
@@ -222,6 +250,9 @@ export function validate(config) {
     if (usesAgingRules(config) && item.aging !== undefined) validateAging(item.aging, item.id + '.aging.')
     if (usesForagingDecisionRules(config) && item.foragingDecisions !== undefined) {
       validateForaging(item.foragingDecisions, item.id + '.foragingDecisions.')
+    }
+    if (usesTerritoryRules(config) && item.territory !== undefined) {
+      validateTerritory(item.territory, item.id + '.territory.')
     }
     const inheritance = usesReproductionRules(config) ? item.inheritance : undefined
     if (inheritance !== undefined && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {

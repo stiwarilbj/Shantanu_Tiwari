@@ -4,12 +4,13 @@ import { ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
   randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
-  usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
+  usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
+import StartingTerritories from './StartingTerritories.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
 
 const lab = useLab()
@@ -21,10 +22,10 @@ const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), discarding = ref(false), applying = ref(false)
 const agingSpecies = ref(null)
-const foragingSpecies = ref(null)
+const foragingSpecies = ref(null), territorySpecies = ref(null)
 const fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
 const groups = {
-  habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
+  habitat: 'Habitat and food', territory: 'Starting territories', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
   aging: 'Aging and lifespan', foraging: 'Foraging decisions', predictions: 'Graph predictions',
 }
 const forecastCycles = ref(String(forecastPreferences.cycles))
@@ -36,6 +37,7 @@ function editForecastCycles(event) {
 const advancedFields = {
   schedule: 'habitat', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
   patchRelocation: 'habitat', patchInterval: 'habitat', refugePercent: 'habitat',
+  territories: 'territory', territory: 'territory',
   huntingAdvantage: 'hunting', firstHuntingDay: 'hunting',
   plantReward: 'movement', preyReward: 'movement', endMode: 'movement', duration: 'movement', rules: 'movement',
   parentMode: 'inheritance', minimumBreedingAge: 'inheritance', birthWait: 'inheritance',
@@ -114,6 +116,7 @@ function remove() {
   const [value]=draft.species.splice(index,1)
   if (agingSpecies.value === value.id) agingSpecies.value = null
   if (foragingSpecies.value === value.id) foragingSpecies.value = null
+  if (territorySpecies.value === value.id) territorySpecies.value = null
   savedSpecies.value={value,index}
   tab.value=draft.species[Math.max(0,index-1)].id
 }
@@ -146,6 +149,7 @@ function discard() {
   savedSpecies.value=null
   agingSpecies.value=null
   foragingSpecies.value=null
+  territorySpecies.value=null
   issue.value={}
   discarding.value=false
 }
@@ -167,6 +171,7 @@ async function apply() {
     const target = key === spreadKey ? 'inheritance' : advancedFields[key]
     if (target === 'aging') agingSpecies.value = forSpecies?.id ?? null
     if (target === 'foraging') foragingSpecies.value = forSpecies?.id ?? null
+    if (target === 'territory') territorySpecies.value = forSpecies?.id ?? null
     showPage(target ? 'advanced' : 'basic', target)
     await nextTick()
     const field = document.getElementById(first)
@@ -282,6 +287,11 @@ onMounted(()=>dialog.value.showModal())
             <HabitatSettings v-model:day="previewDay" :draft="draft" :fork="fork" :run="lab.run" :issue="issue"/>
             <p v-if="!customHabitat" class="quiet">This setup uses its original habitat and hunting rules.</p>
           </template>
+          <template v-else-if="group === 'territory'">
+            <StartingTerritories v-if="usesTerritoryRules(draft)" v-model:species="territorySpecies"
+              :draft="draft" :issue="issue" :fork="fork"/>
+            <p v-else class="quiet">This setup uses its original dawn placement.</p>
+          </template>
           <div v-else-if="group === 'hunting'" class="advanced-block">
             <h3>Hunting rules</h3>
             <label class="advanced-toggle"><input v-model="draft.predation" type="checkbox"> Predation</label>
@@ -307,7 +317,7 @@ onMounted(()=>dialog.value.showModal())
                 <select v-model="foraging"><option value="standard">Standard</option><option value="walkthrough">Video experiment</option></select>
               </label>
               <p v-if="foraging === 'walkthrough'" class="quiet">
-                {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start each day along all four gray sides.' :
+                {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start in the gray refuge.' :
                   'Blobs turn in steps and start the next day where their parents reached the edge.' }}
               </p>
               <label class="advanced-select">Stride

@@ -4143,3 +4143,195 @@ test('retry after a crash in full screen keeps completed days and restarts unche
   await page.getByRole('link', { name: 'Trends', exact: true }).click()
   await expect(page.getByText(/Browser test run .* Through Day 3/)).toBeVisible()
 })
+
+test('starting territories validate and keep field inheritance editable on a phone @pages', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 650 })
+  await openSimulator(page)
+  await page.getByRole('button', { name: 'Simulation Settings' }).press('Enter')
+  await page.getByRole('button', { name: 'Advanced', exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'Starting territories', exact: true }).press('Enter')
+  const dialog = page.getByRole('dialog', { name: 'Simulation Settings' })
+  const group = dialog.getByRole('region', { name: 'Starting territories' })
+  const enabled = group.getByRole('checkbox', { name: 'Use starting territories' })
+  const placement = group.getByRole('combobox', { name: 'Placement for' })
+  const width = group.getByRole('spinbutton', { name: 'Band width (%)' })
+  const top = group.getByRole('checkbox', { name: 'Top', exact: true })
+  const custom = group.getByRole('checkbox', { name: 'Use custom settings' })
+  await expect(enabled).not.toBeChecked()
+  await enabled.press('Space')
+  await expect(group.getByRole('status')).toHaveText('Day 1 at dawn · 50 blobs')
+  await expect(group.getByRole('combobox', { name: 'Apply territories' })).toHaveValue('opening')
+  await width.fill('30')
+  await placement.selectOption('blue')
+  await expect(width).toBeDisabled()
+  await custom.press('Space')
+  await expect(width).toHaveValue('30')
+  await width.fill('4')
+  await expect(group.getByRole('status')).toContainText('Check the territory')
+  await dialog.getByRole('button', { name: 'Evolve!' }).click()
+  await expect(width).toBeFocused()
+  await width.fill('25')
+  for (const edge of ['Top', 'Right', 'Bottom', 'Left']) {
+    await group.getByRole('checkbox', { name: edge, exact: true }).uncheck()
+  }
+  await dialog.getByRole('button', { name: 'Evolve!' }).click()
+  await expect(top).toBeFocused()
+  await expect(dialog.getByRole('alert')).toContainText('Choose at least one starting edge')
+  await top.press('Space')
+  await expect(group.locator('[data-species="blue"]')).toContainText('Top 50 · Right 0 · Bottom 0 · Left 0')
+  await custom.uncheck()
+  await expect(width).toBeDisabled()
+  await expect(width).toHaveValue('30')
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await dialog.getByRole('button', { name: 'Discard changes' }).click()
+  await dialog.getByRole('button', { name: 'Discard draft' }).click()
+  await expect(enabled).not.toBeChecked()
+  await enabled.press('Space')
+  await expect(width).toHaveValue('100')
+})
+
+test('starting territories match preview, live dawn, Quick Sim, replay, and a revised fork @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const evidence = window.territoryEvidence = { preview: [], live: {}, replay: {} }
+    const subscribed = new WeakSet()
+    const post = Worker.prototype.postMessage
+    const positions = blobs => blobs.map(blob => [blob.x, blob.y])
+    Worker.prototype.postMessage = function (...args) {
+      if (!subscribed.has(this)) {
+        subscribed.add(this)
+        this.addEventListener('message', ({ data }) => {
+          if (data.type === 'frame' && data.frame.time === 0) evidence.live[data.frame.day] = positions(data.frame.blobs)
+          if (data.type === 'track') evidence.replay[data.track.day] = positions(data.track.opening)
+        })
+      }
+      return post.apply(this, args)
+    }
+    const ctx = CanvasRenderingContext2D.prototype
+    const fillRect = ctx.fillRect, arc = ctx.arc, stroke = ctx.stroke
+    const preview = context => context.canvas.matches('.territory-map canvas')
+    let lastPoint
+    ctx.fillRect = function (...args) {
+      if (preview(this) && args[0] === 0 && args[1] === 0) evidence.preview = []
+      return fillRect.apply(this, args)
+    }
+    ctx.arc = function (...args) {
+      if (preview(this)) lastPoint = args.slice(0, 2)
+      return arc.apply(this, args)
+    }
+    ctx.stroke = function (...args) {
+      if (preview(this)) evidence.preview.push(lastPoint)
+      return stroke.apply(this, args)
+    }
+  })
+  await openSimulator(page)
+  const graph = page.getByRole('region', { name: 'Starting territories' })
+  const edges = name => graph.getByRole('checkbox', { name, exact: true })
+  const preview = () => page.evaluate(() => window.territoryEvidence.preview)
+  const dawn = day => page.evaluate(day => window.territoryEvidence.live[day], day)
+  const runOptions = page.getByRole('button', { name: 'Run options' })
+  let opening
+  await startRun(page, '10', async () => {
+    await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
+    await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('500')
+    await advancedSettings(page, 'Starting territories')
+    await graph.getByRole('checkbox', { name: 'Use starting territories' }).check()
+    for (const edge of ['Top', 'Right', 'Bottom']) await edges(edge).uncheck()
+    await graph.getByRole('spinbutton', { name: 'Band width (%)' }).fill('35')
+    await expect(graph.locator('[data-species="blue"]')).toContainText('Left 50')
+    opening = await preview()
+    expect(opening).toHaveLength(50)
+  })
+  await expect.poll(() => dawn(1)).toEqual(opening)
+
+  await quickThrough(page, 3)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 3')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await dayTile(page, 1).click()
+  await expect(runOptions).toHaveText('Day 1 / 10 · Replay')
+  await expect.poll(() => page.evaluate(() => window.territoryEvidence.replay[1])).toEqual(opening)
+
+  await openDayTwoBranch(page)
+  await page.getByRole('button', { name: 'Edit branch rules' }).click()
+  await advancedSettings(page, 'Starting territories')
+  await expect(graph.getByRole('status')).toContainText('Day 3 at dawn')
+  const originalThird = await preview()
+  expect(originalThird.length).toBeGreaterThan(0)
+  expect(originalThird.some(([x]) => x > 50)).toBe(true)
+  await edges('Bottom').check()
+  await edges('Left').uncheck()
+  const revisedThird = await preview()
+  expect(revisedThird).toHaveLength(originalThird.length)
+  expect(revisedThird.every(([, y]) => y > 450)).toBe(true)
+  await page.getByRole('button', { name: 'Create branch', exact: true }).click()
+  await expect(runOptions).toHaveText('Day 3 / 10 · Ready')
+  await expect.poll(() => dawn(3)).toEqual(revisedThird)
+  await quickThrough(page, 3)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 3')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await dayTile(page, 3).click()
+  await expect.poll(() => page.evaluate(() => window.territoryEvidence.replay[3])).toEqual(revisedThird)
+})
+
+test('starting territories survive a saved run, compact link, and setup export @pages', async ({ page, context, browser }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openSimulator(page)
+  const region = page.getByRole('region', { name: 'Starting territories' })
+  await startRun(page, '10', async () => {
+    await advancedSettings(page, 'Starting territories')
+    await region.getByRole('checkbox', { name: 'Use starting territories' }).check()
+    await region.getByRole('combobox', { name: 'Apply territories' }).selectOption('daily')
+    const scope = region.getByRole('combobox', { name: 'Placement for' })
+    await scope.selectOption('blue')
+    await region.getByRole('checkbox', { name: 'Use custom settings' }).check()
+    await scope.selectOption({ label: 'Field default' })
+    await region.getByRole('checkbox', { name: 'Top', exact: true }).uncheck()
+    await region.getByRole('spinbutton', { name: 'Band center (%)' }).fill('75')
+  })
+  await page.reload()
+  await openRunLibrary(page)
+  const run = page.getByRole('dialog', { name: 'Run Library' }).locator('article').filter({ hasText: 'Browser test run' })
+  await run.getByText('Actions', { exact: true }).click()
+  await run.getByRole('button', { name: 'Copy setup link' }).click()
+  await expect(page.getByText('Setup link copied. It opens a new experiment draft.')).toBeVisible()
+  const link = await page.evaluate(() => navigator.clipboard.readText())
+  const download = page.waitForEvent('download')
+  await run.getByRole('button', { name: 'Export setup' }).click()
+  const contents = await readFile(await (await download).path())
+  const { setup } = JSON.parse(contents)
+  expect(setup.territories).toEqual({ enabled: true, timing: 'daily', edges: ['right', 'bottom', 'left'], center: 75, width: 100 })
+  expect(setup.species[0].territory).toEqual({ edges: ['top', 'right', 'bottom', 'left'], center: 50, width: 100 })
+  expect(setup.species[1].territory).toBeUndefined()
+
+  const recipient = await browser.newPage()
+  try {
+    const controls = recipient.getByRole('region', { name: 'Starting territories' })
+    async function checkTerritories() {
+      await advancedSettings(recipient, 'Starting territories')
+      const scope = controls.getByRole('combobox', { name: 'Placement for' })
+      const top = controls.getByRole('checkbox', { name: 'Top', exact: true })
+      const center = controls.getByRole('spinbutton', { name: 'Band center (%)' })
+      const custom = controls.getByRole('checkbox', { name: 'Use custom settings' })
+      await expect(controls.getByRole('combobox', { name: 'Apply territories' })).toHaveValue('daily')
+      await expect(center).toHaveValue('75')
+      await expect(top).not.toBeChecked()
+      await scope.selectOption('blue')
+      await expect(custom).toBeChecked()
+      await expect(top).toBeChecked()
+      await expect(center).toHaveValue('50')
+      await scope.selectOption('orange')
+      await expect(custom).not.toBeChecked()
+      await expect(center).toBeDisabled()
+      await expect(center).toHaveValue('75')
+    }
+    await recipient.goto(link)
+    await checkTerritories()
+    await recipient.getByRole('button', { name: 'Close settings' }).click()
+    await openRunLibrary(recipient)
+    await recipient.getByRole('dialog', { name: 'Run Library' }).locator('input[type=file]').setInputFiles({
+      name: 'territory-setup.json', mimeType: 'application/json', buffer: contents,
+    })
+    await checkTerritories()
+  } finally {
+    await recipient.close()
+  }
+})

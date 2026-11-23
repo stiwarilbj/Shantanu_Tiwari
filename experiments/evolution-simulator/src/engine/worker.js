@@ -1,4 +1,4 @@
-import { dawn, founders, step, snapshot } from './simulation.js'
+import { dawnForRun, founders, step, snapshot } from './simulation.js'
 import { rulesFor } from './config.js'
 import { simulateForecast } from '../forecast.js'
 import { tracksForagingDecisions } from './foraging-decisions.js'
@@ -9,7 +9,7 @@ let config, checkpoint, partial, records, committed = 0, stopped = false, busy =
 const emit = (type, data = {}) => postMessage({ type, ...data })
 
 function current() {
-  partial ??= dawn(rulesFor(config, records, committed + 1), committed + 1, checkpoint)
+  partial ??= dawnForRun(config, records, committed + 1, checkpoint)
   return partial
 }
 
@@ -70,12 +70,12 @@ async function replay(message) {
   let at = message.checkpoint
   for (let i = start; i < day; i++) {
     const rules = rulesFor(setup, records, i)
-    const ctx = dawn(rules, i, at)
+    const ctx = dawnForRun(setup, records, i, at)
     advanceReplay(ctx, rules, Infinity)
     at = ctx.settled.checkpoint
     await pause()
   }
-  const rules = rulesFor(setup, records, day), state = dawn(rules, day, at)
+  const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at)
   const startFrame = snapshot(state)
   const opening = structuredClone(startFrame.blobs)
   const plants = state.plants.map(p => ({ id: p.id, x: p.x, y: p.y }))

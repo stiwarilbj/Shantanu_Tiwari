@@ -1,5 +1,5 @@
 import { endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
-  usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
+  rulesFor, usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
 import { summaries } from './stats.js'
 import { forage } from './foraging.js'
@@ -9,6 +9,7 @@ import { FIELD, DT, WALKTHROUGH_STEP, Grid, clamp, radius, travel, cost, walkthr
 import { openingHabitat } from './habitat.js'
 import { agingRules, oldAgeRisk, travelSpeedPercent } from './aging.js'
 import { DECISION, foragingDecisionsFor, tracksForagingDecisions } from './foraging-decisions.js'
+import { startingPose, territoryPositions } from './starting-territories.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -28,14 +29,14 @@ function standardSpawn(blob, i, count, edges, seed, day, refugeWidth) {
   const margin = refugeWidth ? refugeWidth + 2 : 25
   const along = clamp(margin + (FIELD - 2 * margin) * (slot + 0.1 + random(seed, 3, day, blob.id) * 0.8) / slots,
     blob.r + 6, FIELD - blob.r - 6)
-  const inset = refugeWidth ? Math.min(refugeWidth, blob.r + 2) : blob.r + 2
-  const [x, y, inward] = [[inset, along, 0], [FIELD - inset, along, Math.PI],
-    [along, inset, Math.PI / 2], [along, FIELD - inset, -Math.PI / 2]][edge]
-  const angle = inward + (random(seed, 4, day, blob.id) - 0.5) * Math.PI / 6
-  return { x, y, angle }
+  return startingPose(blob, edge, along, refugeWidth, seed, day)
 }
 
-export function dawn(config, day, checkpoint) {
+export function dawnForRun(setup, revisions, day, checkpoint) {
+  return dawn(rulesFor(setup, revisions, day), day, checkpoint, rulesFor(setup, revisions, day - 1))
+}
+
+export function dawn(config, day, checkpoint, previous = config) {
   const { roster, nextId } = checkpoint
   const walkthrough = config.metabolism === 'walkthrough'
   const foraging = usesWalkthroughForaging(config)
@@ -44,14 +45,15 @@ export function dawn(config, day, checkpoint) {
   const inheritedEdges = foraging && !refugeWidth
   const stepSeconds = walkthrough ? WALKTHROUGH_STEP : DT
   const species = new Map(config.species.map(s => [s.id, s]))
-  const edges = inheritedEdges ? null : shuffle([0, 1, 2, 3], config.seed, day, 2)
-  const slots = inheritedEdges ? null : new Map(shuffle(roster, config.seed, day, 1).map((blob, i) => [blob.id, i]))
+  const territories = territoryPositions(config, day, previous, roster, refugeWidth)
+  const edges = inheritedEdges || territories ? null : shuffle([0, 1, 2, 3], config.seed, day, 2)
+  const slots = edges && new Map(shuffle(roster, config.seed, day, 1).map((blob, i) => [blob.id, i]))
   const blobs = roster.map(original => {
     const r = radius(original.size)
-    const position = inheritedEdges
+    const position = territories?.get(original.id) ?? (inheritedEdges
       ? { ...(original.edge ?? edgePoint(FIELD * random(config.seed, 3, day, original.id, 0),
         FIELD * random(config.seed, 3, day, original.id, 1))), angle: 0 }
-      : standardSpawn({ id: original.id, r }, slots.get(original.id), roster.length, edges, config.seed, day, refugeWidth)
+      : standardSpawn({ id: original.id, r }, slots.get(original.id), roster.length, edges, config.seed, day, refugeWidth))
     const settings = species.get(original.species)
     const energy = settings.energy
     const speedMultiplier = travelSpeedPercent(agingRules(config, settings), original.age) / 100

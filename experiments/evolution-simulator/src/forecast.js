@@ -1,5 +1,5 @@
 import { rulesFor } from './engine/config.js'
-import { dawn, step } from './engine/simulation.js'
+import { dawnForRun, step } from './engine/simulation.js'
 
 export function forecastEndpoint(rows) {
   const end = rows.at(-1)?.day
@@ -19,7 +19,7 @@ export function simulateForecast({ setup, revisions, checkpoint, start, end, tar
 
   for (let day = start + 1; day <= target && checkpoint.roster.length; day++) {
     const rules = rulesFor(setup, revisions, day)
-    const state = dawn(rules, day, checkpoint)
+    const state = dawnForRun(setup, revisions, day, checkpoint)
     let result
     do {
       result = step(state, rules, 20, true)
