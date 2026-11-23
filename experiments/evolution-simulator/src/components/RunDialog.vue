@@ -7,7 +7,7 @@ import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
 import { csv, download, setupLink } from '../export.js'
 
 const lab=useLab()
-const emit=defineEmits(['compare','watch','resume','results'])
+const emit=defineEmits(['compare','watch','resume','results','batch-results'])
 const dialog=ref(), mode=ref('additional'), amount=ref(0), target=ref(1), extension=ref(25)
 const message=ref(''), search=ref(''), file=ref(), removeId=ref(null), renameId=ref(null), newName=ref('')
 const actionsId=ref(null)
@@ -169,6 +169,7 @@ onMounted(()=>dialog.value.showModal())
         <button v-if="lab.batch" class="primary" :disabled="lab.batch.stopping" @click="lab.stopBatch">Stop after this day</button>
         <template v-else>
           <button v-if="lab.canEnterLive" class="secondary" @click="lab.modal='quick'">New Quick Sim</button>
+          <button v-if="lab.completed>startProgress" class="secondary" @click="emit('batch-results',{from:startProgress+1,to:lab.completed})">View batch results</button>
           <button v-if="lab.completed" class="primary" @click="emit('watch',lab.completed, null, { atEnd:!!lab.extinctDay })">Watch last day</button>
         </template>
       </footer>

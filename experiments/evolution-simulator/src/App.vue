@@ -27,6 +27,7 @@ const comparison = ref(readComparison(initialQuery))
 const example = ref(initialPage==='viewer' ? knownExample(initialQuery.get('example')) : null)
 const lesson = ref(readLesson(initialQuery))
 const comparisonVersion = ref(0), visited = ref({ viewer:true,[initialPage]:true })
+const batchRange = ref(null)
 const scrolls = new Map()
 let navigating = false, routeRequest = 0, retryNavigation, sharedSetupHash
 
@@ -224,6 +225,16 @@ function task(key) {
   menu.value=false
   lab.modal=key
 }
+function openBatchResults(range) {
+  lab.modal = null
+  batchRange.value = range
+  go('stats')
+  nextTick(() => {
+    if (page.value !== 'stats') return
+    mainSurface.value?.scrollTo(0, 0)
+    mainSurface.value?.focus({ preventScroll:true })
+  })
+}
 async function openRun(value, view) {
   if (view === 'stats' && value.id === lab.run.id) {
     lab.modal = null
@@ -317,7 +328,7 @@ onUnmounted(() => {
     <template v-if="lab.run">
       <World v-show="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
-      <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'"
+      <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'" :batch-range="batchRange"
         @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>
       <About v-if="page==='about'" :lesson="lesson" @lesson="changeLesson" @example="go('viewer',$event)"
         @world="go('viewer')" @trends="go('stats')" @compare="openComparison"/>
@@ -326,7 +337,7 @@ onUnmounted(() => {
       <Tour v-if="lab.modal==='tour'" @close="lab.modal=null" @world="lab.modal=null; go('viewer')"
         @walkthrough="lab.modal=null; lesson='opening'; go('about')"/>
       <RunDialog v-else-if="lab.modal && !lab.settings" @compare="compare" @watch="watchDay"
-        @resume="openRun($event, 'viewer')" @results="openRun($event, 'stats')"/>
+        @resume="openRun($event, 'viewer')" @results="openRun($event, 'stats')" @batch-results="openBatchResults"/>
     </template>
     <p v-else class="startup" role="status">Opening the lab…</p>
   </div>

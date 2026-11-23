@@ -7,7 +7,7 @@ import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../exp
 import TrendPlot from './TrendPlot.vue'
 import TraitSpace from './TraitSpace.vue'
 
-const props = defineProps({ active: Boolean })
+const props = defineProps({ active: Boolean, batchRange: Object })
 const emit = defineEmits(['watch','example','reroll','restart'])
 const lab=useLab()
 const range=ref('all'), from=ref(1), to=ref(50), pin=ref(null), focused=ref(null)
@@ -300,6 +300,13 @@ function downloadVisibleDays() {
 function watchSight(day) {
   emit('watch',day,null,{ sense:'cohort', atEnd:!atDawn.value })
 }
+watch(() => props.batchRange, batch => {
+  if (!batch) return
+  if (ageDemoVisible.value) closeAgeDemo()
+  focused.value=null
+  tab.value='Trends'
+  customRange(batch.from,batch.to)
+}, { immediate:true })
 watch(() => props.active, active => {
   if (!active) {
     if(ageDemoVisible.value) closeAgeDemo()
