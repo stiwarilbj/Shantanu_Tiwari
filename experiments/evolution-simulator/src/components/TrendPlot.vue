@@ -7,7 +7,7 @@ import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String,
-  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean })
+  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
 let chart, brush, ignoreClick = false
@@ -47,7 +47,7 @@ function indexAt(event) {
   return Math.max(0,Math.min(props.rows.length-1,chart.scales.x.getValueForPixel(x)))
 }
 function startBrush(event) {
-  if (!event.shiftKey || !props.rows.length || event.button!==0) return
+  if (props.embedded || !event.shiftKey || !props.rows.length || event.button!==0) return
   const index=indexAt(event)
   brush={ start:index, end:index }
   canvas.value.setPointerCapture(event.pointerId)
@@ -127,6 +127,7 @@ function update() {
     grouped:!s.bar, order:s.bar?2:!s.primary && s.width && s.width<2?1:0
   }))
   chart.options.scales.y.beginAtZero=props.series.some(s=>s.bar || s.zero)
+  if (props.embedded) chart.options.scales.y.ticks.precision=props.series[0]?.integer ? 0 : undefined
   chart.options.scales.y1.display=!!props.right
   chart.update('none')
 }
@@ -144,7 +145,7 @@ function create() {
         if(ignoreClick) return
         const day=props.rows[elements[0]?.index]?.day
         if(day==null) return
-        if(event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
+        if(props.embedded || event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
         else emit('watch',day)
       },
       layout:{padding:{left:8,right:12,top:6}},
@@ -155,7 +156,7 @@ function create() {
         displayColors:true,
         filter:item=>props.series[item.datasetIndex]?.tooltip!==false,
         callbacks:{
-          title:items=>'Day '+items[0]?.label,
+          title:items=>(props.embedded ? 'Generation ' : 'Day ')+items[0]?.label,
           afterTitle:()=>props.scope ?? '',
           label(item) {
             const s=props.series[item.datasetIndex]
@@ -167,7 +168,8 @@ function create() {
         }
       }},
       scales:{
-        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:props.compact?'#3D3A35':'#56534A'} },
+        x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:props.compact?'#3D3A35':'#56534A'},
+          title:{display:props.embedded,text:'Generation',color:ticks.color,font:ticks.font} },
         y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0?'#545147':'#33332F'},border:{color:props.compact?'#3D3A35':'#45433F'},grace:'7%' },
         y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:'#EEEDD6'},grid:{drawOnChartArea:false},border:{color:'#45433F'} }
       }
@@ -203,11 +205,11 @@ function downloadChart() {
       <button v-if="hideable && !focus && !spotlight" class="chart-hide" :aria-label="'Hide '+title" @click="emit('hide')"><Minus :size="13"/></button>
       <h2>{{ title }}</h2>
       <button v-if="peakDay!==undefined" type="button" class="secondary plot-peak" :disabled="peakDay===null" @click="findPeak">Find peak</button>
-      <button class="icon plot-focus" :aria-label="focus || spotlight ? 'Close focus chart' : 'Focus '+title" @click="emit('focus')">
+      <button v-if="!embedded" class="icon plot-focus" :aria-label="focus || spotlight ? 'Close focus chart' : 'Focus '+title" @click="emit('focus')">
         <Minimize2 v-if="focus || spotlight" :size="16"/><Maximize2 v-else :size="16"/>
       </button>
     </header>
-    <div class="chart-unit">{{ unit }}</div>
+    <div v-if="unit || !embedded" class="chart-unit">{{ unit }}</div>
     <div class="chart-canvas" @mouseleave="hovered=null; chart?.draw()">
       <canvas ref="canvas" tabindex="0" role="img" :aria-label="title+' by generation. Arrow keys select a day. Enter watches it and Space pins it.'"
         @keydown="move" @pointerdown="startBrush" @pointermove="moveBrush" @pointerup="endBrush" @pointercancel="brush=null;chart?.draw()"></canvas>

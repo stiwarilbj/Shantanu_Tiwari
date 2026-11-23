@@ -769,7 +769,7 @@ test('Mini line points stay above their generation tiles when the window shrinks
   }
 })
 
-test('the generation spreadsheet adds a row after each live generation @pages', async ({ page }) => {
+test('the generation spreadsheet and stat trends update after each live generation @pages', async ({ page }) => {
   await openSimulator(page)
   await startRun(page, '10', async () => {
     await fixedDay(page)
@@ -798,18 +798,34 @@ test('the generation spreadsheet adds a row after each live generation @pages', 
   await page.getByRole('button', { name:'Play', exact:true }).click()
   await openSheet.click()
 
+  const stat = dialog.getByRole('combobox', { name:'Stat', exact:true })
+  const latest = dialog.locator('.generation-stat-latest')
+  const selected = dialog.locator('.generation-stat-pin')
+  const chart = dialog.getByRole('img', { name:/Opening population by generation/ })
+  await table.getByRole('button', { name:'View Opening population trend', exact:true }).click()
+  await expect(stat).toBeFocused()
+  await expect(stat).toHaveValue('opening')
+  await expect(chart).toBeVisible()
+  await expect(latest).toHaveText(/^Latest · Generation 1\s+60$/)
+  await expect(latest).toHaveText(/^Latest · Generation 2\s+\d+$/)
+  await chart.press('Home')
+  await expect(selected).toContainText(/Generation 1\s+60/)
+  await dialog.getByRole('combobox', { name:'Species' }).selectOption('orange')
+  await expect(selected).toContainText(/Generation 1\s+10/)
+  await chart.press('ArrowRight')
+  await expect(selected.getByRole('button', { name:'Replay generation 2' })).toBeVisible()
+
+  await dialog.getByRole('button', { name:'Spreadsheet', exact:true }).click()
   const first = rows.first()
   await expect(first.getByRole('button', { name:'Replay generation 1' })).toBeVisible()
-  await expect(first.getByRole('cell').first()).toHaveText('60')
   await expect(rows.nth(1).getByRole('button', { name:'Replay generation 2' })).toBeVisible()
-  await dialog.getByRole('combobox', { name:'Species' }).selectOption('orange')
   await expect(first.getByRole('cell').first()).toHaveText('10')
   await first.getByRole('button', { name:'Replay generation 1' }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByRole('button', { name:'Run options' })).toHaveText('Day 1 / 10 · Replay')
 })
 
-test('the generation spreadsheet updates while a batch runs in the background', async ({ page }) => {
+test('the generation spreadsheet and stat trends update during a background batch', async ({ page }) => {
   await installBatchHold(page)
   await openSimulator(page)
   await startRun(page, '10', () => fixedDay(page))
@@ -823,9 +839,28 @@ test('the generation spreadsheet updates while a batch runs in the background', 
   const rows = table.locator('tbody tr')
   await expect(rows).toHaveCount(0)
 
+  await dialog.getByRole('button', { name:'Stat trends', exact:true }).click()
+  const stat = dialog.getByRole('combobox', { name:'Stat', exact:true })
+  await expect(stat).toHaveValue('population')
+  await stat.selectOption('speed')
+  const chart = dialog.getByRole('img', { name:/Average Speed by generation/ })
+  await expect(chart).toBeVisible()
+  await expect(dialog.getByText('No completed days in this range')).toBeVisible()
+
   await page.evaluate(() => window.batchTest.release())
+  const latest = dialog.locator('.generation-stat-latest')
+  await expect(latest).toHaveText(/^Latest · Generation 4\s+\d+\.\d{2}$/)
+  const latestSpeed = await latest.locator('strong').innerText()
+  await chart.press('Home')
+  await expect(dialog.getByRole('button', { name:'Replay generation 1' })).toBeVisible()
+  await chart.press('End')
+  await expect(dialog.getByRole('button', { name:'Replay generation 4' })).toBeVisible()
+
+  await dialog.getByRole('button', { name:'Spreadsheet', exact:true }).click()
   await expect(rows).toHaveCount(4)
   await expect(rows.getByRole('rowheader')).toHaveText(['1','2','3','4'])
+  const speedColumn = await table.getByRole('columnheader', { name:'Average Speed', exact:true }).evaluate(node => node.cellIndex)
+  await expect(rows.last().locator('td').nth(speedColumn - 1)).toHaveText(latestSpeed)
   await expect(dialog.getByText('4 completed', { exact:true })).toBeVisible()
 })
 
