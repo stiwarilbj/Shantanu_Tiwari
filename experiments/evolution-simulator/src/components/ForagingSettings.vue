@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { FORAGING_FIELDS, usesForagingDecisionRules, usesStandardDeviation } from '../engine/config.js'
+import { FORAGING_DEFAULTS, FORAGING_FIELDS, usesForagingDecisionRules, usesOptionalRules, usesStandardDeviation } from '../engine/config.js'
 import { canPursuePrey, keepsMeal, mealFitsBudget, remembersPlant, returnReserve, shouldReturn,
   shouldReturnWithoutMeal, timeSavedPercent } from '../engine/foraging-decisions.js'
 import { DT, WALKTHROUGH_STEP } from '../engine/geometry.js'
@@ -10,6 +10,7 @@ const { draft, issue } = defineProps({ draft:Object, issue:Object })
 const speciesId = defineModel('species')
 const mode = defineModel('mode')
 const selected = computed(() => draft.species.find(species => species.id === speciesId.value))
+const customDecisions = computed(() => draft.advanced?.customForaging !== false)
 const inherited = computed(() => !!selected.value && !selected.value.foragingDecisions)
 const settings = computed(() => selected.value?.foragingDecisions ?? draft.foragingDecisions)
 const prefix = computed(() => selected.value ? selected.value.id + '.foragingDecisions.' : 'foragingDecisions.')
@@ -21,13 +22,23 @@ const reserveLabel = computed(() => {
 })
 const scenario = ref('memory')
 
+function useCustomDecisions(event) {
+  draft.advanced.customForaging = event.target.checked
+  delete issue['advanced.customForaging']
+  if (!event.target.checked) {
+    for (const key of Object.keys(issue)) {
+      if (key.includes('foragingDecisions.')) delete issue[key]
+    }
+  }
+}
+
 function customize(event) {
   if (event.target.checked) selected.value.foragingDecisions = { ...draft.foragingDecisions }
   else delete selected.value.foragingDecisions
 }
 
 const preview = computed(() => {
-  const rules = settings.value
+  const rules = customDecisions.value ? settings.value : FORAGING_DEFAULTS
   if (!rules || !FORAGING_FIELDS.every(({ key, min, max, step }) => {
     const value = rules[key]
     const scaled = value * (step === 0.1 ? 10 : 1)
@@ -86,6 +97,11 @@ const preview = computed(() => {
     </label>
     <p v-if="mode === 'walkthrough'" class="quiet">Video experiment uses its own movement rules. These settings and the preview apply when you use Standard.</p>
     <template v-if="usesForagingDecisionRules(draft)">
+      <label v-if="usesOptionalRules(draft)" class="advanced-toggle">
+        <input id="advanced.customForaging" type="checkbox" :checked="customDecisions" @change="useCustomDecisions">
+        Use custom foraging decisions
+      </label>
+      <p v-if="!customDecisions" class="quiet">Standard runs use the built-in decision rules. Your field and species settings are saved.</p>
       <label class="advanced-select">Foraging decisions for
         <select v-model="speciesId">
           <option :value="null">Field default</option>
@@ -95,14 +111,14 @@ const preview = computed(() => {
         </select>
       </label>
       <label v-if="selected" class="advanced-toggle">
-        <input type="checkbox" :checked="!inherited" @change="customize"> Use custom settings
+        <input type="checkbox" :checked="!inherited" :disabled="!customDecisions" @change="customize"> Use custom settings
       </label>
       <p v-if="inherited" class="quiet">This species uses the field default.</p>
       <NumberField v-for="field in FORAGING_FIELDS" :key="prefix + field.key" :id="prefix + field.key"
         v-model="settings[field.key]" :label="field.label" :min="field.min" :max="field.max" :step="field.step"
-        :disabled="inherited" :error="inherited ? undefined : issue[prefix + field.key]"/>
-      <p v-if="reserveLabel" class="quiet">{{ reserveLabel }}</p>
-      <p class="quiet">Seeing an empty spot clears plant memory immediately. At 0 s of prey pursuit, a blob can still hunt on contact.</p>
+        :disabled="inherited || !customDecisions" :error="inherited || !customDecisions ? undefined : issue[prefix + field.key]"/>
+      <p v-if="customDecisions && reserveLabel" class="quiet">{{ reserveLabel }}</p>
+      <p class="quiet">Set memory, switching threshold, reserve, or pursuit to 0 to remove that limit or behavior. Blobs can still hunt on contact with pursuit off.</p>
     </template>
     <p v-else class="quiet">This setup uses its original foraging decisions.</p>
   </div>

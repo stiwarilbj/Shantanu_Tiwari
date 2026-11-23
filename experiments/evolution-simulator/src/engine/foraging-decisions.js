@@ -1,4 +1,4 @@
-import { FORAGING_DEFAULTS, usesForagingDecisionRules, usesWalkthroughForaging } from './config.js'
+import { advancedRuleEnabled, FORAGING_DEFAULTS, usesForagingDecisionRules, usesWalkthroughForaging } from './config.js'
 
 export const DECISION = Object.freeze({
   searching: 0,
@@ -23,7 +23,7 @@ export function tracksForagingDecisions(config) {
 }
 
 export function foragingDecisionsFor(config, species) {
-  if (!tracksForagingDecisions(config)) return FORAGING_DEFAULTS
+  if (!tracksForagingDecisions(config) || !advancedRuleEnabled(config, 'customForaging')) return FORAGING_DEFAULTS
   return species?.foragingDecisions ?? config.foragingDecisions ?? FORAGING_DEFAULTS
 }
 

@@ -6,7 +6,7 @@ export function agingRules(config, species) {
 }
 
 export function lifespanReached(rules, age) {
-  return rules.enabled && rules.maxAge > 0 && age >= rules.maxAge
+  return rules.enabled && rules.maxAgeEnabled !== false && rules.maxAge > 0 && age >= rules.maxAge
 }
 
 export function oldAgeRisk(rules, age) {

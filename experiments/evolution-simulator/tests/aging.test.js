@@ -23,6 +23,8 @@ test('aging starts after the onset and respects both the speed floor and the lif
   setup.aging.riskIncrease = 2.15
   orange.aging.speedFloor = 9
   orange.aging.maxAge = 0
+  assert.deepEqual(Object.keys(validate(setup)), ['aging.riskIncrease'])
+  orange.aging.enabled = true
   assert.deepEqual(Object.keys(validate(setup)), ['aging.riskIncrease', 'orange.aging.speedFloor', 'orange.aging.maxAge'])
 })
 

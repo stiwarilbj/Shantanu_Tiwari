@@ -4,7 +4,7 @@ import { ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
   randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
-  usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
+  usesOptionalRules, usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
@@ -18,6 +18,9 @@ const draft = lab.draft
 const fork = lab.branchFrom
 const standardDeviation = usesStandardDeviation(draft)
 const customReproduction = usesReproductionRules(draft)
+const optionalRules = usesOptionalRules(draft)
+const refillEnergy = computed(() => draft.advanced?.mealRefills !== false)
+const breeding = computed(() => draft.advanced?.breeding !== false)
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), discarding = ref(false), applying = ref(false)
@@ -56,6 +59,7 @@ const rulesSummary = computed(() => {
 })
 const selected = computed(() => draft.species.find(s => s.id===tab.value) ?? draft.species[0])
 const paired = computed(() => draft.reproduction?.parentMode === 'pair')
+const hasMutation = computed(() => TRAITS.some(trait => selected.value.mutation[trait]))
 const speedPreview = computed(() => {
   const baseline = paired.value ? 'Parents with speeds 8 and 12 give their child a starting speed of 10.' :
     'A parent with speed 10 gives its child a starting speed of 10.'
@@ -78,7 +82,7 @@ const mutationProfile = computed({
   },
   set(profile) {
     for (const trait of TRAITS) {
-      selected.value.mutation[trait] = profile === 'all' || (profile === 'speed' && trait === 'speed')
+      setMutation(trait, profile === 'all' || (profile === 'speed' && trait === 'speed'))
     }
   },
 })
@@ -98,6 +102,29 @@ const foraging = computed({
     else delete draft.foraging
   },
 })
+function clearMutationErrors(species, traits) {
+  for (const trait of traits) {
+    delete issue.value[`${species.id}.${spreadKey}.${trait}`]
+    delete issue.value[`${species.id}.mutationChance.${trait}`]
+  }
+  if (!breeding.value || !TRAITS.some(trait => species.mutation[trait])) {
+    delete issue.value[species.id + '.mutationPattern']
+  }
+}
+function setMutation(trait, enabled) {
+  selected.value.mutation[trait] = enabled
+  if (optionalRules && !enabled) clearMutationErrors(selected.value, [trait])
+}
+function setAdvancedRule(key, event, fields) {
+  draft.advanced[key] = event.target.checked
+  delete issue.value['advanced.' + key]
+  if (!event.target.checked) {
+    for (const field of fields) delete issue.value[field]
+    if (key === 'breeding') {
+      for (const species of draft.species) clearMutationErrors(species, TRAITS)
+    }
+  }
+}
 function add(copy=false) {
   const id = crypto.randomUUID()
   const original = selected.value
@@ -168,7 +195,9 @@ async function apply() {
     const forSpecies = draft.species.find(s => first.startsWith(s.id + '.'))
     if (forSpecies) tab.value = forSpecies.id
     const key = (forSpecies ? first.slice(forSpecies.id.length + 1) : first).split('.')[0]
-    const target = key === spreadKey ? 'inheritance' : advancedFields[key]
+    const optionGroups = { mealRefills: 'movement', breeding: 'inheritance', customForaging: 'foraging' }
+    const target = key === 'advanced' ? optionGroups[first.split('.')[1]] :
+      key === spreadKey ? 'inheritance' : advancedFields[key]
     if (target === 'aging') agingSpecies.value = forSpecies?.id ?? null
     if (target === 'foraging') foragingSpecies.value = forSpecies?.id ?? null
     if (target === 'territory') territorySpecies.value = forSpecies?.id ?? null
@@ -328,6 +357,7 @@ onMounted(()=>dialog.value.showModal())
                   <option value="walkthrough">Video walkthrough</option><option value="product">Product</option><option value="additive">Earlier additive</option>
                 </select>
               </label>
+              <p class="quiet">Size-linked stride is optional. Choose Speed only to leave size out of stride. Every run uses an energy model.</p>
               <output class="energy-calculation" v-if="draft.metabolism==='walkthrough'">
                 (size³ × (distance per step)² + sight range) ÷ 10,000
                 <small>{{ walkthroughStepCost(selected,draft).toFixed(3) }} energy per 0.1 s step for {{ selected.name }}</small>
@@ -339,11 +369,18 @@ onMounted(()=>dialog.value.showModal())
             </div>
             <div class="advanced-block">
               <h3>Energy from meals</h3>
-              <NumberField id="plantReward" v-model="draft.plantReward" label="Plant reward" :min="0" :max="1000" :pace="100" tint="#6C7C3A" :error="issue.plantReward"/>
-              <NumberField id="preyReward" v-model="draft.preyReward" label="Prey reward" :min="0" :max="1000" :pace="100" tint="#8F8048" :error="issue.preyReward"/>
-              <p class="quiet">Each meal gives one food credit. Energy refills up to the blob’s starting amount. A reward of 0 leaves energy unchanged.</p>
+              <label v-if="optionalRules" class="advanced-toggle">
+                <input id="advanced.mealRefills" type="checkbox" :checked="refillEnergy"
+                  @change="setAdvancedRule('mealRefills', $event, ['plantReward', 'preyReward'])">
+                Refill energy after meals
+              </label>
+              <NumberField id="plantReward" v-model="draft.plantReward" label="Plant reward" :min="0" :max="1000" :pace="100" tint="#6C7C3A" :disabled="!refillEnergy" :error="issue.plantReward"/>
+              <NumberField id="preyReward" v-model="draft.preyReward" label="Prey reward" :min="0" :max="1000" :pace="100" tint="#8F8048" :disabled="!refillEnergy" :error="issue.preyReward"/>
+              <p class="quiet">Each meal gives one food credit. {{ refillEnergy ?
+                'Energy refills up to the starting amount. A reward of 0 leaves energy unchanged.' :
+                'Energy refills are off. Your reward amounts are saved.' }}</p>
               <div class="advanced-actions">
-                <button type="button" class="secondary" @click="draft.preyReward = draft.plantReward">Equal rewards</button>
+                <button type="button" class="secondary" :disabled="!refillEnergy" @click="draft.preyReward = draft.plantReward">Equal rewards</button>
               </div>
             </div>
             <div class="advanced-block">
@@ -354,7 +391,8 @@ onMounted(()=>dialog.value.showModal())
                   <option value="timed">After a fixed time</option>
                 </select>
               </label>
-              <template v-if="!endsWhenSettled(draft)">
+              <p v-if="endsWhenSettled(draft)" class="quiet">The fixed timer is off.</p>
+              <template v-else>
                 <NumberField id="duration" v-model="seconds" label="Seconds per day" :min="1" :max="60" :step=".1" :error="issue.duration"/>
                 <div class="quick-picks">
                   <button v-for="n in [1,5,10,20,30,60]" :key="n" type="button" class="secondary"
@@ -390,8 +428,15 @@ onMounted(()=>dialog.value.showModal())
           <template v-else>
             <div class="advanced-block">
               <h3>Reproduction</h3>
-              <p class="quiet">These rules apply to every species. To breed, a blob needs at least two food credits and a safe return to the refuge.</p>
-              <template v-if="customReproduction">
+              <label v-if="optionalRules" class="advanced-toggle">
+                <input id="advanced.breeding" type="checkbox" :checked="breeding"
+                  @change="setAdvancedRule('breeding', $event, ['parentMode', 'minimumBreedingAge', 'birthWait', 'birthChance', 'twinChance'])">
+                Allow reproduction
+              </label>
+              <p class="quiet">{{ breeding ?
+                'To breed, a blob needs at least two food credits and a safe return to the refuge.' :
+                'Blobs can survive each day without producing offspring. Your breeding settings are saved.' }}</p>
+              <template v-if="customReproduction && breeding">
                 <label class="advanced-select">Parent mode
                   <select id="parentMode" v-model="draft.reproduction.parentMode">
                     <option value="single">Single parent</option><option value="pair">Two parents</option>
@@ -410,7 +455,7 @@ onMounted(()=>dialog.value.showModal())
                   :min="0" :max="100" :error="issue.twinChance"/>
                 <p class="quiet">Each eligible {{ paired ? 'pair' : 'parent' }} gets one birth roll. Twins can happen after a successful roll.</p>
               </template>
-              <p v-else class="quiet">In this setup, each eligible parent has one child.</p>
+              <p v-else-if="!customReproduction" class="quiet">In this setup, each eligible parent has one child.</p>
             </div>
             <div class="advanced-block">
               <h3>Inheritance</h3>
@@ -422,13 +467,14 @@ onMounted(()=>dialog.value.showModal())
               </div>
               <p class="quiet">Each species has its own mutation settings.</p>
               <label class="advanced-select">Mutation profile
-                <select v-model="mutationProfile">
+                <select v-model="mutationProfile" :disabled="!breeding">
                   <option value="" disabled>Custom</option><option value="all">All unlocked</option>
-                  <option value="speed">Speed only</option><option value="locked">All locked</option>
+                  <option value="speed">Speed only</option><option value="locked">All locked (mutation off)</option>
                 </select>
               </label>
               <label v-if="customReproduction" class="advanced-select">Mutation pattern
-                <select :id="selected.id+'.mutationPattern'" v-model="selected.inheritance.mutationPattern">
+                <select :id="selected.id+'.mutationPattern'" v-model="selected.inheritance.mutationPattern"
+                  :disabled="optionalRules && (!breeding || !hasMutation)">
                   <option value="normal">Bell curve</option><option value="bounded">Bounded random</option>
                 </select>
               </label>
@@ -436,23 +482,24 @@ onMounted(()=>dialog.value.showModal())
                 {{ customReproduction ? 'Bell curve favors small changes. Bounded random gives every change within its limit equal odds.' : 'Inherited traits stay at least 1.' }}</p>
               <div v-for="key in TRAITS" :key="key" class="inheritance-trait">
                 <label class="advanced-toggle">
-                  <input :id="selected.id+'.mutation.'+key" type="checkbox" v-model="selected.mutation[key]"
+                  <input :id="selected.id+'.mutation.'+key" type="checkbox" :checked="selected.mutation[key]"
+                    :disabled="!breeding" @change="setMutation(key, $event.target.checked)"
                     :aria-label="'Allow '+key+' mutation'"> Allow {{ labels[key].toLowerCase() }} mutation
                 </label>
                 <NumberField v-if="customReproduction" :id="selected.id+'.mutationChance.'+key"
                   v-model="selected.inheritance.mutationChance[key]" :label="labels[key]+' mutation chance (%)'"
                   :min="0" :max="100" :tint="swatches[key]" :error="issue[selected.id+'.mutationChance.'+key]"
-                  :disabled="!selected.mutation[key] && !issue[selected.id+'.mutationChance.'+key]"/>
+                  :disabled="!breeding || (!selected.mutation[key] && !issue[selected.id+'.mutationChance.'+key])"/>
                 <NumberField :id="selected.id+'.'+spreadKey+'.'+key" v-model="selected[spreadKey][key]"
                   :label="(standardDeviation ? 'σ ' : 'σ² ') + labels[key]"
                   :min="standardDeviation ? 0 : .01" :max="10" :step=".01" :pace="1" :tint="swatches[key]"
                   :error="issue[selected.id+'.'+spreadKey+'.'+key]"
-                  :disabled="!selected.mutation[key] && !issue[selected.id+'.'+spreadKey+'.'+key]"/>
+                  :disabled="!breeding || (!selected.mutation[key] && !issue[selected.id+'.'+spreadKey+'.'+key])"/>
                 <small v-if="standardDeviation && Number.isFinite(selected[spreadKey][key])" class="quiet">
                   Variance (σ²) = {{ Number((selected[spreadKey][key] ** 2).toFixed(3)) }}
                 </small>
               </div>
-              <div class="inheritance-preview">
+              <div v-if="breeding" class="inheritance-preview">
                 <h4>Example offspring</h4>
                 <p class="quiet">{{ speedPreview }}</p>
               </div>

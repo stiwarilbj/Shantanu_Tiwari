@@ -1,4 +1,4 @@
-import { endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
+import { advancedRuleEnabled, endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
   rulesFor, usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
 import { summaries } from './stats.js'
@@ -98,10 +98,10 @@ function eat(ctx, config, blob, target, time, type) {
   if (type === 'plant') {
     target.eaten = true
     if (blob.steering?.plant?.id === target.id) blob.steering.plant = null
-    blob.energy = Math.min(blob.capacity, blob.energy + config.plantReward)
+    if (advancedRuleEnabled(config, 'mealRefills')) blob.energy = Math.min(blob.capacity, blob.energy + config.plantReward)
   } else {
     blob.preyCredits++
-    blob.energy = Math.min(blob.capacity, blob.energy + config.preyReward)
+    if (advancedRuleEnabled(config, 'mealRefills')) blob.energy = Math.min(blob.capacity, blob.energy + config.preyReward)
     extra.targetSpecies = target.species
   }
   blob.credits++
@@ -370,7 +370,8 @@ export function dusk(ctx, config) {
   const foraging = usesWalkthroughForaging(config)
   const currentRules = usesReproductionRules(config)
   const rules = currentRules ? config.reproduction ?? REPRODUCTION_DEFAULTS : REPRODUCTION_DEFAULTS
-  const candidates = rules.parentMode === 'pair' ? new Map() : null
+  const breeding = advancedRuleEnabled(config, 'breeding')
+  const candidates = breeding && rules.parentMode === 'pair' ? new Map() : null
   for (const b of ctx.blobs) {
     if (!b.alive) continue
     if (!b.home && ctx.refugeWidth && b.credits && b.energy > 0 && refugeDistance(b, ctx.refugeWidth) <= 1e-9) {
@@ -393,7 +394,7 @@ export function dusk(ctx, config) {
     if (currentRules && b.lastBirthDay != null) survivor.lastBirthDay = b.lastBirthDay
     if (foraging && !ctx.refugeWidth) survivor.edge = b.target
     if (!foraging || candidates) closing.push(survivor)
-    const eligible = b.credits >= 2 && b.age - 1 >= rules.minimumBreedingAge &&
+    const eligible = breeding && b.credits >= 2 && b.age - 1 >= rules.minimumBreedingAge &&
       (survivor.lastBirthDay == null || ctx.day - survivor.lastBirthDay > rules.birthWait)
     if (eligible) {
       const parent = { blob: b, survivor }

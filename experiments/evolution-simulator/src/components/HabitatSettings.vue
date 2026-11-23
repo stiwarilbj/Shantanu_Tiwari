@@ -73,7 +73,7 @@ function addAnchor() {
     <h3>Plant supply</h3>
     <label class="advanced-select">Food schedule
       <select id="schedule" v-model="draft.scheduleMode" @change="delete issue.schedule">
-        <option value="constant">Constant</option><option value="ramp">Ramp</option><option value="step">Step</option>
+        <option value="constant">Constant (schedule off)</option><option value="ramp">Ramp</option><option value="step">Step</option>
       </select>
     </label>
     <template v-if="draft.scheduleMode !== 'constant'">
@@ -95,7 +95,7 @@ function addAnchor() {
     <h3>Field layout</h3>
     <label class="advanced-select">Food placement
       <select id="foodPlacement" v-model="draft.foodPlacement">
-        <option value="scattered">Scattered</option><option value="patches">Patches</option>
+        <option value="scattered">Scattered (patches off)</option><option value="patches">Patches</option>
       </select>
     </label>
     <template v-if="draft.foodPlacement === 'patches'">

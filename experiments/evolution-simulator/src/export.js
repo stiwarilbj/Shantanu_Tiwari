@@ -1,6 +1,6 @@
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
-import { AGING_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
-  TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesForagingDecisionRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
+import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
+  TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
   const entries = Object.entries(values ?? {}).filter(([key, value]) => value !== defaults[key])
@@ -59,6 +59,7 @@ export function setupLink(setup) {
     const fieldTerritory = territories && setup.territories ? packTerritory(setup.territories, true) : []
     compact = {
       ...omitDefaults(setup, HABITAT_DEFAULTS),
+      ...(usesOptionalRules(setup) && { advanced: omitDefaults(setup.advanced, ADVANCED_DEFAULTS) }),
       ...(usesAgingRules(setup) && { aging: omitDefaults(setup.aging, AGING_DEFAULTS) }),
       ...(foraging && { foragingDecisions: undefined, fd: fieldDecisions.length ? fieldDecisions : undefined }),
       ...(territories && { territories: undefined, tt: fieldTerritory.length ? fieldTerritory : undefined }),

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, shallowRef, watch, watchEffect } from 'vue'
-import { rulesFor, TERRITORY_EDGES, TERRITORY_FIELDS, validate } from '../engine/config.js'
+import { rulesFor, TERRITORY_EDGES, TERRITORY_FIELDS, usesOptionalRules, validate } from '../engine/config.js'
 import { FIELD } from '../engine/geometry.js'
 import { dawn, founders } from '../engine/simulation.js'
 import { startingEdge, territoryFor } from '../engine/starting-territories.js'
@@ -22,6 +22,13 @@ const prefix = computed(() => selected.value ? selected.value.id + '.territory.'
 const territoryIssue = key => key.startsWith('territories.') || key.includes('.territory.')
 const showFields = computed(() => draft.territories.enabled || Object.keys(issue).some(territoryIssue))
 const edgeLabel = edge => edge[0].toUpperCase() + edge.slice(1)
+
+function clearTerritoryErrors(event) {
+  if (event.target.checked || !usesOptionalRules(draft)) return
+  for (const key of Object.keys(issue)) {
+    if (territoryIssue(key)) delete issue[key]
+  }
+}
 
 function customize(event) {
   const { edges, center, width } = draft.territories
@@ -111,7 +118,7 @@ watchEffect(() => {
   <div class="advanced-block">
     <h3>Starting territories</h3>
     <label class="advanced-toggle">
-      <input id="territories.enabled" v-model="draft.territories.enabled" type="checkbox">
+      <input id="territories.enabled" v-model="draft.territories.enabled" type="checkbox" @change="clearTerritoryErrors">
       Use starting territories
     </label>
     <p class="quiet">Choose where each species enters the field. Blobs still return to the usual refuge.</p>

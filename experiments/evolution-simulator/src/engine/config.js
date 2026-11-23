@@ -10,7 +10,8 @@ export const REPRODUCTION_RULE_VERSION = 8
 export const AGING_RULE_VERSION = 9
 export const FORAGING_DECISION_RULE_VERSION = 10
 export const TERRITORY_RULE_VERSION = 11
-export const VERSION = TERRITORY_RULE_VERSION
+export const OPTIONAL_RULES_VERSION = 12
+export const VERSION = OPTIONAL_RULES_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -61,6 +62,7 @@ export const TERRITORY_FIELDS = [
   { key: 'center', label: 'Band center (%)', min: 0, max: 100 },
   { key: 'width', label: 'Band width (%)', min: 5, max: 100 },
 ]
+export const ADVANCED_DEFAULTS = Object.freeze({ mealRefills: true, breeding: true, customForaging: true })
 export const INHERITANCE_DEFAULTS = Object.freeze({
   mutationPattern: 'normal',
   mutationChance: Object.freeze({ speed: 100, size: 100, sense: 100 }),
@@ -75,10 +77,13 @@ export const usesReproductionRules = config => config.version >= REPRODUCTION_RU
 export const usesAgingRules = config => config.version >= AGING_RULE_VERSION
 export const usesForagingDecisionRules = config => config.version >= FORAGING_DECISION_RULE_VERSION
 export const usesTerritoryRules = config => config.version >= TERRITORY_RULE_VERSION
+export const usesOptionalRules = config => config.version >= OPTIONAL_RULES_VERSION
+export const advancedRuleEnabled = (config, key) => !usesOptionalRules(config) || config.advanced?.[key] !== false
 export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
 export function setupWithRuleDefaults(setup) {
+  if (usesOptionalRules(setup)) setup = { ...setup, advanced: { ...ADVANCED_DEFAULTS, ...setup.advanced } }
   if (usesHabitatRules(setup)) setup = { ...HABITAT_DEFAULTS, ...setup }
   if (usesAgingRules(setup)) setup = { ...setup, aging: { ...AGING_DEFAULTS, ...setup.aging } }
   if (usesForagingDecisionRules(setup)) {
@@ -150,8 +155,16 @@ export function validate(config) {
   }
   number('seed', 'Seed', config.seed, 1, MAX_SEED)
   number('food', 'Starting plants', config.food, 10, 1000)
-  number('plantReward', 'Plant reward', config.plantReward, 0, 1000)
-  number('preyReward', 'Prey reward', config.preyReward, 0, 1000)
+  if (usesOptionalRules(config) && config.advanced !== undefined) {
+    for (const key of Object.keys(ADVANCED_DEFAULTS)) {
+      const value = config.advanced?.[key]
+      if (value !== undefined && typeof value !== 'boolean') errors['advanced.' + key] = 'Choose whether this rule is enabled.'
+    }
+  }
+  if (advancedRuleEnabled(config, 'mealRefills')) {
+    number('plantReward', 'Plant reward', config.plantReward, 0, 1000)
+    number('preyReward', 'Prey reward', config.preyReward, 0, 1000)
+  }
   if (!['prepare', 'live'].includes(config.mode) || !['linked', 'speed'].includes(config.stride) ||
       !['walkthrough', 'product', 'additive'].includes(config.metabolism) || typeof config.predation !== 'boolean' ||
       typeof config.sameSpecies !== 'boolean' ||
@@ -170,7 +183,7 @@ export function validate(config) {
       number('firstHuntingDay', 'First hunting day', config.firstHuntingDay, 1, Number.isInteger(config.days) ? config.days : 1000)
     }
   }
-  if (usesReproductionRules(config) && config.reproduction !== undefined) {
+  if (usesReproductionRules(config) && config.reproduction !== undefined && advancedRuleEnabled(config, 'breeding')) {
     const rules = config.reproduction
     if (!['single', 'pair'].includes(rules?.parentMode)) errors.parentMode = 'Choose a parent mode.'
     number('minimumBreedingAge', 'Minimum breeding age', rules?.minimumBreedingAge, 0, 30)
@@ -180,6 +193,7 @@ export function validate(config) {
   }
   function validateAging(rules, prefix) {
     if (typeof rules?.enabled !== 'boolean') errors[prefix + 'enabled'] = 'Choose whether aging is enabled.'
+    if (usesOptionalRules(config) && rules?.enabled === false) return
     for (const { key, label, min, max, step } of AGING_FIELDS) {
       const value = rules?.[key]
       number(prefix + key, label, value, min, max, step === 1)
@@ -187,10 +201,16 @@ export function validate(config) {
         errors[prefix + key] = 'Use at most one decimal place.'
       }
     }
-    if (rules?.maxAge !== null) number(prefix + 'maxAge', 'Maximum lifespan', rules?.maxAge, 1, 1000)
+    if (usesOptionalRules(config) && rules?.maxAgeEnabled !== undefined && typeof rules.maxAgeEnabled !== 'boolean') {
+      errors[prefix + 'maxAgeEnabled'] = 'Choose whether to limit the lifespan.'
+    }
+    if (rules?.maxAge !== null && (!usesOptionalRules(config) || rules?.maxAgeEnabled !== false)) {
+      number(prefix + 'maxAge', 'Maximum lifespan', rules?.maxAge, 1, 1000)
+    }
   }
 
   function validateForaging(rules, prefix) {
+    if (usesOptionalRules(config) && (!advancedRuleEnabled(config, 'customForaging') || usesWalkthroughForaging(config))) return
     for (const { key, label, min, max, step } of FORAGING_FIELDS) {
       const value = rules?.[key]
       number(prefix + key, label, value, min, max, step === 1)
@@ -206,8 +226,10 @@ export function validate(config) {
   }
   function validateTerritory(placement, prefix) {
     const edges = placement?.edges
-    if (!Array.isArray(edges) || !edges.length || new Set(edges).size !== edges.length ||
+    const active = !usesOptionalRules(config) || config.territories?.enabled !== false
+    if (!Array.isArray(edges) || (active && !edges.length) || new Set(edges).size !== edges.length ||
         edges.some(edge => !TERRITORY_EDGES.includes(edge))) errors[prefix + 'edges'] = 'Choose at least one starting edge.'
+    if (!active) return
     for (const { key, label, min, max } of TERRITORY_FIELDS) {
       number(prefix + key, label, placement?.[key], min, max)
     }
@@ -255,17 +277,20 @@ export function validate(config) {
       validateTerritory(item.territory, item.id + '.territory.')
     }
     const inheritance = usesReproductionRules(config) ? item.inheritance : undefined
-    if (inheritance !== undefined && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
+    const breeding = advancedRuleEnabled(config, 'breeding')
+    const mutationActive = trait => !usesOptionalRules(config) || (breeding && item.mutation?.[trait] === true)
+    if (inheritance !== undefined && TRAITS.some(mutationActive) && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
       errors[item.id + '.mutationPattern'] = 'Choose a mutation pattern.'
     }
     for (const trait of TRAITS) {
       number(item.id + '.' + trait, trait, item[trait], 1, 100)
+      if (typeof item.mutation?.[trait] !== 'boolean') errors[item.id + '.mutation.' + trait] = 'Specify which traits mutate.'
+      if (!mutationActive(trait)) continue
       if (usesStandardDeviation(config)) {
         number(item.id + '.standardDeviation.' + trait, 'Standard deviation', item.standardDeviation?.[trait], 0, 10, false)
       } else {
         number(item.id + '.variance.' + trait, 'Variance', item.variance?.[trait], 0.01, 10, false)
       }
-      if (typeof item.mutation?.[trait] !== 'boolean') errors[item.id + '.mutation.' + trait] = 'Specify which traits mutate.'
       if (inheritance !== undefined) {
         number(item.id + '.mutationChance.' + trait, 'Mutation chance', inheritance?.mutationChance?.[trait], 0, 100)
       }
