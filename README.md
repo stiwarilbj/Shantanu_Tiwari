@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs hunt, gather food, and pass on traits like size and speed. Follow one blob, skip ahead with Quick Sim, or open Advanced stats to see who survived, how much traits vary, and how the blobs found food each generation. In About, try a stride race or compare two runs to see how changes in size shape 600 generations.
+Watch blobs hunt, gather food, and pass on traits like size and speed. Try food patches or delay hunting in Advanced Settings, then jump ahead with Quick Sim to see who survives. Replay any generation, chart how traits change, or try a stride race in About.
 
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 

@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
+import { LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
   rulesFor, setupForNewRun, speciesTemplate, validate, validateRevisions } from '../src/engine/config.js'
 import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthroughStepCost } from '../src/engine/geometry.js'
 import { normal } from '../src/engine/random.js'
 import { dawn, dusk, founders, snapshot, step } from '../src/engine/simulation.js'
+import { openingHabitat } from '../src/engine/habitat.js'
 import { distribution, foragingStats, openingTrends, survivalStats, traitSpread } from '../src/engine/stats.js'
 import { adjacentFrameTime, prepareTrack, trackFrame } from '../src/track.js'
 import { createLivePlayback } from '../src/live-playback.js'
@@ -87,6 +88,85 @@ test('dawn balances all four edges, resets credits and capacity, and keys food b
   assert.deepEqual(field.plants, dawn(config, 1, opening).plants)
   assert.notDeepEqual(field.plants, dawn(config, 2, opening).plants)
   assert.notDeepEqual(field.plants, dawn({ ...config, seed: 99 }, 1, opening).plants)
+})
+
+test('patches divide the scheduled supply, respawn inside the refuge boundary and move after the interval', () => {
+  const config = { ...starter(), foodPlacement:'patches', patchCount:3, patchRadius:60,
+    refugePercent:20, food:20, scheduleMode:'step', schedule:[{day:5,food:26}] }
+  const fixed = openingHabitat(config, 5)
+  assert.equal(fixed.refugeWidth, 100)
+  assert.equal(fixed.plants.length, 26)
+  assert.deepEqual(fixed.patches, openingHabitat(config, 6).patches)
+  assert.notDeepEqual(fixed.plants, openingHabitat(config, 6).plants)
+
+  const moving = { ...config, patchRelocation:'interval', patchInterval:5 }
+  assert.deepEqual(fixed, openingHabitat(moving, 5))
+  const relocated = openingHabitat(moving, 6)
+  assert.notDeepEqual(relocated.patches, fixed.patches)
+  assert.deepEqual(relocated.patches, openingHabitat(moving, 10).patches)
+  assert.notDeepEqual(relocated, openingHabitat({ ...moving, seed:19 }, 6))
+
+  for (const { patches, plants } of [fixed, relocated]) {
+    const counts = [0, 0, 0]
+    for (const plant of plants) {
+      const index = plant.id % patches.length
+      const patch = patches[index]
+      const distance = Math.hypot(plant.x - patch.x, plant.y - patch.y)
+      assert.ok(distance <= patch.radius)
+      assert.ok([plant.x, plant.y].every(value => value >= 102 && value <= 398))
+      counts[index]++
+    }
+    assert.deepEqual(counts, [9,9,8])
+  }
+  const board = dawn(moving, 6, founders(moving))
+  assert.deepEqual(snapshot(board).plants, snapshot({ ...board, plants: relocated.plants }).plants)
+})
+
+test('new habitat defaults preserve version 6 and custom fields stay deterministic when replayed or resumed', () => {
+  for (const foraging of [undefined, 'walkthrough']) {
+    const old = { ...starter(STEERING_RULE_VERSION), foraging }
+    const upgraded = setupForNewRun(old)
+    const original = dawn(old, 1, founders(old))
+    const same = dawn(upgraded, 1, founders(upgraded))
+    assert.deepEqual(same, original)
+    assert.deepEqual(step(same, upgraded, Infinity, true), step(original, old, Infinity, true))
+    assert.deepEqual(same.events, original.events)
+
+    const config = { ...upgraded, foodPlacement:'patches', patchRelocation:'interval', patchInterval:1,
+      refugePercent:15, huntingAdvantage:40, firstHuntingDay:2, food:100 }
+    const checkpoint = founders(config)
+    const live = dawn(config, 2, checkpoint)
+    const replay = dawn(config, 2, checkpoint)
+    step(live, config, 12)
+    const partial = structuredClone(live)
+    let result
+    while (!result) result = step(live, config)
+    assert.deepEqual(step(partial, config, Infinity, true), result)
+    assert.deepEqual(step(replay, config, Infinity, true), result)
+    assert.deepEqual(replay.events, live.events)
+    assert.deepEqual(snapshot(replay), snapshot(live))
+  }
+})
+
+test('the hunting start day and custom size threshold apply in both foraging modes', () => {
+  for (const foraging of [undefined, 'walkthrough']) {
+    const config = { ...starter(), foraging, huntingAdvantage:50, firstHuntingDay:4 }
+    for (const [day, size, eligible] of [[3,15,false], [4,14.999,false], [4,15,true], [5,15,true]]) {
+      const field = dawn(config, day, founders(config))
+      const [hunter, prey] = field.blobs
+      field.blobs = [hunter, prey]
+      field.plants = [{ id:0, x:400, y:400, eaten:false }]
+      Object.assign(hunter, { x:250, y:250, angle:0, size, r:radius(size) })
+      Object.assign(prey, { x:250, y:250, angle:0, size:10 })
+      step(field, config)
+      assert.equal(prey.alive, !eligible, `${foraging ?? 'standard'} Day ${day} size ${size}`)
+      assert.equal(field.events.some(event => event.type === 'prey'), eligible)
+    }
+  }
+  const config = { ...starter(), foodPlacement:'patches', patchRelocation:'interval', patchInterval:0,
+    patchCount:9, patchRadius:9, refugePercent:1, firstHuntingDay:51, huntingAdvantage:101 }
+  assert.deepEqual(Object.keys(validate(config)), ['patchCount','patchRadius','patchInterval','refugePercent','huntingAdvantage','firstHuntingDay'])
+  assert.deepEqual(validate({ ...config, foodPlacement:'scattered', refugePercent:10, predation:false }), {})
 })
 
 function steeringField(config, poses) {

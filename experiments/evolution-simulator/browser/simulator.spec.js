@@ -13,15 +13,24 @@ async function startRun(page, days = '10', configure) {
   await page.getByLabel('Run name').fill('Browser test run')
   await page.getByRole('spinbutton', { name: 'Days to run' }).fill(days)
   await configure?.()
+  await page.getByRole('button', { name: 'Basic', exact: true }).click()
   await page.getByRole('button', { name: /^Watch live/ }).click()
   await page.getByRole('button', { name: 'Evolve!' }).click()
   await expect(page.getByRole('button', { name: 'Run options' })).toHaveText(`Day 1 / ${days} · Ready`)
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeEnabled()
 }
 
+async function advancedSettings(page, group = 'Habitat and food') {
+  const advanced = page.getByRole('button', { name: 'Advanced', exact: true })
+  if (await advanced.getAttribute('aria-pressed') !== 'true') await advanced.click()
+  await page.getByRole('button', { name: group, exact: true }).click()
+}
+
 async function fixedDay(page, seconds = '10') {
+  await advancedSettings(page, 'Inheritance and timing')
   await page.getByRole('combobox', { name: 'End each day' }).selectOption('timed')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill(seconds)
+  await page.getByRole('button', { name: 'Basic', exact: true }).click()
 }
 
 async function stepTo(page, seconds) {
@@ -209,6 +218,7 @@ test('the production build runs a new experiment and shows its charts @pages', a
   await expect(page.getByRole('heading', { name: 'Current Generation Stats' })).toBeVisible()
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
+    await advancedSettings(page, 'Inheritance and timing')
     const size = page.getByRole('spinbutton', { name: 'σ Size', exact: true })
     const sizeRow = page.locator('.variance-row').filter({ has: size })
     await size.fill('1.00')
@@ -216,11 +226,11 @@ test('the production build runs a new experiment and shows its charts @pages', a
     await size.fill('0.50')
     await expect(sizeRow.getByText('Variance (σ²) = 0.25', { exact: true })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'End each day' })).toHaveValue('settled')
-    await page.getByRole('button', { name: /^Refill rewards/ }).click()
+    await advancedSettings(page, 'Movement and energy')
     await expect(page.getByRole('spinbutton', { name: 'Plant reward' })).toHaveValue('0')
     await expect(page.getByRole('spinbutton', { name: 'Prey reward' })).toHaveValue('0')
-    await page.getByRole('button', { name: /^Advanced Rules/ }).click()
-    await expect(page.getByText('A hunter must be at least 25% larger than its prey.')).toBeVisible()
+    await advancedSettings(page, 'Hunting')
+    await expect(page.getByRole('spinbutton', { name: 'Minimum hunting size advantage' })).toHaveValue('25')
   })
   await quickThrough(page, 3)
   await expect(page.getByRole('heading', { name: 'Simulation complete' })).toBeVisible()
@@ -1033,6 +1043,7 @@ test('browser Back closes a focused Trends chart and restores World controls', a
 test('Trends marks the food rules used on each completed day of a branch', async ({ page }) => {
   await openSimulator(page)
   await startRun(page, '10', async () => {
+    await advancedSettings(page)
     await page.getByLabel('Food schedule').selectOption('step')
     await addFoodPoint(page, 3, 25)
     await addFoodPoint(page, 5, 45)
@@ -1051,13 +1062,19 @@ test('Trends marks the food rules used on each completed day of a branch', async
   await page.getByRole('button', { name: 'Branch here', exact: true }).click()
   await page.getByLabel('Branch after day').fill('4')
   await page.getByRole('button', { name: 'Edit branch rules' }).click()
+  await advancedSettings(page)
   await page.getByLabel('Food schedule').selectOption('step')
   await addFoodPoint(page, 2, 70)
   await addFoodPoint(page, 5, 70)
   const branchSettings = page.getByRole('dialog', { name:'Branch Settings' })
+  await branchSettings.getByLabel('Food placement').selectOption('patches')
+  await branchSettings.getByRole('spinbutton', { name:'Number of patches' }).fill('8')
+  await branchSettings.getByLabel('Refuge width').selectOption('15')
   await expect(branchSettings.getByRole('status')).toHaveText('Day 5 · 70 plants at dawn')
+  await expect(branchSettings.getByText(/Refuge covers 15%/)).toBeVisible()
   await branchSettings.getByRole('spinbutton', { name:'Preview day' }).fill('4')
   await expect(branchSettings.getByRole('status')).toHaveText('Day 4 · 25 plants at dawn (saved)')
+  await expect(branchSettings.getByText(/Refuge covers 10%/)).toBeVisible()
   await page.getByRole('button', { name: 'Create branch', exact: true }).click()
   await expect(runOptions).toHaveText('Day 5 / 10 · Ready')
   await quickThrough(page, 6)
@@ -1066,6 +1083,26 @@ test('Trends marks the food rules used on each completed day of a branch', async
   await trends.click()
   await expect(markers).toHaveText([/Day 3 · 25 plants/, /Day 5 · Branch · 70 plants/])
   await page.reload()
+  await expect(markers).toHaveText([/Day 3 · 25 plants/, /Day 5 · Branch · 70 plants/])
+
+  await openRunLibrary(page)
+  const library = page.getByRole('dialog', { name:'Run Library' })
+  const archive = library.locator('article').filter({ hasText:'Browser test run · branch' })
+  await archive.getByText('Actions', { exact:true }).click()
+  const download = page.waitForEvent('download')
+  await archive.getByRole('button', { name:'Export setup' }).click()
+  const setupFile = await (await download).path()
+  const exported = JSON.parse(await readFile(setupFile, 'utf8'))
+  expect(exported.revisions.map(({ setup }) => [setup.foodPlacement, setup.refugePercent]))
+    .toEqual([['scattered', 10], ['patches', 15]])
+  await library.locator('input[type=file]').setInputFiles({
+    name:'branch.json', mimeType:'application/json', buffer:Buffer.from(JSON.stringify(exported)),
+  })
+  await expect(library).toHaveCount(0)
+  await quickThrough(page, 6)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 6')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await trends.click()
   await expect(markers).toHaveText([/Day 3 · 25 plants/, /Day 5 · Branch · 70 plants/])
 })
 
@@ -1085,6 +1122,7 @@ test('a food-only branch keeps the day length at the fork', async ({ page }) => 
   await branch.click()
   await page.getByLabel('Branch after day').fill('2')
   await page.getByRole('button', { name: 'Edit branch rules' }).click()
+  await advancedSettings(page, 'Inheritance and timing')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill('2')
   await create.click()
   await expect(runOptions).toHaveText('Day 3 / 10 · Ready')
@@ -1111,6 +1149,7 @@ test('a food-only branch keeps the day length at the fork', async ({ page }) => 
 test('a branch defaults to the plant supply recorded on the selected day', async ({ page }) => {
   await openSimulator(page)
   await startRun(page, '10', async () => {
+    await advancedSettings(page)
     await page.getByLabel('Food schedule').selectOption('step')
     await addFoodPoint(page, 3, 25)
     await addFoodPoint(page, 5, 70)
@@ -1475,7 +1514,9 @@ test('Food Schedule previews draft ramp and step values and agrees with the repl
     const mode = settings.getByLabel('Food schedule')
     const food = settings.getByRole('spinbutton', { name:'Food', exact:true })
     await fixedDay(page, '5')
+    await page.getByRole('button', { name: 'Basic', exact: true }).click()
     await food.fill('150')
+    await advancedSettings(page)
     await day.fill('3')
     await expect(result).toHaveText('Day 3 · 150 plants at dawn')
 
@@ -1491,7 +1532,9 @@ test('Food Schedule previews draft ramp and step values and agrees with the repl
     await day.fill('3')
     await mode.selectOption('step')
     await expect(result).toHaveText('Day 3 · 150 plants at dawn')
+    await page.getByRole('button', { name: 'Basic', exact: true }).click()
     await food.fill('160')
+    await advancedSettings(page)
     await expect(result).toHaveText('Day 3 · 160 plants at dawn')
     await day.fill('5')
     await expect(result).toHaveText('Day 5 · 201 plants at dawn')
@@ -1504,7 +1547,9 @@ test('Food Schedule previews draft ramp and step values and agrees with the repl
     await anchor.fill('5')
     await expect(result).toContainText('Use unique days')
     await anchor.fill('9')
+    await page.getByRole('button', { name: 'Basic', exact: true }).click()
     await food.fill('150')
+    await advancedSettings(page)
     await mode.selectOption('ramp')
     await day.press('Enter')
     await expect(result).toHaveText('Day 3 · 176 plants at dawn')
@@ -1522,9 +1567,11 @@ test('Food Schedule previews draft ramp and step values and agrees with the repl
 test('Constant food settings can start after shortening a scheduled run', async ({ page }) => {
   await openSimulator(page)
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
+  await advancedSettings(page)
   const schedule = page.getByLabel('Food schedule')
   await schedule.selectOption('step')
   await addFoodPoint(page, 20, 75)
+  await page.getByRole('button', { name: 'Basic', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Days to run' }).fill('10')
   await page.getByRole('button', { name: /^Watch live/ }).click()
   const evolve = page.getByRole('button', { name: 'Evolve!' })
@@ -1541,6 +1588,57 @@ test('Constant food settings can start after shortening a scheduled run', async 
   await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Ready')
 })
 
+test('Advanced Settings preview seeded patches and preserve the draft on a phone @pages', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 650 })
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await openSimulator(page)
+  await expect(page).toHaveTitle('Evolution Simulator')
+  await startRun(page, '10', async () => {
+    await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('400')
+    await page.getByRole('button', { name:/^Advanced Settings/ }).press('Enter')
+    await expect(page.getByRole('heading', { name:'Advanced Settings' })).toBeFocused()
+    const dialog = page.getByRole('dialog', { name:'Simulation Settings' })
+    const habitat = dialog.getByRole('region', { name:'Habitat and food' })
+    await habitat.getByLabel('Food placement').selectOption('patches')
+    await habitat.getByRole('spinbutton', { name:'Number of patches' }).fill('8')
+    await habitat.getByRole('spinbutton', { name:'Patch radius' }).fill('60')
+    await habitat.getByLabel('Patch relocation').selectOption('interval')
+    await habitat.getByRole('spinbutton', { name:'Generations between moves' }).fill('2')
+    await habitat.getByLabel('Refuge width').selectOption('20')
+    const preview = habitat.getByLabel('Preview day')
+    await preview.fill('2')
+    const map = habitat.locator('canvas')
+    await expect(map).toBeVisible()
+    const pixels = () => map.evaluate(canvas => canvas.toDataURL())
+    const dayTwo = await pixels()
+    await preview.fill('3')
+    await expect.poll(pixels).not.toBe(dayTwo)
+
+    await advancedSettings(page, 'Hunting')
+    await dialog.getByRole('spinbutton', { name:'Minimum hunting size advantage' }).fill('50')
+    const firstHunt = dialog.getByRole('spinbutton', { name:'First hunting day' })
+    await firstHunt.fill('11')
+    await dialog.getByRole('button', { name:'Basic', exact:true }).click()
+    await dialog.getByRole('button', { name:'Evolve!' }).click()
+    await expect(firstHunt).toBeFocused()
+    await expect(firstHunt).toHaveAccessibleDescription('First hunting day must be a whole number from 1 to 10.')
+    await firstHunt.fill('4')
+    await advancedSettings(page)
+    await expect(preview).toHaveValue('3')
+    await expect(habitat).toContainText('Day 3 · 400 plants at dawn')
+    await expect(habitat).toContainText('Refuge covers 20% from each edge · Hunting off')
+    await preview.fill('4')
+    await expect(habitat).toContainText('Refuge covers 20% from each edge · Hunting active')
+    expect(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+  })
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name:'Watch last day' }).click()
+  await expect(page.getByRole('slider', { name:'Replay time' })).toHaveValue('0')
+  expect(errors).toEqual([])
+})
+
 test('Settings rejects invalid day lengths instead of rounding them', async ({ page }) => {
   await openSimulator(page)
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
@@ -1550,6 +1648,7 @@ test('Settings rejects invalid day lengths instead of rounding them', async ({ p
   const evolve = settings.getByRole('button', { name: 'Evolve!' })
   await settings.getByRole('spinbutton', { name: 'Days to run' }).fill('10')
   await settings.getByRole('button', { name: /^Watch live/ }).click()
+  await advancedSettings(page, 'Inheritance and timing')
 
   for (const [value, error] of [
     ['10.04', 'Enter seconds in tenths.'],
@@ -1622,14 +1721,15 @@ test('discarding edits to a duplicated run restores the duplicated setup', async
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
   await expect(name).toHaveValue('Working title')
   await expect(food).toHaveValue('444')
-  await settings.getByRole('button', { name: /^Advanced Rules/ }).click()
+  await advancedSettings(page, 'Movement and energy')
   const foraging = settings.getByRole('combobox', { name: 'Foraging rules' })
   await foraging.selectOption('walkthrough')
   await discard.click()
   await settings.getByRole('button', { name: 'Discard draft', exact: true }).click()
+  await expect(foraging).toHaveValue('standard')
+  await settings.getByRole('button', { name: 'Basic', exact: true }).click()
   await expect(name).toHaveValue('Archive source copy')
   await expect(food).toHaveValue('321')
-  await expect(foraging).toHaveValue('standard')
   await expect(settings.getByRole('spinbutton', { name: 'Random seed' })).toHaveValue('37')
   await expect(discard).toHaveCount(0)
 })
@@ -1637,28 +1737,37 @@ test('discarding edits to a duplicated run restores the duplicated setup', async
 test('mutation profiles follow the selected species and its trait switches', async ({ page }) => {
   await openSimulator(page)
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
-  await page.getByRole('button', { name: /^Advanced Rules/ }).click()
+  await advancedSettings(page, 'Inheritance and timing')
   const profile = page.getByLabel('Mutation profile')
   const size = page.getByRole('checkbox', { name: 'Allow size mutation' })
   const sense = page.getByRole('checkbox', { name: 'Allow sense mutation' })
+  const basic = page.getByRole('button', { name: 'Basic', exact: true })
 
   await profile.selectOption('speed')
+  await basic.click()
   await expect(size).not.toBeChecked()
   await expect(sense).not.toBeChecked()
-
   await page.getByRole('button', { name: /^Orange/ }).click()
   await expect(size).toBeChecked()
+
+  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('all')
   await profile.selectOption('locked')
+  await basic.click()
   await expect(page.getByRole('checkbox', { name: 'Allow speed mutation' })).not.toBeChecked()
   await expect(size).not.toBeChecked()
   await expect(sense).not.toBeChecked()
 
   await page.getByRole('button', { name: 'Blue', exact: true }).click()
+  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('speed')
+  await basic.click()
   await size.check()
+  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('')
+  await basic.click()
   await sense.check()
+  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('all')
   await page.getByRole('button', { name: /^Orange/ }).click()
   await expect(profile).toHaveValue('locked')
@@ -2309,6 +2418,7 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('321')
     await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
+    await advancedSettings(page, 'Inheritance and timing')
     await page.getByRole('spinbutton', { name: 'σ Size', exact: true }).fill('1.00')
   })
   await page.getByRole('button', { name: 'Run options' }).click()
@@ -2333,6 +2443,7 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
     await expect(name).toHaveValue('Browser test run')
     await expect(food).toHaveValue('321')
     await expect(settings.getByRole('spinbutton', { name: 'Random seed' })).toHaveValue('118')
+    await advancedSettings(recipient, 'Inheritance and timing')
     await expect(settings.getByRole('spinbutton', { name: 'σ Size', exact: true })).toHaveValue('1.00')
     await expect(recipient).toHaveURL(link)
 
@@ -2403,10 +2514,15 @@ test('a replay applies the predation threshold saved with its setup', async ({ p
       buffer: Buffer.from(JSON.stringify({ ...setup, version, species })),
     })
     if (version === LEGACY_RULE_VERSION) {
+      await advancedSettings(page, 'Inheritance and timing')
       await expect(page.getByRole('spinbutton', { name: 'σ² Size', exact: true })).toHaveValue('0.25')
     }
-    await page.getByRole('button', { name: /^Advanced Rules/ }).click()
-    await expect(page.getByText(`A hunter must be at least ${threshold}% larger than its prey.`)).toBeVisible()
+    await advancedSettings(page, 'Hunting')
+    if (version === LEGACY_RULE_VERSION) {
+      await expect(page.getByText(`A hunter must be at least ${threshold}% larger than its prey.`)).toBeVisible()
+    } else {
+      await expect(page.getByRole('spinbutton', { name:'Minimum hunting size advantage' })).toHaveValue(String(threshold))
+    }
     await page.getByRole('button', { name: 'Evolve!' }).click()
     await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Ready')
 
@@ -2525,7 +2641,7 @@ test('creature details use the movement and energy rules for the day being watch
     for (const [name, value] of [['Food', '400'], ['Size', '12'], ['Sense Range', '30'], ['Energy', '1000']]) {
       await page.getByRole('spinbutton', { name, exact: true }).fill(value)
     }
-    await page.getByRole('button', { name: /^Advanced Rules/ }).click()
+    await advancedSettings(page, 'Movement and energy')
     await page.getByRole('combobox', { name: /^Energy model/ }).selectOption('product')
   })
   await quickThrough(page, 1)
@@ -2546,7 +2662,7 @@ test('creature details use the movement and energy rules for the day being watch
   await runOptions.click()
   await page.getByRole('button', { name: 'Branch here', exact: true }).click()
   await page.getByRole('button', { name: 'Edit branch rules' }).click()
-  await page.getByRole('button', { name: /^Advanced Rules/ }).click()
+  await advancedSettings(page, 'Movement and energy')
   await page.getByRole('combobox', { name: /^Stride/ }).selectOption('speed')
   await page.getByRole('combobox', { name: /^Energy model/ }).selectOption('additive')
   await page.getByRole('button', { name: 'Create branch', exact: true }).click()
@@ -2695,7 +2811,7 @@ test('playback actions disable advancing at dusk and work again on the next day'
   await openSimulator(page)
   await startRun(page, '10', async () => {
     await fixedDay(page, '1')
-    await page.getByRole('button', { name: /^Advanced Rules/ }).click()
+    await advancedSettings(page, 'Movement and energy')
     await expect(page.getByRole('combobox', { name: /^Energy model/ })).toHaveValue('walkthrough')
     await expect(page.getByText('10.002 energy per 0.1 s step for Blue')).toBeVisible()
   })

@@ -5,13 +5,31 @@ export const SETTLED_RULE_VERSION = 3
 export const WALKTHROUGH_RULE_VERSION = 4
 export const REFUGE_RULE_VERSION = 5
 export const STEERING_RULE_VERSION = 6
-export const VERSION = STEERING_RULE_VERSION
+export const HABITAT_RULE_VERSION = 7
+export const VERSION = HABITAT_RULE_VERSION
 export const MAX_SEED = 0xffffffff
+export const HABITAT_DEFAULTS = Object.freeze({
+  foodPlacement: 'scattered',
+  patchCount: 3,
+  patchRadius: 30,
+  patchRelocation: 'fixed',
+  patchInterval: 5,
+  refugePercent: 10,
+  huntingAdvantage: 25,
+  firstHuntingDay: 1,
+})
 export const endsWhenSettled = config => config.version >= SETTLED_RULE_VERSION && config.endMode === 'settled'
 export const usesStandardDeviation = config => config.version >= WALKTHROUGH_RULE_VERSION
 export const usesWalkthroughForaging = config => usesStandardDeviation(config) && config.foraging === 'walkthrough'
 export const usesRefugeBorder = config => config.version >= REFUGE_RULE_VERSION
 export const usesImprovedSteering = config => config.version >= STEERING_RULE_VERSION && !usesWalkthroughForaging(config)
+export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
+export const huntingOnDay = (config, day) => config.predation &&
+  (!usesHabitatRules(config) || day >= config.firstHuntingDay)
+
+function setupWithHabitatDefaults(setup) {
+  return usesHabitatRules(setup) ? { ...setup, ...HABITAT_DEFAULTS } : setup
+}
 
 export function speciesTemplate(id, name, color, count = 10, enabled = true, version = VERSION) {
   const spread = usesStandardDeviation({ version })
@@ -23,14 +41,14 @@ export function speciesTemplate(id, name, color, count = 10, enabled = true, ver
 }
 
 export function starter(version = VERSION) {
-  return {
+  return setupWithHabitatDefaults({
     version, name: 'Starter field', days: 50, endMode: 'settled', duration: 100, seed: 18, food: 50,
     mode: 'prepare', predation: true, sameSpecies: true, stride: 'linked', metabolism: 'walkthrough',
     plantReward: 0, preyReward: 0, schedule: [], scheduleMode: 'constant',
     species: [speciesTemplate('blue', 'Blue', PALETTE[0], 50, true, version),
       { ...speciesTemplate('orange', 'Orange', PALETTE[1], 10, false, version), sense: 50 },
       { ...speciesTemplate('pink', 'Pink', PALETTE[2], 10, false, version), speed: 9, size: 9 }]
-  }
+  })
 }
 
 export function validate(config) {
@@ -58,6 +76,20 @@ export function validate(config) {
       !['walkthrough', 'product', 'additive'].includes(config.metabolism) || typeof config.predation !== 'boolean' ||
       typeof config.sameSpecies !== 'boolean' ||
       (config.foraging !== undefined && !usesWalkthroughForaging(config))) errors.rules = 'Choose supported simulation rules.'
+  if (usesHabitatRules(config)) {
+    if (!['scattered', 'patches'].includes(config.foodPlacement)) errors.foodPlacement = 'Choose scattered plants or patches.'
+    if (config.foodPlacement === 'patches') {
+      number('patchCount', 'Number of patches', config.patchCount, 1, 8)
+      number('patchRadius', 'Patch radius', config.patchRadius, 10, 60)
+      if (!['fixed', 'interval'].includes(config.patchRelocation)) errors.patchRelocation = 'Choose when food patches move.'
+      if (config.patchRelocation === 'interval') number('patchInterval', 'Generations between moves', config.patchInterval, 1, 100)
+    }
+    if (![10, 15, 20].includes(config.refugePercent)) errors.refugePercent = 'Choose a supported refuge width.'
+    if (config.predation) {
+      number('huntingAdvantage', 'Minimum hunting size advantage', config.huntingAdvantage, 5, 100)
+      number('firstHuntingDay', 'First hunting day', config.firstHuntingDay, 1, Number.isInteger(config.days) ? config.days : 1000)
+    }
+  }
   if (!Array.isArray(config.schedule) || !['constant', 'ramp', 'step'].includes(config.scheduleMode)) {
     errors.schedule = 'Choose a supported food schedule.'
   } else {
@@ -143,10 +175,12 @@ export function randomSeed(exclude = 0) {
 }
 
 export function setupForNewRun(setup) {
-  if (setup.version === WALKTHROUGH_RULE_VERSION || setup.version === REFUGE_RULE_VERSION) return { ...setup, version: VERSION }
+  if (setup.version >= WALKTHROUGH_RULE_VERSION && setup.version < VERSION) {
+    return setupWithHabitatDefaults({ ...setup, version: VERSION })
+  }
   if (setup.version !== SETTLED_RULE_VERSION) return setup
   const species = setup.species.map(({ variance, ...item }) => ({
     ...item, standardDeviation: Object.fromEntries(TRAITS.map(trait => [trait, Math.sqrt(variance[trait])])),
   }))
-  return { ...setup, version: VERSION, species }
+  return setupWithHabitatDefaults({ ...setup, version: VERSION, species })
 }

@@ -484,9 +484,6 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .daily-card .number-shell .spring-track{height:23px}
 .daily-card .number-shell .spring-track i{top:10px;background:var(--daily-rule)}
 .daily-card .number-shell input[type=number]{min-width:0;min-height:29px;padding:3px 4px;font-size:12px}
-.olive-label{display:flex;align-items:center;justify-content:flex-end;gap:5px;color:#c4cd97;margin-top:2px;font-size:10px}
-.daily-card .link{min-height:22px;padding:1px 4px;font-size:10px}
-.olive-label select{min-height:23px;padding:1px 4px;font-size:10px}
 .reset-note{margin:1px auto!important;font-size:9px;line-height:1.1}
 .setting-inset{max-width:760px;margin:4px auto;display:grid;gap:4px}
 .schedule-row,.schedule-preview,.run-name{display:flex;align-items:center;gap:8px;color:var(--muted);flex-wrap:wrap}
@@ -496,8 +493,6 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .run-name input{flex:1;min-width:100px}
 .final-fields{max-width:600px;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
 .final-fields>.run-name:first-child{grid-column:1/-1}
-.final-fields>.run-mode{display:flex;gap:5px;align-items:center;flex-wrap:nowrap;white-space:nowrap;font-size:11px}
-.final-fields>.run-mode select{width:148px;min-width:0;padding:3px 4px;font-size:11px}
 .final-fields>.run-name:nth-of-type(3){grid-column:span 1}
 .final-fields>small{text-align:left;grid-column:1/-1;font-size:11px}
 .final-fields .number-shell{grid-template-columns:minmax(0,1fr) 48px;grid-template-rows:20px 22px;min-height:42px}
@@ -514,16 +509,38 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .start-modes button{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:5px;text-align:center;padding:3px 6px;min-height:29px}
 .start-modes button strong{font-size:10px}
 .start-modes small{display:block;color:var(--muted);line-height:1.15;font-size:9px}
-.run-controls{max-width:600px;margin:2px auto;text-align:center}
-.run-mode{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin:0 auto;color:var(--muted);font-size:10px}
-.run-mode select{min-height:24px;padding:1px 6px;font-size:10px}
 .run-days-note{display:block;max-width:600px;margin:1px auto;text-align:center;font-size:9px;line-height:1.1}
-.advanced{padding:0;margin:2px auto;gap:0;background:transparent;border:0}
-.advanced>button{min-height:27px;padding:2px 7px;font-size:12px}
-.advanced-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;color:var(--muted)}
-.advanced-grid .predation-note{grid-column:1/-1}
-.advanced-grid output{font-family:var(--mono);color:var(--cream)}
-.advanced-grid output small{display:block;color:var(--quiet);margin-top:5px}
+.settings-pages{display:flex;flex:none;gap:4px;margin:4px 14px 8px;border-bottom:1px solid var(--line)}
+.settings-pages button,.advanced-groups button{min-height:36px;padding:4px 12px;color:var(--muted);font-size:14px}
+.settings-pages button{border-bottom:2px solid transparent}
+.settings-pages button[aria-pressed=true]{color:var(--focus);border-color:var(--focus)}
+.settings-pages button:hover,.advanced-groups button:hover{color:var(--ink)}
+.mutation-switches{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:12px}
+.mutation-switches label,.advanced-toggle{display:flex;align-items:center;gap:5px;min-height:28px}
+.advanced-summary{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 10px;
+  text-align:left;color:var(--cream);background:#1c1c1b;border:1px solid var(--subtle);border-radius:5px}
+.advanced-summary:hover{border-color:var(--teal)}
+.advanced-summary small{display:block;color:var(--muted)}
+.advanced-settings{flex:none;padding:2px 14px 10px}
+.advanced-settings h2{font-size:17px;margin-bottom:8px}
+.advanced-groups{display:flex;flex-wrap:wrap;gap:6px}
+.advanced-groups button{border:1px solid var(--line);border-radius:5px;padding-inline:10px}
+.advanced-groups button[aria-pressed=true]{background:var(--select);border-color:var(--teal);color:var(--focus)}
+.advanced-group,.advanced-block{display:grid;gap:8px}
+.advanced-block{padding:12px;background:#1c1c1b;border:1px solid var(--subtle);border-radius:5px}
+.advanced-block h3{font-size:16px}
+.advanced-group .quiet{font-size:13px;line-height:1.3}
+.advanced-select{display:flex;justify-content:space-between;align-items:center;gap:6px 14px;flex-wrap:wrap;color:var(--cream)}
+.advanced-actions{display:flex;gap:8px}
+.advanced-block .number-shell{grid-template-columns:minmax(0,1fr) minmax(60px,32%) 65px}
+.advanced-block .mutation-stack .number-shell{grid-template-columns:minmax(0,1fr) 54px}
+.advanced-block .number-shell input{min-width:0}
+.advanced-block .species-tabs{justify-content:flex-start;margin-bottom:0}
+.energy-calculation{font-family:var(--mono);color:var(--cream)}
+.energy-calculation small{display:block;color:var(--quiet);margin-top:4px}
+.habitat-preview{grid-template-columns:minmax(0,1fr) minmax(96px,30%);align-items:center;gap:8px 14px}
+.habitat-preview .schedule-preview{display:grid;align-content:start;padding:0}
+.habitat-preview canvas{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:5px}
 .settings-footer{flex:none;text-align:center;padding:4px 10px 7px;color:var(--muted);border-top:1px solid var(--subtle)}
 .settings-footer>small{display:inline;margin-left:6px;font-size:9px}.settings-footer p{margin:1px 0;font-size:9px;line-height:1.1}
 .settings-errors{max-width:500px;max-height:min(22dvh,128px);overflow:auto;overscroll-behavior:contain;margin:4px auto 6px;text-align:left;border:1px solid #894f47;border-radius:5px;padding:6px 8px}
@@ -744,6 +761,12 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .settings-sheet{width:100vw;max-height:100dvh;height:100dvh;border:0;border-radius:0}
   .settings-fields{padding-inline:9px}
   .settings-close{top:6px;right:7px}
+  .settings-pages{margin-inline:9px}
+  .advanced-settings{padding-inline:9px}
+  .advanced-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .advanced-groups button{min-height:34px;font-size:13px}
+  .advanced-block{padding:9px}
+  .advanced-block .mutation-stack .number-shell{grid-template-columns:minmax(0,1fr)}
   .daily-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
   .mutation-stack{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
   .final-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}

@@ -1,4 +1,4 @@
-import { LEGACY_RULE_VERSION } from './config.js'
+import { LEGACY_RULE_VERSION, usesHabitatRules } from './config.js'
 
 export const FIELD = 500
 export const REFUGE_WIDTH = 50
@@ -15,9 +15,12 @@ export function cost(blob, config) {
   if (config.metabolism === 'product') return blob.size ** 3 * blob.speed ** 2 * blob.sense / 20000
   return 0.001 * (blob.size ** 3 * (travel(blob, config) / 10) ** 2 + blob.sense)
 }
-export const canHunt = (hunter, prey, config) => config.predation && hunter.id !== prey.id &&
-  (config.sameSpecies || hunter.species !== prey.species) &&
-  (config.version === LEGACY_RULE_VERSION ? hunter.size >= 1.2 * prey.size : prey.size <= 0.8 * hunter.size)
+export function canHunt(hunter, prey, config) {
+  if (!config.predation || hunter.id === prey.id || (!config.sameSpecies && hunter.species === prey.species)) return false
+  if (config.version === LEGACY_RULE_VERSION) return hunter.size >= 1.2 * prey.size
+  const largestPreyRatio = usesHabitatRules(config) ? 100 / (100 + config.huntingAdvantage) : 0.8
+  return prey.size <= largestPreyRatio * hunter.size
+}
 
 export function turn(from, to) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from))

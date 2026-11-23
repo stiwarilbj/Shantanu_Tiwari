@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { rulesFor, setupForNewRun, starter, validate, validateRevisions } from './engine/config.js'
+import { rulesFor, setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
 import { dawn, founders, snapshot } from './engine/simulation.js'
 import { DT, clamp } from './engine/geometry.js'
 import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
@@ -655,7 +655,11 @@ export const useLab = defineStore('lab', () => {
     if (!settings.value) restorePlay = playing.value
     stopPlayback()
     if (setup || !draft.value || branchFrom.value != null) {
-      openingDraft = JSON.stringify(setup ?? setupForNewRun(run.value?.setup ?? starter()))
+      // Rule version 7 defaults reproduce version 6, including for branches and imported setups.
+      const initial = setup?.version === STEERING_RULE_VERSION
+        ? setupForNewRun(setup)
+        : setup ?? setupForNewRun(run.value?.setup ?? starter())
+      openingDraft = JSON.stringify(initial)
       draft.value = JSON.parse(openingDraft)
     }
     branchFrom.value = from

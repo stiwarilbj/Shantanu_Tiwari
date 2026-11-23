@@ -1,10 +1,11 @@
-import { endsWhenSettled, plantsForDay, TRAITS, usesImprovedSteering, usesRefugeBorder, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
+import { endsWhenSettled, huntingOnDay, TRAITS, usesImprovedSteering, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
 import { summaries } from './stats.js'
 import { forage } from './foraging.js'
 import { improvedIntent, steer } from './steering.js'
-import { FIELD, REFUGE_WIDTH, DT, WALKTHROUGH_STEP, Grid, clamp, radius, travel, cost, walkthroughStepCost,
+import { FIELD, DT, WALKTHROUGH_STEP, Grid, clamp, radius, travel, cost, walkthroughStepCost,
   canHunt, turn, edgePoint, homePoints, refugeContact, refugeDistance, pathOf, contact } from './geometry.js'
+import { openingHabitat } from './habitat.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -35,7 +36,7 @@ export function dawn(config, day, checkpoint) {
   const { roster, nextId } = checkpoint
   const walkthrough = config.metabolism === 'walkthrough'
   const foraging = usesWalkthroughForaging(config)
-  const refugeWidth = usesRefugeBorder(config) ? REFUGE_WIDTH : 0
+  const { refugeWidth, plants } = openingHabitat(config, day)
   const inheritedEdges = foraging && !refugeWidth
   const stepSeconds = walkthrough ? WALKTHROUGH_STEP : DT
   const species = new Map(config.species.map(s => [s.id, s]))
@@ -55,11 +56,6 @@ export function dawn(config, day, checkpoint) {
       speedWorld: travel(original, config), moveCost }
   })
   if (!foraging) blobs.sort((a, b) => a.id - b.id)
-  const margin = refugeWidth ? refugeWidth + 2 : foraging ? 0 : 12
-  const width = FIELD - 2 * margin
-  const plants = Array.from({ length: plantsForDay(config, day) }, (_, id) => ({
-    id, x: margin + width * random(config.seed, 5, day, id, 0), y: margin + width * random(config.seed, 5, day, id, 1), eaten: false,
-  }))
   const limit = endsWhenSettled(config) ? null : Math.round(config.duration / 10 / stepSeconds)
   return { day, tick: 0, stepSeconds, limit, refugeWidth,
     nextId, opening: roster, blobs, plants, events: [], settled: false }
@@ -299,14 +295,15 @@ export function step(ctx, config, count = 1, skipIdle = false) {
   const stop = Math.min(limit, ctx.tick + count)
   const hasActive = () => ctx.blobs.some(b => b.alive && !b.home)
   const foraging = usesWalkthroughForaging(config)
+  const dayRules = config.predation && !huntingOnDay(config, ctx.day) ? { ...config, predation: false } : config
   while (ctx.tick < stop) {
     if ((ctx.limit == null || skipIdle) && !hasActive()) {
       if (ctx.limit == null) break
       ctx.tick = stop
       break
     }
-    if (foraging) forage(ctx, config, settleHome, kill, eat)
-    else tick(ctx, config)
+    if (foraging) forage(ctx, dayRules, settleHome, kill, eat)
+    else tick(ctx, dayRules)
   }
   return ctx.tick === limit || (ctx.limit == null && !hasActive()) ? dusk(ctx, config) : null
 }
