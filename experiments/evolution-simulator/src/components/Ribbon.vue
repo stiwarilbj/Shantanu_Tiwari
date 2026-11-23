@@ -3,11 +3,12 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Bookmark, ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
-import { predict } from '../forecast.js'
-import { forecastPreferences } from '../forecast-preferences.js'
+import { useForecast } from '../use-forecast.js'
+import ForecastStatus from './ForecastStatus.vue'
 import Flower from './Flower.vue'
 import ExtinctionIcon from './ExtinctionIcon.vue'
 
+const props = defineProps({ active: Boolean })
 const emit = defineEmits(['reroll', 'table'])
 const lab = useLab()
 const scroll = ref(null), fold = ref(false), legend = ref(false), panel = ref(null), inspection = ref(null)
@@ -20,19 +21,18 @@ legend.value = innerWidth >= 620
 const order = computed(() => mode.value === 'classic' ? [1,3,4,5,0] : [1,2,3,4,5,0])
 const rows = computed(() => lab.run.summaries.map(record => record.rows[lab.scope]))
 const miniKey = computed(() => METRICS[order.value[rotation.value] ?? 1])
-const forecasts = computed(() => {
-  if (mode.value !== 'line' || !forecastPreferences.enabled || lab.extinctDay) return []
-  const { key } = miniKey.value
-  return predict(rows.value, row=>metricValue(row,key), forecastPreferences.cycles, {
-    integer: key === 'population', extinct: row=>key === 'population' && row?.population === 0,
-  })
-})
+const forecast = useForecast(() => lab.run, () => lab.run.summaries,
+  () => props.active && !fold.value && mode.value === 'line')
+const forecasts = computed(() => forecast.rows.value.map(record => metricValue(record.rows[lab.scope], miniKey.value.key)))
 const forecastEnd = computed(() => lab.completed + forecasts.value.length)
 const forecastForDay = day => forecasts.value[day - lab.completed - 1]
 function forecastText(value) {
   return format(value,miniKey.value.key === 'population' ? 0 : 2)
 }
-const forecastLabel = day => 'Predicted · Day '+day+' · '+miniKey.value.short+' '+forecastText(forecastForDay(day))
+const forecastLabel = day => [
+  'Predicted', ...(day > lab.run.setup.days ? ['If extended'] : []),
+  'Day '+day, miniKey.value.short+' '+forecastText(forecastForDay(day)),
+].join(' · ')
 const bookmarks = computed(() => new Set(lab.run.bookmarks ?? []))
 const bookmarkAction = day => bookmarks.value.has(day) ? 'Remove bookmark for Day '+day : 'Bookmark Day '+day
 const bounds = computed(() => {
@@ -70,7 +70,7 @@ const extraForecastDays = computed(() => Array.from({ length:Math.max(0, forecas
   (_,index)=>tiles.value.length+index+1))
 const miniSeries = computed(() => {
   const { key } = miniKey.value
-  const scale = Math.max(bounds.value[key].max,...forecasts.value) || 1
+  const scale = Math.max(bounds.value[key].max,...forecasts.value.filter(Number.isFinite)) || 1
   const point = (day,value) => ({ day, x:(day-.5)*100, y:58-value/scale*50 })
   const points = []
   let path = ''
@@ -82,9 +82,17 @@ const miniSeries = computed(() => {
     path += ` ${command}${x} ${y}`
     points.push({ day: tile.day, x, y })
   }
-  const future = forecasts.value.map((value,index)=>point(lab.completed+index+1,value))
-  const predictedPath = future.length ? [points.at(-1), ...future]
-    .map(({ x,y },index)=>`${index ? 'L' : 'M'}${x} ${y}`).join(' ') : ''
+  const future = []
+  let predictedPath = ''
+  let previous = points.at(-1)
+  for (const [index, value] of forecasts.value.entries()) {
+    if (!Number.isFinite(value)) continue
+    const next = point(lab.completed + index + 1, value)
+    if (!future.length && previous?.day === next.day - 1) predictedPath = `M${previous.x} ${previous.y}`
+    predictedPath += ` ${previous?.day === next.day - 1 ? 'L' : 'M'}${next.x} ${next.y}`
+    future.push(next)
+    previous = next
+  }
   return { path, points, future, predictedPath }
 })
 const firstExtinct = computed(() => rows.value.find(row => row?.population === 0)?.day)
@@ -191,6 +199,7 @@ function escapeRibbon(event) {
 </script>
 <template>
   <section class="dock" aria-label="Current generation and timeline">
+    <ForecastStatus :forecasts="[forecast]"/>
     <div v-if="!fold" class="ribbon" @keydown.esc="escapeRibbon">
       <div ref="scroll" class="ribbon-scroll" @wheel="wheel" @scroll.passive="anchorDetail">
         <div class="tile-track">
@@ -214,8 +223,8 @@ function escapeRibbon(event) {
           <div v-for="day in extraForecastDays" :key="day" class="day-tile line-tile predicted-tile" :data-day="day"
             :tabindex="focusDay===day ? 0 : -1" role="img" :aria-label="forecastLabel(day)" :title="forecastLabel(day)"
             @focus="focusDay=day" @keydown="keys($event,day)">
-            <span class="day-number">{{ day }}</span><small class="mini-prediction">Predicted</small>
-            <small class="mini-prediction">≈ {{ forecastText(forecastForDay(day)) }}</small>
+            <span class="day-number">{{ day }}</span><small class="mini-prediction">If extended</small>
+            <small v-if="forecastForDay(day)!=null" class="mini-prediction">≈ {{ forecastText(forecastForDay(day)) }}</small>
           </div>
           <button v-if="lab.extinctDay" class="day-tile extinction-tile" :aria-label="'Extinct on Day '+lab.extinctDay+' · Watch final scene'" @click="lab.openDay(lab.extinctDay, Infinity)">
             <ExtinctionIcon/>

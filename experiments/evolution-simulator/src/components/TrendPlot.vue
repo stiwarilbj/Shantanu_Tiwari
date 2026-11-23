@@ -4,11 +4,9 @@ import { Chart, LineController, LineElement, PointElement, BarController, BarEle
   Tooltip, Filler } from 'chart.js'
 import { Maximize2, Minimize2, Minus } from 'lucide-vue-next'
 import { format } from '../engine/stats.js'
-import { predict, predictDistribution } from '../forecast.js'
-import { forecastPreferences } from '../forecast-preferences.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
-const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String, min:Number, max:Number,
+const props = defineProps({ id:String, title:String, rows:Array, futureRows:{ type:Array, default:() => [] }, series:Array, unit:String, color:String, min:Number, max:Number,
   pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
@@ -18,29 +16,29 @@ const hidden = ref([])
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
   [hovered.value, props.pin].find(day => day != null && props.rows.some(row => row.day === day)) ?? null)
-const hasSamples = computed(() => props.series.some(series => props.rows.some(row => series.value(row) != null)))
-const projections = computed(() => {
-  if (!forecastPreferences.enabled) return []
-  const cycles = forecastPreferences.cycles
-  const distributions = new Map()
-  return props.series.map((series, index) => {
-    if (hidden.value.includes(series.label)) return null
-    const { read, field, ...bounds } = series.prediction ?? {}
-    if (read && !distributions.has(read)) distributions.set(read, predictDistribution(props.rows, read, cycles))
-    const samples = distributions.get(read)
-    const values = samples ? samples.map(sample => sample[field] ?? null) :
-      predict(props.rows, series.value, cycles, { ...bounds, integer:series.integer })
-    if (!values.some(Number.isFinite)) return null
-    return { series, index, values, samples }
-  }).filter(Boolean)
+const hasSamples = computed(() => projections.value.length > 0 ||
+  props.series.some(series => props.rows.some(row => series.value(row) != null)))
+const projections = computed(() => props.series.flatMap((series, index) => {
+  if (hidden.value.includes(series.label)) return []
+  const values = props.futureRows.map(row => series.value(row) ?? null)
+  return values.some(Number.isFinite) ? [{ series, index, values }] : []
+}))
+const predictionDays = computed(() => projections.value.length ? props.futureRows.map(row => row.day) : [])
+const isExtended = (series, row) => row && (series.extended ? series.extended(row) : row.ifExtended)
+const firstExtended = computed(() => props.futureRows.findIndex((row, index) =>
+  projections.value.some(({ series, values }) => Number.isFinite(values[index]) && isExtended(series, row))))
+const predictionReading = computed(() => {
+  const index = predictedIndex.value
+  if (predictionDays.value[index] == null) return ''
+  const row = props.futureRows[index]
+  const readings = projections.value.filter(p => p.series.tooltip !== false && Number.isFinite(p.values[index]))
+  const extended = readings.length ? readings.every(p => isExtended(p.series, row)) : row.ifExtended
+  return [
+    (extended ? 'Predicted · If extended' : 'Predicted')+' · '+(props.embedded ? 'Generation ' : 'Day ')+row.day,
+    ...readings.map(({ series, values }) => seriesReading(series, values[index], series.spread?.(row))+
+      (!extended && isExtended(series, row) ? ' (If extended)' : '')),
+  ].join(' · ')
 })
-const predictionDays = computed(() => projections.value.length
-  ? Array.from({ length:forecastPreferences.cycles }, (_, i) => props.rows.at(-1).day + i + 1) : [])
-const predictionReading = computed(() => predictionDays.value[predictedIndex.value] == null ? '' :
-  ['Predicted · '+(props.embedded ? 'Generation ' : 'Day ')+predictionDays.value[predictedIndex.value],
-    ...projections.value.filter(p=>Number.isFinite(p.values[predictedIndex.value]))
-      .map(p=>seriesReading(p.series, p.values[predictedIndex.value], p.series.spread ? p.samples?.[predictedIndex.value]?.sd : null))
-  ].join(' · '))
 
 function seriesReading(series, value, spread) {
   if (series.bar && value < 0) value = -value
@@ -146,6 +144,11 @@ const marker = {
       ctx.fillStyle='#83B3CE17'
       ctx.fillRect(boundary,area.top,area.right-boundary,area.bottom-area.top)
       mark(boundary,'#83B3CE99',[3,4])
+      if (firstExtended.value > 0) {
+        const end = dayX(props.rows.length + firstExtended.value - 1)
+        const next = dayX(props.rows.length + firstExtended.value)
+        mark((end + next)/2,'#A9D2E799',[2,3])
+      }
     }
     for (const annotation of props.annotations ?? []) {
       const i=props.rows.findIndex(row=>row.day===annotation.day)
@@ -177,12 +180,14 @@ const marker = {
     if (predictionDays.value.length) {
       ctx.save()
       ctx.font='11px "Lab Mono", monospace'
-      const width=ctx.measureText('Prediction').width+10
+      const label=firstExtended.value === 0 ? 'Prediction · If extended' :
+        firstExtended.value > 0 ? 'Prediction · Includes extension' : 'Prediction'
+      const width=ctx.measureText(label).width+10
       const x=area.right-width
       ctx.fillStyle='#202F37'
       ctx.fillRect(x,area.top+2,width,17)
       ctx.fillStyle='#C4E5F4'
-      ctx.fillText('Prediction',x+5,area.top+14)
+      ctx.fillText(label,x+5,area.top+14)
       ctx.restore()
     }
   }
@@ -218,7 +223,12 @@ function update() {
       borderColor:s.color.length === 9 ? s.color.slice(0,7)+'80' : s.color,
       backgroundColor:s.bar ? s.color.slice(0,7)+'29' : s.fill ? s.fill.slice(0,7)+'10' : s.color,
       borderSkipped:false,
-      pointRadius:0, pointHoverRadius:s.bar ? 0 : 3,
+      pointRadius: context => {
+        const { dataIndex: i, dataset } = context
+        return !s.bar && i >= history && dataset.data[i] != null &&
+          dataset.data[i - 1] == null && dataset.data[i + 1] == null ? 2.5 : 0
+      },
+      pointHoverRadius:s.bar ? 0 : 3,
       fill:typeof s.area==='number' ? forecastFills.get(s.area) ?? false : actual.fill,
     })
   }
@@ -267,15 +277,21 @@ function create() {
         filter:item=>item.dataset.projection
           ? item.dataIndex >= props.rows.length && !showPredictionReading.value : props.series[item.datasetIndex]?.tooltip!==false,
         callbacks:{
-          title:items=>(items[0]?.dataset.projection ? 'Predicted · ' : '')+
-            (props.embedded ? 'Generation ' : 'Day ')+items[0]?.label,
+          title(items) {
+            const item = items[0]
+            const projected = item?.dataset.projection
+            const row = projected && props.futureRows[item.dataIndex - props.rows.length]
+            const extended = row && items.every(i => i.dataset.projection && isExtended(i.dataset.projection.series, row))
+            return (projected ? extended ? 'Predicted · If extended · ' : 'Predicted · ' : '') +
+              (props.embedded ? 'Generation ' : 'Day ')+item?.label
+          },
           afterTitle:()=>props.scope ?? '',
           label(item) {
             const p=item.dataset.projection
             const series=p?.series ?? props.series[item.datasetIndex]
-            const spread=p ? (series.spread ? p.samples?.[item.dataIndex-props.rows.length]?.sd : null) :
-              series.spread?.(props.rows[item.dataIndex])
-            return seriesReading(series,item.raw,spread)
+            const row = p ? props.futureRows[item.dataIndex - props.rows.length] : props.rows[item.dataIndex]
+            return seriesReading(series,item.raw,row && series.spread?.(row))+
+              (p && isExtended(series, row) ? ' (If extended)' : '')
           }
         }
       }},

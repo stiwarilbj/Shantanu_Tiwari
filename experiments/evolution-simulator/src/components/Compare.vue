@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Pause, Play, Scan } from 'lucide-vue-next'
 import Board from './Board.vue'
 import TrendPlot from './TrendPlot.vue'
+import ForecastStatus from './ForecastStatus.vue'
+import { pairedForecastRows } from '../forecast.js'
+import { useForecast } from '../use-forecast.js'
 import { useLab } from '../store.js'
 import { trackFrame } from '../track.js'
 import { rulesFor, usesWalkthroughForaging, WALKTHROUGH_RULE_VERSION } from '../engine/config.js'
@@ -60,6 +63,12 @@ const frames=computed(()=>tracks.value.map((track,index)=>track
 const commonSpecies=computed(()=>left.value?.setup.species.filter(s=>s.enabled&&right.value?.setup.species.some(b=>b.enabled&&b.id===s.id)) ?? [])
 const rows=computed(()=>Array.from({length:horizon.value},(_,i)=>({day:i+1,
   a:left.value.summaries[i].rows[scope.value],b:right.value.summaries[i].rows[scope.value]})))
+const leftForecast = useForecast(() => left.value, () => rows.value)
+const rightForecast = useForecast(() => right.value, () => rows.value)
+const futureRows = computed(() => pairedForecastRows(leftForecast.rows.value, rightForecast.rows.value, (a, b) => ({
+  day: a?.day ?? b.day, a: a?.rows[scope.value], b: b?.rows[scope.value],
+  aExtended: a?.ifExtended, bExtended: b?.ifExtended,
+})))
 const summary=computed(()=>runs.value.map((run,index)=>run?.summaries[days.value[index]-1]?.rows[scope.value]))
 const resultTitle=computed(()=>days.value[0]===days.value[1] ? `Day ${days.value[0]} results` : `Day ${days.value[0]} vs Day ${days.value[1]} results`)
 const firstHunts=computed(()=>tracks.value.map(track=>track?.events.find(event=>
@@ -103,7 +112,7 @@ const trendSeries=computed(()=>Object.fromEntries(trendMetrics.map(metric=>[metr
   [['a',left.value,'Left','#83B3CE'],['b',right.value,'Right','#F6AD73']].map(([side,run,name,color])=>({
     label:run.setup.name+' · '+name, color, value:row=>valueFor(row[side],metric),
     integer:metric.count || metric.key==='population', zero:metric.count || metric.key==='population',
-    prediction:metric.key==='population'?{extinct:row=>row[side]?.population===0}:undefined,
+    extended:row=>row[side+'Extended'],
   })),
 ])))
 function stop(index=null) {
@@ -440,7 +449,8 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
       </section>
       <div class="compact-plots">
         <p class="quiet compare-trend-note">Trend charts line up the runs by generation. The two world views above can show different days.</p>
-        <TrendPlot v-for="m in trendMetrics" :key="m.key" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows"
+        <ForecastStatus :forecasts="[leftForecast, rightForecast]"/>
+        <TrendPlot v-for="m in trendMetrics" :key="m.key" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows" :future-rows="futureRows"
           :pin="day" :series="trendSeries[m.key]" :focus="focus===m.key" legend @watch="seekDay" @pin="seekDay" @focus="focus=focus===m.key?'':m.key"/>
       </div>
     </template>

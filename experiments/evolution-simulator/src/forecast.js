@@ -1,48 +1,42 @@
-const WINDOW = 10
+import { rulesFor } from './engine/config.js'
+import { dawn, step } from './engine/simulation.js'
 
-export function predict(rows, value, cycles, { min = 0, max = Infinity, integer = false, extinct } = {}) {
-  const latest = rows.at(-1)
-  if (!latest || extinct?.(latest)) return []
-  const values = []
-  for (let index = rows.length - 1; index >= 0 && values.length < WINDOW; index--) {
-    const row = rows[index]
-    const sample = value(row)
-    if (row.day !== latest.day - values.length || !Number.isFinite(sample)) break
-    values.push(sample)
-  }
-  if (values.length < 3) return []
-
-  // Fit a slope in generation units, then start the line at the last measured value.
-  const midpoint = (values.length - 1) / 2
-  let covariance = 0, variance = 0
-  for (const [index, sample] of values.entries()) {
-    const distance = midpoint - index
-    covariance += distance * (sample - values[0])
-    variance += distance ** 2
-  }
-  const slope = covariance / variance
-  return Array.from({ length: cycles }, (_, index) => {
-    const estimate = values[0] + slope * (index + 1)
-    return Math.min(max, Math.max(min, integer ? Math.round(estimate) : estimate))
-  })
+export function forecastEndpoint(rows) {
+  const end = rows.at(-1)?.day
+  return rows.length >= 3 && rows.at(-2).day === end - 1 && rows.at(-3).day === end - 2 ? end : null
 }
 
-export function predictDistribution(rows, read, cycles) {
-  const bounds = ['min', 'p25', 'p75', 'max']
-  const fields = [...bounds, 'mean', 'sd']
-  const forecasts = fields.map(key => predict(rows, row => read(row)?.[key], cycles))
-  return Array.from({ length: cycles }, (_, index) => {
-    const sample = Object.fromEntries(fields.map((key, i) => [key, forecasts[i][index] ?? null]))
-    const available = bounds.filter(key => sample[key] != null)
-    const ordered = available.map(key => sample[key]).sort((a, b) => a - b)
-    available.forEach((key, i) => { sample[key] = ordered[i] })
-    if (sample.mean != null) {
-      sample.mean = Math.min(sample.max ?? Infinity, Math.max(sample.min ?? 0, sample.mean))
-      if (sample.sd != null) {
-        sample.upper = Math.min(sample.max ?? Infinity, sample.mean + sample.sd)
-        sample.lower = Math.max(sample.min ?? 0, sample.mean - sample.sd)
+export function forecastCheckpoint(run, end) {
+  return end === run.summaries.at(-1)?.day
+    ? { day: end, ...run.latest }
+    : run.checkpoints.findLast(point => point.day <= end)
+}
+
+export function simulateForecast({ setup, revisions, checkpoint, start, end, target }, progress = () => {}) {
+  const summaries = []
+  let through = start
+  let lastProgress = performance.now()
+
+  for (let day = start + 1; day <= target && checkpoint.roster.length; day++) {
+    const rules = rulesFor(setup, revisions, day)
+    const state = dawn(rules, day, checkpoint)
+    let result
+    do {
+      result = step(state, rules, 20, true)
+      const now = performance.now()
+      if (now - lastProgress >= 1000) {
+        progress()
+        lastProgress = now
       }
-    }
-    return sample
-  })
+    } while (!result)
+    checkpoint = result.checkpoint
+    through = day
+    if (day > end) summaries.push(result.summary)
+  }
+  return { summaries, through, checkpoint }
+}
+
+export function pairedForecastRows(left, right, map) {
+  const length = Math.max(left.length, right.length)
+  return Array.from({ length }, (_, index) => map(left[index], right[index]))
 }

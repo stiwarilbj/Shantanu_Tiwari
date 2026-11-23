@@ -358,7 +358,7 @@ onMounted(()=>dialog.value.showModal())
                 @input="editForecastCycles" @blur="forecastCycles = String(forecastPreferences.cycles)">
             </label>
             <small v-if="!forecastCyclesValid" id="forecast-error" class="issue">Enter a whole number from 1 to {{ maxForecastCycles }}.</small>
-            <p id="forecast-help" class="quiet">Dashed predictions use the last 3 to 10 visible generations. Changes apply to all runs right away.</p>
+            <p id="forecast-help" class="quiet">Dashed lines preview what this seed and its scheduled rules produce after the last visible generation. Show at least three completed generations in a row to see predictions. Days past the run limit are marked “If extended”.</p>
           </div>
           <template v-else>
             <div class="advanced-block">

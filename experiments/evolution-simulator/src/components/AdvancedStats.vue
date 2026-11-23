@@ -2,6 +2,8 @@
 import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { DEATH_CAUSES, METRICS, foragingStats, format, survivalStats, traitSpread } from '../engine/stats.js'
 import { useLab } from '../store.js'
+import { useForecast } from '../use-forecast.js'
+import ForecastStatus from './ForecastStatus.vue'
 
 const TrendPlot = defineAsyncComponent(() => import('./TrendPlot.vue'))
 const lab = useLab()
@@ -53,11 +55,14 @@ const title = computed(() => view.value === 'traits'
   ? traitMetric.value.short + ' · ' + metric.value.label : metric.value.label)
 const unit = computed(() => view.value === 'traits'
   ? traitMetric.value.unit + ' · End of generation' : metric.value.unit)
+const chartRow = ({ day, rows, ifExtended }) => ({ day, ...section.value.read(rows[lab.scope], rows.all), ifExtended })
 const rows = computed(() => {
   const summaries = lab.run.summaries
   const visible = range.value === 'all' ? summaries : summaries.slice(-Number(range.value))
-  return visible.map(({ day, rows }) => ({ day, ...section.value.read(rows[lab.scope], rows.all) }))
+  return visible.map(chartRow)
 })
+const forecast = useForecast(() => lab.run, () => rows.value)
+const futureRows = computed(() => forecast.rows.value.map(chartRow))
 const latest = computed(() => rows.value.at(-1))
 const pinned = computed(() => rows.value.find(row => row.day === pinnedDay.value))
 const reading = computed(() => pinned.value ?? latest.value)
@@ -72,7 +77,6 @@ const series = computed(() => [{
   value: row => row[metric.value.key],
   primary: true,
   zero: metric.value.key === 'growthRate',
-  prediction: { min:metric.value.key === 'growthRate' ? -100 : metric.value.min, max:metric.value.max },
 }])
 
 const readings = computed(() => {
@@ -130,8 +134,9 @@ function statValue(row) {
     </select></label>
     <span v-if="latest" class="advanced-stats-latest quiet">Latest completed · Generation {{ latest.day }}</span>
   </div>
+  <ForecastStatus :forecasts="[forecast]"/>
   <div class="advanced-stats-body">
-    <TrendPlot :key="title" embedded :title="title" :unit="unit" :rows="rows" :series="series" :color="color" :min="metric.min" :max="metric.max"
+    <TrendPlot :key="title" embedded :title="title" :unit="unit" :rows="rows" :future-rows="futureRows" :series="series" :color="color" :min="metric.min" :max="metric.max"
       :scope="metric.field ? 'Whole field' : scopeName" :pin="pinned?.day"
       @pin="pinnedDay = $event" @watch="emit('watch', $event)"/>
     <section v-if="reading" class="advanced-stats-reading" aria-label="Generation readings">

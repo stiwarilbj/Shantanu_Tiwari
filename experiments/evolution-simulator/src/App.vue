@@ -342,7 +342,7 @@ onUnmounted(() => {
   </Teleport>
   <div id="main-surface" ref="mainSurface" :class="{ 'reading-surface':page!=='viewer' || example }" tabindex="-1" :inert="!ready">
     <template v-if="lab.run">
-      <World v-show="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
+      <World v-show="page==='viewer' && !example" :active="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
       <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'" :batch-range="batchRange"
         @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>

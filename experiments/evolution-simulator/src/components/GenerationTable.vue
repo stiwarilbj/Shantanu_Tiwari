@@ -2,6 +2,8 @@
 import { computed, defineAsyncComponent, nextTick, ref } from 'vue'
 import { format, METRICS, metricValue } from '../engine/stats.js'
 import { useLab } from '../store.js'
+import { useForecast } from '../use-forecast.js'
+import ForecastStatus from './ForecastStatus.vue'
 
 const lab = useLab()
 const emit = defineEmits(['watch'])
@@ -31,11 +33,10 @@ function valueOf(row, column) {
 }
 
 const column = computed(() => columns.find(item => item.key === stat.value))
-const trendRows = computed(() => generations.value.map(({ day, rows }) => ({
-  day,
-  value: valueOf(rows[lab.scope], column.value) ?? null,
-  population: rows[lab.scope]?.population,
-})))
+const chartRow = ({ day, rows, ifExtended }) => ({ day, value: valueOf(rows[lab.scope], column.value), ifExtended })
+const trendRows = computed(() => generations.value.map(chartRow))
+const forecast = useForecast(() => lab.run, () => generations.value, () => view.value === 'trend')
+const futureRows = computed(() => forecast.rows.value.map(chartRow))
 const trendColor = computed(() => column.value.color ?? '#71D2C0')
 const series = computed(() => [{
   label: column.value.label,
@@ -43,11 +44,6 @@ const series = computed(() => [{
   value: row => row.value,
   integer: !column.value.average,
   zero: !column.value.average,
-  prediction: {
-    min: column.value.key === 'net' ? -Infinity : 0,
-    max: ['food','plants','plantsLeft'].includes(column.value.key) ? 1000 : Infinity,
-    extinct: ['opening','population'].includes(column.value.key) ? row=>row.population===0 : undefined,
-  },
 }])
 const trendScope = computed(() => column.value.unit === 'field total'
   ? 'Whole field'
@@ -113,7 +109,8 @@ async function showTrend(key) {
       </select></label>
       <span v-if="latest" class="generation-stat-latest">Latest · Generation {{ latest.day }} <strong>{{ trendValue(latest) }}</strong></span>
     </div>
-    <TrendPlot :key="stat" :title="column.label" :unit="column.unit" :rows="trendRows" :series="series"
+    <ForecastStatus :forecasts="[forecast]"/>
+    <TrendPlot :key="stat" :title="column.label" :unit="column.unit" :rows="trendRows" :future-rows="futureRows" :series="series"
       :scope="trendScope" :color="trendColor" :pin="pinned?.day" :embedded="true"
       @pin="pinnedDay = $event" @watch="emit('watch', $event)"/>
     <div v-if="pinned" class="generation-sheet-tools generation-stat-pin" aria-live="polite">

@@ -1,42 +1,75 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { predict, predictDistribution } from '../src/forecast.js'
+import { REPRODUCTION_RULE_VERSION, REFUGE_RULE_VERSION, rulesFor, starter } from '../src/engine/config.js'
+import { dawn, founders, step } from '../src/engine/simulation.js'
+import { openingSummary, openingTrends } from '../src/engine/stats.js'
+import { forecastCheckpoint, forecastEndpoint, simulateForecast } from '../src/forecast.js'
 
-const rows = values => values.map((value, i) => ({ day:i+1, value }))
-const read = row => row.value
-
-test('prediction fits a recent slope and starts at the last visible observation', () => {
-  const history = rows([800, 900, ...Array.from({ length:10 }, (_, index)=>index*2), 100])
-  assert.deepEqual(predict(history.slice(0, -1), read, 3), [20, 22, 24])
-  assert.deepEqual(predict(rows([1, 9, 5]), read, 2), [7, 9])
-})
-
-test('prediction requires three consecutive finite samples at the visible endpoint', () => {
-  assert.deepEqual(predict(rows([1, 2]), read, 2), [])
-  assert.deepEqual(predict(rows([1, 2, 3, null]), read, 2), [])
-  assert.deepEqual(predict(rows([1, 2, 3, 4]).filter(row=>row.day!==2), read, 2), [])
-  assert.deepEqual(predict(rows([1, 2, 3, null, 5, 6, 7]), read, 2), [8, 9])
-})
-
-test('prediction constrains counts and rates and preserves signed values', () => {
-  assert.deepEqual(predict(rows([7, 4, 2]), read, 2, { integer:true }), [0, 0])
-  assert.deepEqual(predict(rows([4, 6, 7]), read, 2, { integer:true }), [9, 10])
-  assert.deepEqual(predict(rows([80, 90, 99]), read, 2, { max:100 }), [100, 100])
-  assert.deepEqual(predict(rows([-3, -2, -1]), read, 2, { min:-Infinity,max:0 }), [0, 0])
-  assert.deepEqual(predict(rows([2, 0, -2]), read, 2, { min:-Infinity }), [-4, -6])
-  assert.deepEqual(predict(rows([10, 11, 12]), read, 2, { extinct: row=>row.day===3 }), [])
-})
-
-test('forecast quartiles and mean stay within the range as bounds cross', () => {
-  const history = [0, 1, 2].map(i => ({
-    day:i+1, min:1+4*i, p25:4+3*i, mean:10, p75:16-2*i, max:20-4*i, sd:3,
-  }))
-  const forecasts = predictDistribution(history, row=>row, 3)
-  for (const { min, p25, mean, p75, max, upper, lower, sd } of forecasts) {
-    assert.ok(min <= p25 && p25 <= p75 && p75 <= max)
-    assert.ok(min <= mean && mean <= max)
-    assert.equal(upper, Math.min(max, mean+sd))
-    assert.equal(lower, Math.max(min, mean-sd))
+function record(setup, revisions, limit) {
+  let latest = founders(setup)
+  const checkpoints = [{ day: 0, ...latest }]
+  const summaries = []
+  for (let day = 1; day <= limit && latest.roster.length; day++) {
+    const rules = rulesFor(setup, revisions, day)
+    const state = dawn(rules, day, latest)
+    let result
+    while (!(result = step(state, rules, 1))) {}
+    latest = result.checkpoint
+    summaries.push(result.summary)
+    if (day % 10 === 0) checkpoints.push({ day, ...latest })
   }
-  assert.equal(predictDistribution(history, row=>({...row, sd:null}), 1)[0].upper, undefined)
+  return { setup, revisions, latest, checkpoints, summaries }
+}
+
+function preview(run, end, count, checkpoint = forecastCheckpoint(run, end)) {
+  return simulateForecast({ setup: run.setup, revisions: run.revisions,
+    start: checkpoint.day, checkpoint, end, target: end + count })
+}
+
+test('requires three consecutive observed days at the visible endpoint', () => {
+  const endpoint = (...days) => forecastEndpoint(days.map(day => ({ day })))
+  assert.equal(endpoint(1, 2), null)
+  assert.equal(endpoint(1, 2, 4, 5), null)
+  assert.equal(endpoint(4, 5, 6), 6)
+})
+
+test('a historical forecast reproduces the exact later dawn and dusk stats across a rules change', async () => {
+  const setup = { ...starter(REPRODUCTION_RULE_VERSION), seed:118, food:500, days:10,
+    endMode:'timed', duration:200, foraging:'walkthrough' }
+  const branch = { ...setup, scheduleMode:'step', schedule:[{ day:5, food:700 }, { day:7, food:600 }],
+    foodPlacement:'patches', patchCount:8, patchRadius:90, patchRelocation:'interval', patchInterval:2,
+    reproduction:{ parentMode:'single', birthChance:70, twinChance:20 },
+    species:setup.species.map(species => ({ ...species, inheritance:{
+      mutationPattern:'bounded', mutationChance:{ speed:50, size:80, sense:20 },
+    } })),
+  }
+  const revisions = [{ day:1, setup }, { day:5, setup:branch }]
+  const full = record(setup, revisions, 12)
+  const early = record(setup, revisions, 4)
+  assert.equal(forecastCheckpoint(full, 4).day, 0)
+  const copyBefore = structuredClone(early)
+
+  const fromHistory = await preview(full, 4, 8)
+  const fromLatest = await preview(early, 4, 8)
+  assert.deepEqual(fromHistory, fromLatest)
+  assert.equal(fromLatest.through, 12)
+  assert.deepEqual(fromLatest.summaries, full.summaries.slice(4))
+  assert.notEqual(fromLatest.summaries[0].rows.all.food, early.summaries.at(-1).rows.all.food)
+  assert.deepEqual(early, copyBefore)
+
+  const futureDawn = fromLatest.summaries.map((summary, index) =>
+    openingSummary(summary, (fromLatest.summaries[index - 1] ?? early.summaries.at(-1)).rows))
+  assert.deepEqual(futureDawn, openingTrends(full).slice(4))
+})
+
+test('keeps the extinction generation and stops there without inventing trait samples', async () => {
+  const setup = { ...starter(REFUGE_RULE_VERSION), seed:6, food:10, days:10 }
+  const run = record(setup, [], 3)
+  const actual = record(setup, [], 10)
+  const projected = await preview(run, 3, 25)
+  assert.equal(projected.through, 4)
+  assert.deepEqual(projected.summaries, actual.summaries.slice(3))
+  assert.equal(projected.summaries[0].rows.all.population, 0)
+  assert.equal(projected.summaries[0].rows.all.speed.mean, null)
+  assert.deepEqual((await preview(actual, 4, 5)).summaries, [])
 })

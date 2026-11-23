@@ -1,5 +1,6 @@
 import { dawn, founders, step, snapshot } from './simulation.js'
 import { rulesFor } from './config.js'
+import { simulateForecast } from '../forecast.js'
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 0))
 let config, checkpoint, partial, records, committed = 0, stopped = false, busy = false
@@ -124,6 +125,11 @@ async function replay(message) {
 self.onmessage = async ({ data }) => {
   try {
     switch (data.type) {
+      case 'forecast': {
+        const result = simulateForecast(data, () => emit('forecast-progress'))
+        emit('forecast-result', result)
+        break
+      }
       case 'replay': await replay(data); break
       case 'init':
         config = data.config

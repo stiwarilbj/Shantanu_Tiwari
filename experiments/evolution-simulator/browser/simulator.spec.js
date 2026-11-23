@@ -803,6 +803,7 @@ test('graph predictions respect the visible range, saved controls and recorded-d
   await chart.press('ArrowRight')
   await expect(reading).toBeEmpty()
   await page.getByRole('spinbutton', { name:'To day' }).fill('4')
+  await expect(page.getByText('Preparing predictions…')).toBeHidden()
   await chart.press('End')
   await chart.press('ArrowRight')
   await expect(reading).toContainText('Predicted · Day 5')
@@ -843,6 +844,7 @@ test('graph predictions respect the visible range, saved controls and recorded-d
   await show.check()
   await page.getByRole('button', { name:'Close settings' }).click()
   await page.getByRole('link', { name:'Trends', exact:true }).click()
+  await expect(page.getByText('Preparing predictions…')).toBeHidden()
   await chart.press('End')
   await chart.press('ArrowRight')
   await expect(reading).toContainText('Predicted · Day 7')
@@ -858,6 +860,7 @@ test('graph predictions respect the visible range, saved controls and recorded-d
     const dialog = page.getByRole('dialog', { name })
     if (start) await dialog.getByRole('button', { name:start }).click()
     const graph = dialog.getByRole('img', { name:/by generation/ })
+    await expect(dialog.getByText('Preparing predictions…')).toBeHidden()
     await graph.press('End')
     await graph.press('ArrowRight')
     await expect(dialog.locator('.prediction-reading')).toContainText('Predicted · Generation 7')
@@ -883,6 +886,9 @@ test('Compare forecasts both runs from the end of their shared history', async (
     .getByRole('button', { name:'Compare', exact:true }).click()
   const population = page.getByRole('article', { name:'Population chart', exact:true })
   const chart = population.getByRole('img')
+  await expect(chart).toBeVisible()
+  await expect(page.getByText('Preparing predictions…')).toBeHidden()
+  await expect(page.getByText('Predictions couldn’t load')).toHaveCount(0)
   await chart.press('End')
   await chart.press('ArrowRight')
   await expect(population.getByRole('status')).toHaveText(/Predicted · Day 4 · Shorter run · Left\s+\d+ · Longer run · Right\s+\d+/)
@@ -890,6 +896,69 @@ test('Compare forecasts both runs from the end of their shared history', async (
   await chart.press('End')
   await chart.press('ArrowRight')
   await expect(population.getByRole('status')).toHaveText(/Predicted · Day 4 · Longer run · Right\s+\d+/)
+})
+
+test('seeded previews match the recorded day, survive a worker retry and label extensions @pages', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.addInitScript(() => {
+    const send = Worker.prototype.postMessage
+    window.forecastStarts = []
+    Worker.prototype.postMessage = function (message, ...rest) {
+      if (message.type === 'forecast') {
+        window.forecastStarts.push({ start:message.start, target:message.target })
+        if (window.forecastStarts.length === 1) {
+          queueMicrotask(() => this.dispatchEvent(new MessageEvent('message', { data:{ type:'error' } })))
+          return
+        }
+      }
+      return send.call(this, message, ...rest)
+    }
+  })
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page)
+    await page.getByRole('spinbutton', { name:'Random seed' }).fill('118')
+    await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('500')
+  })
+  await quickThrough(page, 9)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 9')
+  await page.getByRole('button', { name:'Close', exact:true }).click()
+  await page.getByRole('link', { name:'Trends', exact:true }).click()
+  await expect(page.getByText('Predictions couldn’t load')).toBeVisible()
+  await page.getByRole('button', { name:'Retry predictions' }).click()
+  await expect(page.getByText('Preparing predictions…')).toBeHidden()
+
+  const population = page.getByRole('article', { name:'Population chart', exact:true })
+  const chart = population.getByRole('img')
+  const reading = population.getByRole('status')
+  await page.getByText('Chart options', { exact:true }).click()
+  await page.getByRole('combobox', { name:'Cohort', exact:true }).selectOption('dusk')
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(reading).toHaveText(/Predicted · Day 10 · Closing population\s+\d+/)
+  const predicted = (await reading.textContent()).match(/Closing population\s+(\d+)/)[1]
+  await chart.press('ArrowRight')
+  await expect(reading).toContainText('Predicted · If extended · Day 11')
+  await chart.press('Enter')
+  await expect.poll(async () => (await savedManualProgress(page)).days.at(-1)).toBe(9)
+
+  await page.getByRole('link', { name:'World', exact:true }).click()
+  await page.getByRole('button', { name:'Generation options', exact:true }).click()
+  await page.getByRole('button', { name:'Mini line', exact:true }).click()
+  await page.getByRole('region', { name:'Current generation and timeline' }).getByRole('button', { name:'Population', exact:true }).click()
+  await expect(page.locator('.ribbon-line g circle')).toHaveCount(5)
+  await expect(page.getByRole('img', { name:/Predicted · If extended · Day 11 · Population/ })).toHaveCount(1)
+  expect(await page.evaluate(() => window.forecastStarts)).toHaveLength(2)
+
+  await quickThrough(page, 10)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 10')
+  await page.getByRole('button', { name:'Close', exact:true }).click()
+  await page.getByRole('link', { name:'Trends', exact:true }).click()
+  await chart.press('End')
+  await expect(page.locator('#pinned-day-details')).toContainText(predicted+' blobs at dusk')
+  await expect.poll(() => page.evaluate(() => window.forecastStarts.at(-1))).toEqual({ start:14, target:15 })
+  expect(errors).toEqual([])
 })
 
 test('the generation spreadsheet and stat trends update after each live generation @pages', async ({ page }) => {

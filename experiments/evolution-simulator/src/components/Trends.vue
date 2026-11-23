@@ -1,11 +1,14 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ChartNoAxesCombined, Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
-import { DEATH_CAUSES, METRICS, metricValue, format, openingTrends } from '../engine/stats.js'
+import { DEATH_CAUSES, METRICS, metricValue, format, openingSummary, openingTrends } from '../engine/stats.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
 import TrendPlot from './TrendPlot.vue'
 import TraitSpace from './TraitSpace.vue'
+import { useForecast } from '../use-forecast.js'
+import { pairedForecastRows } from '../forecast.js'
+import ForecastStatus from './ForecastStatus.vue'
 
 const props = defineProps({ active: Boolean, batchRange: Object })
 const emit = defineEmits(['watch','example','reroll','restart'])
@@ -28,19 +31,39 @@ const trendSubhead=computed(()=>{
 })
 const scopeName=computed(()=>activeRun.value.setup.species.find(s=>s.id===lab.scope)?.name ?? 'All species')
 const species=computed(()=>activeRun.value.setup.species.filter(s=>s.enabled))
+const partnerRun=computed(()=>ageDemoPair.value?.[1])
 const dawnRows=computed(()=>openingTrends(activeRun.value))
 const atDawn=computed(()=>cohort.value==='dawn')
 const cohortLabel=computed(()=>atDawn.value?'Dawn':'Dusk')
 const rows=computed(()=>{
   const activeSource=atDawn.value?dawnRows.value:activeRun.value.summaries
-  const partner=ageDemoPair.value?.[1]
+  const partner=partnerRun.value
   const partnerSource=partner ? (atDawn.value?openingTrends(partner):partner.summaries) : null
   const visible=range.value==='all'?activeSource:range.value==='custom' ? activeSource.filter(d=>d.day>=from.value && d.day<=to.value) : activeSource.slice(-Number(range.value))
   const closing=new Map(activeRun.value.summaries.map(d=>[d.day,d.rows[lab.scope]?.population]))
-  return visible.map(d=>({day:d.day,...d.rows[lab.scope],scopes:d.rows,closing:closing.get(d.day),
+  return visible.filter(d=>!partner || d.day<=partner.summaries.length).map(d=>({day:d.day,...d.rows[lab.scope],scopes:d.rows,closing:closing.get(d.day),
     wide:ageDemoPair.value ? d.rows[lab.scope] : null,
     narrow:partnerSource?.[d.day-1]?.rows[lab.scope] ?? null,
   }))
+})
+const forecastActive = () => props.active && tab.value === 'Trends' && (!ageDemoVisible.value || ageDemoPair.value)
+const forecast = useForecast(() => activeRun.value, () => rows.value, forecastActive)
+const partnerForecast = useForecast(() => partnerRun.value, () => rows.value, forecastActive)
+function atCohort(record, previous) {
+  return record && (atDawn.value ? openingSummary(record, previous?.rows) : record)
+}
+const futureRows = computed(() => {
+  const end = rows.value.at(-1)?.day
+  const left = forecast.rows.value, right = partnerForecast.rows.value
+  return pairedForecastRows(left, right, (record, partner) => {
+    const day = record?.day ?? partner.day
+    const index = day - end - 1
+    const a = atCohort(record, index ? left[index - 1] : activeRun.value.summaries[end - 1])
+    const b = atCohort(partner, index ? right[index - 1] : partnerRun.value?.summaries[end - 1])
+    return { day, ...a?.rows[lab.scope], scopes: a?.rows, closing: record?.rows[lab.scope]?.population,
+      wide: a?.rows[lab.scope], narrow: b?.rows[lab.scope], ifExtended: record?.ifExtended,
+      narrowExtended: partner?.ifExtended }
+  })
 })
 const pinned=computed(()=>rows.value.find(row=>row.day===pin.value)?.scopes[lab.scope])
 const peakDay=computed(()=>{
@@ -88,24 +111,21 @@ const basic=['population','age','speed','size','sense']
 const titles={ population:'Population',age:'Age',speed:'Speed',size:'Size',sense:'Sense Range',deathAge:'Age at Death' }
 const m=key=>METRICS.find(metric=>metric.key===key)
 const line=(label,color,value,rest={})=>({label,color,value,...rest})
-const extinct=(run, scope)=>row=>run.summaries[row.day-1]?.rows[scope]?.population===0
 function distribution(key) {
   const metric=m(key), useSD=spread.value==='sd'
   const ink=basic.includes(key)?metric.petal:metric.color
   const band={ width:1, area:2, fill:ink+'1A', tooltip:false }
-  const read=row=>row[key]
-  const predictField=field=>({read,field})
   return [
-    line('Max',metric.outer+(useSD?'40':'66'),r=>r[key]?.max,{width:1,dash:useSD?undefined:[2,2],prediction:predictField('max')}),
+    line('Max',metric.outer+(useSD?'40':'66'),r=>r[key]?.max,{width:1,dash:useSD?undefined:[2,2]}),
     useSD
-      ? line('Mean + sample SD',ink+'26',r=>r[key]?.n?Math.min(r[key].max,r[key].mean+r[key].sd):null,{...band,prediction:predictField('upper')})
-      : line('P75',metric.inner+'A6',r=>r[key]?.p75,{width:1.5,prediction:predictField('p75')}),
+      ? line('Mean + sample SD',ink+'26',r=>r[key]?.n?Math.min(r[key].max,r[key].mean+r[key].sd):null,band)
+      : line('P75',metric.inner+'A6',r=>r[key]?.p75,{width:1.5}),
     line('Mean',ink,r=>r[key]?.mean,{primary:true,width:basic.includes(key)?1.7:2.2,zero:key==='age'||key==='deathAge',
-      spread:useSD?(r=>r?.[key]?.sd):undefined,prediction:predictField('mean')}),
+      spread:useSD?(r=>r?.[key]?.sd):undefined}),
     useSD
-      ? line('Mean − sample SD',ink+'26',r=>r[key]?.n?Math.max(r[key].min,r[key].mean-r[key].sd):null,{...band,prediction:predictField('lower')})
-      : line('P25',metric.inner+'A6',r=>r[key]?.p25,{width:1.5,dash:[4,2],prediction:predictField('p25')}),
-    line('Min',metric.outer+(useSD?'40':'66'),r=>r[key]?.min,{width:1,dash:useSD?undefined:[2,2],prediction:predictField('min')})
+      ? line('Mean − sample SD',ink+'26',r=>r[key]?.n?Math.max(r[key].min,r[key].mean-r[key].sd):null,band)
+      : line('P25',metric.inner+'A6',r=>r[key]?.p25,{width:1.5,dash:[4,2]}),
+    line('Min',metric.outer+(useSD?'40':'66'),r=>r[key]?.min,{width:1,dash:useSD?undefined:[2,2]})
   ]
 }
 function pairedDistribution(key) {
@@ -113,19 +133,18 @@ function pairedDistribution(key) {
   const series=[]
   for (const [side,label,color] of [['wide','Wide · σ 1.00',ink],['narrow','Narrow · σ 0.50',metric.heading ?? metric.inner]]) {
     const offset=series.length
-    const read=row=>row[side]?.[key]
-    const predictField=field=>({read,field})
     const value=(row,field)=>row?.[side]?.[key]?.[field]
+    const extended=row=>side==='wide'?row.ifExtended:row.narrowExtended
     const bound=field=>row=>row?.[side]?.[key]?.n ?
       field==='max' ? row[side][key].max : row[side][key].min : null
     series.push(
-      line(label+' max',metric.outer+'40',bound('max'),{width:1,tooltip:false,prediction:predictField('max')}),
+      line(label+' max',metric.outer+'40',bound('max'),{width:1,tooltip:false,extended}),
       line(label+' mean + SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.min(row[side][key].max,row[side][key].mean+row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false,prediction:predictField('upper')}),
-      line(label,color,row=>value(row,'mean'),{primary:true,width:1.8,spread:row=>value(row,'sd'),prediction:predictField('mean')}),
+        {width:1,area:offset+2,fill:color+'18',tooltip:false,extended}),
+      line(label,color,row=>value(row,'mean'),{primary:true,width:1.8,spread:row=>value(row,'sd'),extended}),
       line(label+' mean − SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.max(row[side][key].min,row[side][key].mean-row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false,prediction:predictField('lower')}),
-      line(label+' min',metric.outer+'40',bound('min'),{width:1,tooltip:false,prediction:predictField('min')})
+        {width:1,area:offset+2,fill:color+'18',tooltip:false,extended}),
+      line(label+' min',metric.outer+'40',bound('min'),{width:1,tooltip:false,extended})
     )
   }
   return series
@@ -133,41 +152,39 @@ function pairedDistribution(key) {
 const options=computed(()=>{
   const charts={}
   const paired=Boolean(ageDemoPair.value)
-  const populationPrediction={extinct:extinct(activeRun.value,lab.scope)}
   for(const key of [...basic,'deathAge']) charts[key]={
     id:key,title:titles[key],color:m(key).heading ?? m(key).color,
     unit:key==='deathAge'?'Deaths during the day · days':cohortLabel.value+' · '+m(key).unit,
     guide:key==='size'&&transition.value?100:undefined, hideable:true,legend:paired || key!=='population'||otherPopulation.value||compareSpecies.value,
     series:paired && key==='population' ? [
-      line('Wide · σ 1.00',m(key).color,r=>r.wide?.population,{primary:true,integer:true,width:1.7,prediction:populationPrediction}),
+      line('Wide · σ 1.00',m(key).color,r=>r.wide?.population,{primary:true,integer:true,width:1.7}),
       line('Narrow · σ 0.50','#BDBAB0',r=>r.narrow?.population,{integer:true,width:1.5,dash:[4,3],
-        prediction:{extinct:extinct(ageDemoPair.value[1],lab.scope)}}),
+        extended:r=>r.narrowExtended}),
     ]:paired ? pairedDistribution(key) : key==='population' ? [
-      line(atDawn.value?'Opening population':'Closing population',m(key).color,r=>r.population,{primary:true,integer:true,width:1.7,prediction:populationPrediction}),
+      line(atDawn.value?'Opening population':'Closing population',m(key).color,r=>r.population,{primary:true,integer:true,width:1.7}),
       ...(otherPopulation.value?[line(atDawn.value?'Closing population':'Opening population','#BDBAB0',
-        atDawn.value?(r=>r.closing):(r=>r.opening),{integer:true,dash:[4,3],width:1.5,prediction:populationPrediction})]:[]),
-      ...(compareSpecies.value?species.value.map((s,i)=>line(s.name,s.color,r=>r.scopes[s.id]?.population,{
-        integer:true,dash:[i*2+2,3],prediction:{extinct:extinct(activeRun.value,s.id)}
+        atDawn.value?(r=>r.closing):(r=>r.opening),{integer:true,dash:[4,3],width:1.5})]:[]),
+      ...(compareSpecies.value?species.value.map((s,i)=>line(s.name,s.color,r=>r.scopes?.[s.id]?.population,{
+        integer:true,dash:[i*2+2,3]
       })):[])
     ]:distribution(key)
   }
   if (!ageDemoVisible.value) charts.population.peakDay=peakDay.value
   charts.overview={id:'overview',title:'Overview',unit:'Traits · left axis   /   Population · right axis',right:true,legend:true,
     series:METRICS.filter(metric=>!hidden.value.includes(metric.key)).map(metric=>line(metric.short,metric.color,r=>metricValue(r,metric.key),{
-      axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined,
-      prediction:metric.key==='population'?populationPrediction:undefined
+      axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined
     }))}
   charts.births={id:'births',title:'Births and Deaths',unit:'Births above zero · deaths below zero',legend:true,hideable:true,
     series:[line('Births','#A1BD67',r=>r.births,{bar:true,integer:true}),
-      line('Deaths','#BD5558',r=>-r.deaths,{bar:true,integer:true,prediction:{min:-Infinity,max:0}}),
-      line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10',prediction:{min:-Infinity}}),
+      line('Deaths','#BD5558',r=>r.deaths == null ? null : -r.deaths,{bar:true,integer:true}),
+      line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10'}),
       ...(causes.value?DEATH_CAUSES.map((cause,i)=>
-        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>-(r.causes?.[cause]??0),
-          {integer:true,dash:[3+i,3],width:1.3,prediction:{min:-Infinity,max:0}})):[])
+        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>r.causes && -r.causes[cause],
+          {integer:true,dash:[3+i,3],width:1.3})):[])
     ]}
   charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,series:[
-    line(lab.scope==='all'?'Food available':'Shared plant supply','#BDBAB0',r=>r.food,{dash:[4,3],integer:true,zero:true,prediction:{max:1000}}),
-    line('Food eaten','#B7D65A',r=>r.plants,{integer:true,area:'origin',fill:'#B7D65A12',prediction:{max:1000}}),
+    line(lab.scope==='all'?'Food available':'Shared plant supply','#BDBAB0',r=>r.food,{dash:[4,3],integer:true,zero:true}),
+    line('Food eaten','#B7D65A',r=>r.plants,{integer:true,area:'origin',fill:'#B7D65A12'}),
     line('Creatures eaten','#D38C80',r=>r.hunts,{dash:[6,3,2,3],integer:true})
   ]}
   return charts
@@ -436,29 +453,31 @@ onBeforeUnmount(()=>ageDemoController?.abort())
           </div>
         </template>
       </details>
+      <ForecastStatus v-if="!focused || focused==='age'" :forecasts="[forecast, partnerForecast]"/>
       <template v-if="!ageDemoVisible || ageDemoPair" v-for="section in sectionOrder" :key="section">
         <div v-if="section==='compact'" class="compact-plots walkthrough-plots" :class="{'spotlight-layout':focused==='age'}">
           <TrendPlot v-for="key in basic.filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]"
-            compact :spotlight="focused==='age' && focused===key" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations"
+            compact :spotlight="focused==='age' && focused===key" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations"
             @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
         </div>
         <section v-else-if="section==='overview'" id="trends-overview" class="overview">
           <button class="secondary overview-mode" :aria-pressed="separate" @click="separate=!separate">{{ separate?'Combined scales':'Separate scales' }}</button>
           <div v-if="separate" class="compact-plots" :class="{'spotlight-layout':focused==='age'}">
             <TrendPlot v-for="key in [...basic,'deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="{...options[key],series:options[key].series.filter(s=>s.primary),hideable:false}"
-              :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
+              :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
           </div>
-          <TrendPlot v-else v-bind="options.overview" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" @focus="focus('overview')" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
+          <TrendPlot v-else v-bind="options.overview" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" @focus="focus('overview')" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
         </section>
         <div v-else class="secondary-plots">
-          <TrendPlot v-for="key in ['births','food','deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]" :rows="rows" :pin="pin"
+          <TrendPlot v-for="key in ['births','food','deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]" :rows="rows" :future-rows="futureRows" :pin="pin"
             :scope="scopeName" :annotations="annotations" @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
         </div>
       </template>
     </template>
     <Teleport to="body">
       <dialog ref="focusDialog" class="focus-dialog" aria-label="Focused chart" @cancel.prevent="focused=null">
-        <TrendPlot v-if="focused && focused!=='age'" v-bind="options[focused]" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" focus
+        <ForecastStatus v-if="focused && focused!=='age'" :forecasts="[forecast, partnerForecast]"/>
+        <TrendPlot v-if="focused && focused!=='age'" v-bind="options[focused]" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" focus
           @focus="focused=null" @pin="pin=$event" @peak="pinPeak" @watch="focused=null; watchPlot($event)" @range="customRange"/>
       </dialog>
     </Teleport>

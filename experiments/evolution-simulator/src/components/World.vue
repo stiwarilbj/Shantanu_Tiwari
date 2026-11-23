@@ -11,6 +11,7 @@ import Board from './Board.vue'
 import Flower from './Flower.vue'
 import Ribbon from './Ribbon.vue'
 
+const props = defineProps({ active: Boolean })
 const lab = useLab()
 const emit = defineEmits(['reroll', 'fullscreen-change'])
 const board = ref(), surface = ref(), fullscreenActive = ref(false)
@@ -320,6 +321,6 @@ defineExpose({ select, overhead })
         </button>
       </div>
     </div>
-    <Ribbon @reroll="emit('reroll')" @table="lab.modal='table'"/>
+    <Ribbon :active="props.active" @reroll="emit('reroll')" @table="lab.modal='table'"/>
   </main>
 </template>
