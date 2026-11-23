@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Dices, Download, FastForward, Layers, RotateCcw } from 'lucide-vue-next'
+import { Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
 import { METRICS, metricValue, format, openingTrends } from '../engine/stats.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
@@ -329,6 +329,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
         <select v-if="tab==='Trends'" aria-label="Jump to chart" @change="jump"><option value="">Jump to chart</option><option v-for="plot in options" :key="plot.id" :value="plot.id">{{ plot.title }}</option></select>
       </div>
       <div class="trend-actions">
+        <button class="secondary" :disabled="ageDemoVisible" @click="lab.modal='table'"><Table2 :size="17" aria-hidden="true"/> Generation table</button>
         <button class="secondary" :disabled="ageDemoVisible" :title="ageDemoVisible?'Close the age walkthrough to download your run':''" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
         <button class="icon" title="Run again" aria-label="Run again" :disabled="ageDemoVisible" @click="emit('restart')"><RotateCcw :size="17"/></button>
         <button class="icon" title="Reroll seed" aria-label="Reroll seed" :disabled="ageDemoVisible" @click="emit('reroll')"><Dices :size="17"/></button>

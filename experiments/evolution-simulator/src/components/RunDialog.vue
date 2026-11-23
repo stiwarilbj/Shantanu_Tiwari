@@ -2,9 +2,9 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { CircleX, Download, FastForward, Upload } from 'lucide-vue-next'
 import { useLab } from '../store.js'
-import { METRICS, format, metricValue } from '../engine/stats.js'
 import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
 import { csv, download, setupLink } from '../export.js'
+import GenerationTable from './GenerationTable.vue'
 
 const lab=useLab()
 const emit=defineEmits(['compare','watch','resume','results','batch-results'])
@@ -36,8 +36,6 @@ const quickPreview = computed(() => {
   if (first === last) return `Finish Day ${first}.`
   return `Finish Day ${first}, then complete ${dayRange(first + 1, last)}.`
 })
-const scopeLabel=computed(()=>lab.run.setup.species.find(s=>s.id===lab.scope)?.name ?? 'All species')
-const rows=computed(()=>lab.run.summaries.map(s=>s.rows[lab.scope]).filter(Boolean))
 const matches=computed(()=>{
   const query=search.value.trim().toLowerCase()
   const exactSeed=run=>String(run.setup.seed)===query
@@ -142,7 +140,7 @@ async function createBranch(edit=false) {
 onMounted(()=>dialog.value.showModal())
 </script>
 <template>
-  <dialog ref="dialog" class="task-dialog" :class="{'wide-dialog':['library','table'].includes(lab.modal)}" @cancel.prevent="close" aria-labelledby="dialog-title">
+  <dialog ref="dialog" class="task-dialog" :class="{'wide-dialog':lab.modal==='library','generation-dialog':lab.modal==='table'}" @cancel.prevent="close" aria-labelledby="dialog-title">
     <header><h2 id="dialog-title">{{ lab.modal==='quick-done' && lab.extinctDay ? 'Population extinct' : titles[lab.modal] }}</h2><button class="icon" aria-label="Close dialog" @click="close"><CircleX :size="23"/></button></header>
     <template v-if="lab.modal==='quick'">
       <p>Advance the active run without animation.</p>
@@ -197,11 +195,7 @@ onMounted(()=>dialog.value.showModal())
       <footer><button class="secondary" @click="close">Cancel</button><button class="primary" :disabled="exportKind==='csv'&&!canExportCsv" @click="exportRun"><Download :size="17"/> Download</button></footer>
     </template>
     <template v-else-if="lab.modal==='table'">
-      <p class="quiet">{{ scopeLabel }} · Dusk results · Select a day to replay it</p>
-      <div class="table-scroll"><table><thead><tr><th>Day</th><th v-for="m in METRICS" :key="m.key">{{ m.short }}</th></tr></thead>
-        <tbody><tr v-for="r in rows" :key="r.day"><td><button class="link" @click="lab.modal=null;emit('watch',r.day)">{{ r.day }}</button></td>
-          <td v-for="m in METRICS" :key="m.key" :title="String(metricValue(r,m.key) ?? '')">{{ format(metricValue(r,m.key),m.key==='population'?0:2) }}</td></tr></tbody></table></div>
-      <p v-if="!rows.length" class="quiet">Complete a generation to populate the table.</p>
+      <GenerationTable @watch="lab.modal=null;emit('watch',$event)"/>
       <footer><button class="secondary" @click="lab.openDownload()">Download</button><button class="primary" @click="close">Done</button></footer>
     </template>
     <template v-else-if="lab.modal==='library'">

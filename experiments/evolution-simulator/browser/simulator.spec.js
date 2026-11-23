@@ -769,6 +769,66 @@ test('Mini line points stay above their generation tiles when the window shrinks
   }
 })
 
+test('the generation spreadsheet adds a row after each live generation @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page)
+    await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('100')
+    await page.getByRole('button', { name:'Orange Off', exact:true }).click()
+    await page.getByRole('checkbox', { name:'Enabled', exact:true }).check()
+  })
+
+  const openSheet = page.getByRole('button', { name:'View generation table' })
+  const dialog = page.getByRole('dialog', { name:'Generation statistics' })
+  const table = dialog.getByRole('table', { name:'Completed generations' })
+  const rows = table.locator('tbody tr')
+  const done = dialog.getByRole('button', { name:'Done', exact:true })
+  await openSheet.click()
+  await expect(table.getByRole('columnheader', { name:'Generation', exact:true })).toBeVisible()
+  await expect(table.getByRole('columnheader', { name:/Average Speed/ })).toHaveCount(1)
+  await expect(table.getByRole('columnheader', { name:'Deaths', exact:true })).toHaveCount(1)
+  await expect(rows).toHaveCount(0)
+  await done.click()
+
+  const speed = page.getByRole('button', { name:'Viewing speed', exact:true })
+  await speed.click()
+  await page.getByRole('slider', { name:'Viewing speed multiplier' }).fill('12')
+  await speed.click()
+  await expect(page.getByRole('button', { name:'Play through generations' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name:'Play', exact:true }).click()
+  await openSheet.click()
+
+  const first = rows.first()
+  await expect(first.getByRole('button', { name:'Replay generation 1' })).toBeVisible()
+  await expect(first.getByRole('cell').first()).toHaveText('60')
+  await expect(rows.nth(1).getByRole('button', { name:'Replay generation 2' })).toBeVisible()
+  await dialog.getByRole('combobox', { name:'Species' }).selectOption('orange')
+  await expect(first.getByRole('cell').first()).toHaveText('10')
+  await first.getByRole('button', { name:'Replay generation 1' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('button', { name:'Run options' })).toHaveText('Day 1 / 10 · Replay')
+})
+
+test('the generation spreadsheet updates while a batch runs in the background', async ({ page }) => {
+  await installBatchHold(page)
+  await openSimulator(page)
+  await startRun(page, '10', () => fixedDay(page))
+  await page.evaluate(() => { window.batchTest.hold = true })
+  await quickThrough(page, 4)
+  await page.getByRole('button', { name:'Hide progress' }).click()
+  await page.getByRole('link', { name:'Trends', exact:true }).click()
+  await page.getByRole('button', { name:'Generation table', exact:true }).click()
+  const dialog = page.getByRole('dialog', { name:'Generation statistics' })
+  const table = dialog.getByRole('table', { name:'Completed generations' })
+  const rows = table.locator('tbody tr')
+  await expect(rows).toHaveCount(0)
+
+  await page.evaluate(() => window.batchTest.release())
+  await expect(rows).toHaveCount(4)
+  await expect(rows.getByRole('rowheader')).toHaveText(['1','2','3','4'])
+  await expect(dialog.getByText('4 completed', { exact:true })).toBeVisible()
+})
+
 test('Mini line can plot Population and Age at Death', async ({ page }) => {
   await openSimulator(page)
   await startRun(page)
