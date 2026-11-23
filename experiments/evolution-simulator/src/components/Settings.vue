@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, speciesTemplate, usesHabitatRules, usesRefugeBorder, usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
+  randomSeed, speciesTemplate, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
+  usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
@@ -12,18 +13,22 @@ const lab = useLab()
 const draft = lab.draft
 const fork = lab.branchFrom
 const standardDeviation = usesStandardDeviation(draft)
+const customReproduction = usesReproductionRules(draft)
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), discarding = ref(false), applying = ref(false)
 const fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
 const groups = {
-  habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and timing',
+  habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
 }
 const advancedFields = {
   schedule: 'habitat', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
   patchRelocation: 'habitat', patchInterval: 'habitat', refugePercent: 'habitat',
   huntingAdvantage: 'hunting', firstHuntingDay: 'hunting',
-  plantReward: 'movement', preyReward: 'movement', endMode: 'inheritance', duration: 'inheritance', rules: 'movement',
+  plantReward: 'movement', preyReward: 'movement', endMode: 'movement', duration: 'movement', rules: 'movement',
+  parentMode: 'inheritance', minimumBreedingAge: 'inheritance', birthWait: 'inheritance',
+  birthChance: 'inheritance', twinChance: 'inheritance',
+  mutation: 'inheritance', mutationChance: 'inheritance', mutationPattern: 'inheritance',
 }
 const customHabitat = computed(() => usesHabitatRules(draft))
 const previewDay = ref((fork ?? 0) + 1)
@@ -36,6 +41,20 @@ const rulesSummary = computed(() => {
   return [food, hunting].join(' · ')
 })
 const selected = computed(() => draft.species.find(s => s.id===tab.value) ?? draft.species[0])
+const paired = computed(() => draft.reproduction?.parentMode === 'pair')
+const speedPreview = computed(() => {
+  const baseline = paired.value ? 'Parents with speeds 8 and 12 give their child a starting speed of 10.' :
+    'A parent with speed 10 gives its child a starting speed of 10.'
+  const chance = customReproduction ? selected.value.inheritance.mutationChance.speed : 100
+  const spread = selected.value[spreadKey].speed
+  const deviation = standardDeviation ? spread : Math.sqrt(spread)
+  if (!selected.value.mutation.speed || chance === 0 || spread === 0) return baseline + ' The child keeps that speed.'
+  if (!Number.isFinite(chance) || !Number.isFinite(spread) || deviation < 0) return baseline
+  const change = customReproduction && selected.value.inheritance.mutationPattern === 'bounded'
+    ? `a change of up to ${Number((Math.sqrt(3) * deviation).toFixed(3))} in either direction`
+    : `a bell-curve change with a standard deviation of ${Number(deviation.toFixed(3))}`
+  return baseline + ` With these settings, it gets ${change} in ${chance}% of births.`
+})
 const mutationProfile = computed({
   get() {
     const { speed, size, sense } = selected.value.mutation
@@ -197,12 +216,11 @@ onMounted(()=>dialog.value.showModal())
             </div>
           </section>
           <section class="setting-section">
-            <h2>When they reproduce</h2>
-            <div class="mutation-switches">
-              <label v-for="key in TRAITS" :key="key">
-                <input type="checkbox" v-model="selected.mutation[key]" :aria-label="'Allow '+key+' mutation'"> {{ labels[key] }}
-              </label>
-            </div>
+            <button type="button" class="advanced-summary" @click="showPage('advanced', 'inheritance', true)">
+              <span><strong>Inheritance and reproduction</strong><small>{{ paired ? 'Two parents' : 'Single parent' }} ·
+                {{ TRAITS.filter(trait => selected.mutation[trait]).length }} traits allowed to mutate for {{ selected.name }}</small></span>
+              <ChevronRight :size="17" aria-hidden="true"/>
+            </button>
           </section>
           <section class="setting-section">
             <h2>Each generation</h2>
@@ -300,42 +318,6 @@ onMounted(()=>dialog.value.showModal())
                 <button type="button" class="secondary" @click="draft.preyReward = draft.plantReward">Equal rewards</button>
               </div>
             </div>
-          </template>
-          <template v-else>
-            <div class="advanced-block">
-              <h3>Inherited traits</h3>
-              <div class="species-tabs" aria-label="Edit species">
-                <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
-                  :aria-pressed="selected.id === s.id" :style="{'--species':s.color}" @click="tab = s.id">
-                  <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
-                </button>
-              </div>
-              <label class="advanced-select">Mutation profile
-                <select v-model="mutationProfile">
-                  <option value="" disabled>Custom</option><option value="all">All unlocked</option>
-                  <option value="speed">Speed only</option><option value="locked">All locked</option>
-                </select>
-              </label>
-              <p class="quiet">
-                {{ standardDeviation ? 'Standard deviation (σ) controls how widely newborn traits vary around the parent’s value.' :
-                  'Variance (σ²) controls the spread. Inherited traits stay at least 1.' }}
-                The spread applies when mutation is enabled for a trait.
-              </p>
-              <div class="form-stack mutation-stack">
-                <div v-for="key in TRAITS" :key="key" class="variance-row">
-                  <NumberField :id="selected.id+'.'+spreadKey+'.'+key" v-model="selected[spreadKey][key]"
-                    :label="(standardDeviation ? 'σ ' : 'σ² ') + labels[key]"
-                    :min="standardDeviation ? 0 : .01" :max="10" :step=".01" :pace="1" :tint="swatches[key]"
-                    :error="issue[selected.id+'.'+spreadKey+'.'+key]" compact/>
-                  <div class="variance-meta mutation-meta">
-                    <template v-if="Number.isFinite(selected[spreadKey][key])">
-                      <small>{{ standardDeviation ? 'σ = '+selected[spreadKey][key] : 'σ = '+Math.sqrt(selected[spreadKey][key]).toFixed(2) }}</small>
-                      <small>Variance (σ²) = {{ standardDeviation ? Number((selected[spreadKey][key] ** 2).toFixed(3)) : selected[spreadKey][key] }}</small>
-                    </template>
-                  </div>
-                </div>
-              </div>
-            </div>
             <div class="advanced-block">
               <h3>Day length</h3>
               <label v-if="draft.version >= SETTLED_RULE_VERSION" class="advanced-select">End each day
@@ -352,6 +334,77 @@ onMounted(()=>dialog.value.showModal())
                 </div>
                 <small class="quiet">Up to {{ ((draft.days*seconds)/60).toFixed(1) }} min of playback at 1×</small>
               </template>
+            </div>
+          </template>
+          <template v-else>
+            <div class="advanced-block">
+              <h3>Reproduction</h3>
+              <p class="quiet">These rules apply to every species. To breed, a blob needs at least two food credits and a safe return to the refuge.</p>
+              <template v-if="customReproduction">
+                <label class="advanced-select">Parent mode
+                  <select id="parentMode" v-model="draft.reproduction.parentMode">
+                    <option value="single">Single parent</option><option value="pair">Two parents</option>
+                  </select>
+                </label>
+                <p v-if="paired" class="quiet">At dusk, eligible blobs pair up with their own species anywhere in the refuge. A child starts with the average of its parents’ traits.</p>
+                <NumberField id="minimumBreedingAge" v-model="draft.reproduction.minimumBreedingAge" label="Minimum breeding age"
+                  :min="0" :max="30" :error="issue.minimumBreedingAge"/>
+                <p class="quiet">Full generations a blob must finish before its breeding day. At 0, it can breed on its first day.</p>
+                <NumberField id="birthWait" v-model="draft.reproduction.birthWait" label="Wait after a birth"
+                  :min="0" :max="30" :error="issue.birthWait"/>
+                <p class="quiet">Full generations to skip after having offspring. With a wait of 1, a Day 4 parent can breed again on Day 6.</p>
+                <NumberField id="birthChance" v-model="draft.reproduction.birthChance" label="Chance of a birth (%)"
+                  :min="0" :max="100" :error="issue.birthChance"/>
+                <NumberField id="twinChance" v-model="draft.reproduction.twinChance" label="Chance of twins (%)"
+                  :min="0" :max="100" :error="issue.twinChance"/>
+                <p class="quiet">Each eligible {{ paired ? 'pair' : 'parent' }} gets one birth roll. Twins can happen after a successful roll.</p>
+              </template>
+              <p v-else class="quiet">In this setup, each eligible parent has one child.</p>
+            </div>
+            <div class="advanced-block">
+              <h3>Inheritance</h3>
+              <div class="species-tabs" aria-label="Edit species">
+                <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
+                  :aria-pressed="selected.id === s.id" :style="{'--species':s.color}" @click="tab = s.id">
+                  <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
+                </button>
+              </div>
+              <p class="quiet">Each species has its own mutation settings.</p>
+              <label class="advanced-select">Mutation profile
+                <select v-model="mutationProfile">
+                  <option value="" disabled>Custom</option><option value="all">All unlocked</option>
+                  <option value="speed">Speed only</option><option value="locked">All locked</option>
+                </select>
+              </label>
+              <label v-if="customReproduction" class="advanced-select">Mutation pattern
+                <select :id="selected.id+'.mutationPattern'" v-model="selected.inheritance.mutationPattern">
+                  <option value="normal">Bell curve</option><option value="bounded">Bounded random</option>
+                </select>
+              </label>
+              <p class="quiet">{{ standardDeviation ? 'Standard deviation (σ)' : 'Variance (σ²)' }} sets the spread of a mutation.
+                {{ customReproduction ? 'Bell curve favors small changes. Bounded random gives every change within its limit equal odds.' : 'Inherited traits stay at least 1.' }}</p>
+              <div v-for="key in TRAITS" :key="key" class="inheritance-trait">
+                <label class="advanced-toggle">
+                  <input :id="selected.id+'.mutation.'+key" type="checkbox" v-model="selected.mutation[key]"
+                    :aria-label="'Allow '+key+' mutation'"> Allow {{ labels[key].toLowerCase() }} mutation
+                </label>
+                <NumberField v-if="customReproduction" :id="selected.id+'.mutationChance.'+key"
+                  v-model="selected.inheritance.mutationChance[key]" :label="labels[key]+' mutation chance (%)'"
+                  :min="0" :max="100" :tint="swatches[key]" :error="issue[selected.id+'.mutationChance.'+key]"
+                  :disabled="!selected.mutation[key] && !issue[selected.id+'.mutationChance.'+key]"/>
+                <NumberField :id="selected.id+'.'+spreadKey+'.'+key" v-model="selected[spreadKey][key]"
+                  :label="(standardDeviation ? 'σ ' : 'σ² ') + labels[key]"
+                  :min="standardDeviation ? 0 : .01" :max="10" :step=".01" :pace="1" :tint="swatches[key]"
+                  :error="issue[selected.id+'.'+spreadKey+'.'+key]"
+                  :disabled="!selected.mutation[key] && !issue[selected.id+'.'+spreadKey+'.'+key]"/>
+                <small v-if="standardDeviation && Number.isFinite(selected[spreadKey][key])" class="quiet">
+                  Variance (σ²) = {{ Number((selected[spreadKey][key] ** 2).toFixed(3)) }}
+                </small>
+              </div>
+              <div class="inheritance-preview">
+                <h4>Example offspring</h4>
+                <p class="quiet">{{ speedPreview }}</p>
+              </div>
             </div>
           </template>
         </section>

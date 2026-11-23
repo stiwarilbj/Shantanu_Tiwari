@@ -27,7 +27,7 @@ async function advancedSettings(page, group = 'Habitat and food') {
 }
 
 async function fixedDay(page, seconds = '10') {
-  await advancedSettings(page, 'Inheritance and timing')
+  await advancedSettings(page, 'Movement and energy')
   await page.getByRole('combobox', { name: 'End each day' }).selectOption('timed')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill(seconds)
   await page.getByRole('button', { name: 'Basic', exact: true }).click()
@@ -218,15 +218,15 @@ test('the production build runs a new experiment and shows its charts @pages', a
   await expect(page.getByRole('heading', { name: 'Current Generation Stats' })).toBeVisible()
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
-    await advancedSettings(page, 'Inheritance and timing')
+    await advancedSettings(page, 'Inheritance and reproduction')
     const size = page.getByRole('spinbutton', { name: 'σ Size', exact: true })
-    const sizeRow = page.locator('.variance-row').filter({ has: size })
+    const sizeRow = page.locator('.inheritance-trait').filter({ has: size })
     await size.fill('1.00')
     await expect(sizeRow.getByText('Variance (σ²) = 1', { exact: true })).toBeVisible()
     await size.fill('0.50')
     await expect(sizeRow.getByText('Variance (σ²) = 0.25', { exact: true })).toBeVisible()
-    await expect(page.getByRole('combobox', { name: 'End each day' })).toHaveValue('settled')
     await advancedSettings(page, 'Movement and energy')
+    await expect(page.getByRole('combobox', { name: 'End each day' })).toHaveValue('settled')
     await expect(page.getByRole('spinbutton', { name: 'Plant reward' })).toHaveValue('0')
     await expect(page.getByRole('spinbutton', { name: 'Prey reward' })).toHaveValue('0')
     await advancedSettings(page, 'Hunting')
@@ -1122,7 +1122,7 @@ test('a food-only branch keeps the day length at the fork', async ({ page }) => 
   await branch.click()
   await page.getByLabel('Branch after day').fill('2')
   await page.getByRole('button', { name: 'Edit branch rules' }).click()
-  await advancedSettings(page, 'Inheritance and timing')
+  await advancedSettings(page, 'Movement and energy')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill('2')
   await create.click()
   await expect(runOptions).toHaveText('Day 3 / 10 · Ready')
@@ -1648,7 +1648,7 @@ test('Settings rejects invalid day lengths instead of rounding them', async ({ p
   const evolve = settings.getByRole('button', { name: 'Evolve!' })
   await settings.getByRole('spinbutton', { name: 'Days to run' }).fill('10')
   await settings.getByRole('button', { name: /^Watch live/ }).click()
-  await advancedSettings(page, 'Inheritance and timing')
+  await advancedSettings(page, 'Movement and energy')
 
   for (const [value, error] of [
     ['10.04', 'Enter seconds in tenths.'],
@@ -1737,40 +1737,79 @@ test('discarding edits to a duplicated run restores the duplicated setup', async
 test('mutation profiles follow the selected species and its trait switches', async ({ page }) => {
   await openSimulator(page)
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
-  await advancedSettings(page, 'Inheritance and timing')
+  await advancedSettings(page, 'Inheritance and reproduction')
   const profile = page.getByLabel('Mutation profile')
   const size = page.getByRole('checkbox', { name: 'Allow size mutation' })
   const sense = page.getByRole('checkbox', { name: 'Allow sense mutation' })
-  const basic = page.getByRole('button', { name: 'Basic', exact: true })
 
   await profile.selectOption('speed')
-  await basic.click()
   await expect(size).not.toBeChecked()
   await expect(sense).not.toBeChecked()
   await page.getByRole('button', { name: /^Orange/ }).click()
+  await expect(profile).toHaveValue('all')
   await expect(size).toBeChecked()
 
-  await advancedSettings(page, 'Inheritance and timing')
-  await expect(profile).toHaveValue('all')
   await profile.selectOption('locked')
-  await basic.click()
   await expect(page.getByRole('checkbox', { name: 'Allow speed mutation' })).not.toBeChecked()
   await expect(size).not.toBeChecked()
   await expect(sense).not.toBeChecked()
 
   await page.getByRole('button', { name: 'Blue', exact: true }).click()
-  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('speed')
-  await basic.click()
   await size.check()
-  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('')
-  await basic.click()
   await sense.check()
-  await advancedSettings(page, 'Inheritance and timing')
   await expect(profile).toHaveValue('all')
   await page.getByRole('button', { name: /^Orange/ }).click()
   await expect(profile).toHaveValue('locked')
+})
+
+test('paired breeding settings show both parents in the saved replay @pages', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('400')
+    await page.getByRole('button', { name: /^Inheritance and reproduction/ }).press('Enter')
+    await expect(page.getByRole('heading', { name: 'Advanced Settings' })).toBeFocused()
+    await page.getByLabel('Parent mode').selectOption('pair')
+    const chance = page.getByRole('spinbutton', { name: 'Chance of a birth (%)' })
+    await chance.fill('101')
+    await page.getByRole('button', { name: 'Evolve!' }).click()
+    await expect(chance).toBeFocused()
+    await expect(chance).toHaveAccessibleDescription('Chance of a birth must be a whole number from 0 to 100.')
+    await chance.fill('100')
+    await page.getByRole('spinbutton', { name: 'Chance of twins (%)' }).fill('100')
+    await page.getByRole('spinbutton', { name: 'Speed mutation chance (%)' }).fill('0')
+    await expect(page.getByText('Parents with speeds 8 and 12 give their child a starting speed of 10. The child keeps that speed.')).toBeVisible()
+    const dialog = page.getByRole('dialog', { name: 'Simulation Settings' })
+    expect(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+  })
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Replay')
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Replay')
+  await page.getByRole('button', { name: 'Playback actions' }).click()
+  await page.getByRole('button', { name: 'Go to end' }).click()
+  await page.getByRole('button', { name: 'View options' }).click()
+  await page.getByRole('button', { name: 'Creatures', exact: true }).click()
+  const details = page.getByRole('complementary', { name: 'Creature details' })
+  const creature = details.getByRole('combobox', { name: 'Creature', exact: true })
+  await creature.selectOption('51')
+  const parents = details.getByText('Parents', { exact: true }).locator('xpath=following-sibling::dd[1]')
+  await expect(parents).toHaveText(/^#\d+ and #\d+$/)
+  const parentIds = (await parents.textContent()).match(/\d+/g)
+  for (const id of parentIds) {
+    await creature.selectOption(id)
+    await details.getByRole('combobox', { name: 'Filter creature events' }).selectOption('birth')
+    await expect(details.getByRole('button', { name: /Offspring #51/ })).toBeVisible()
+    await expect(details.getByRole('button', { name: /Offspring #52/ })).toBeVisible()
+  }
+  expect(errors).toEqual([])
 })
 
 test('Trends compares sight spread in the filtered days and opens each closing cohort', async ({ page }) => {
@@ -2059,11 +2098,14 @@ test('Trait Space centers the mean over a histogram with one trait value', async
   await openSimulator(page)
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('400')
+    await advancedSettings(page, 'Inheritance and reproduction')
     await page.getByLabel('Allow sense mutation').uncheck()
+    await page.getByRole('button', { name: 'Basic', exact: true }).click()
     await page.getByRole('button', { name: /^Orange/ }).click()
     await page.getByLabel('Enabled', { exact: true }).check()
     await page.getByRole('spinbutton', { name: 'Sense Range', exact: true }).fill('30')
     await page.getByRole('spinbutton', { name: 'Energy', exact: true }).fill('1000')
+    await advancedSettings(page, 'Inheritance and reproduction')
     await page.getByLabel('Allow sense mutation').uncheck()
   })
   await quickThrough(page, 1)
@@ -2418,7 +2460,11 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('321')
     await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
-    await advancedSettings(page, 'Inheritance and timing')
+    await advancedSettings(page, 'Inheritance and reproduction')
+    await page.getByLabel('Parent mode').selectOption('pair')
+    await page.getByRole('spinbutton', { name: 'Chance of twins (%)' }).fill('80')
+    await page.getByLabel('Mutation pattern').selectOption('bounded')
+    await page.getByRole('spinbutton', { name: 'Speed mutation chance (%)' }).fill('35')
     await page.getByRole('spinbutton', { name: 'σ Size', exact: true }).fill('1.00')
   })
   await page.getByRole('button', { name: 'Run options' }).click()
@@ -2429,6 +2475,11 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
   await expect(page.getByText('Setup link copied. It opens a new experiment draft.')).toBeVisible()
   const link = await page.evaluate(() => navigator.clipboard.readText())
   expect(link).toContain('#/setup/')
+  const downloaded = page.waitForEvent('download')
+  await run.getByRole('button', { name: 'Export setup' }).click()
+  const exported = JSON.parse(await readFile(await (await downloaded).path(), 'utf8'))
+  expect(exported.setup.reproduction).toMatchObject({ parentMode: 'pair', twinChance: 80 })
+  expect(exported.setup.species[0].inheritance).toMatchObject({ mutationPattern: 'bounded', mutationChance: { speed: 35 } })
 
   const recipient = await browser.newPage()
   try {
@@ -2443,8 +2494,12 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
     await expect(name).toHaveValue('Browser test run')
     await expect(food).toHaveValue('321')
     await expect(settings.getByRole('spinbutton', { name: 'Random seed' })).toHaveValue('118')
-    await advancedSettings(recipient, 'Inheritance and timing')
+    await advancedSettings(recipient, 'Inheritance and reproduction')
     await expect(settings.getByRole('spinbutton', { name: 'σ Size', exact: true })).toHaveValue('1.00')
+    await expect(settings.getByLabel('Parent mode')).toHaveValue('pair')
+    await expect(settings.getByRole('spinbutton', { name: 'Chance of twins (%)' })).toHaveValue('80')
+    await expect(settings.getByLabel('Mutation pattern')).toHaveValue('bounded')
+    await expect(settings.getByRole('spinbutton', { name: 'Speed mutation chance (%)' })).toHaveValue('35')
     await expect(recipient).toHaveURL(link)
 
     await settings.getByRole('button', { name: 'Close settings' }).click()
@@ -2457,6 +2512,16 @@ test('a copied setup link keeps the shared settings after reload', async ({ page
     await settings.getByRole('button', { name: 'Evolve!' }).click()
     await expect(recipient.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Ready')
     await expect(recipient).toHaveURL(/#\/r\/[^/]+\/s\/1\/viewer$/)
+
+    await openRunLibrary(recipient)
+    await recipient.getByRole('dialog', { name: 'Run Library' }).locator('input[type=file]').setInputFiles({
+      name: 'evolution-setup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(exported)),
+    })
+    await expect(food).toHaveValue('321')
+    await advancedSettings(recipient, 'Inheritance and reproduction')
+    await expect(settings.getByLabel('Parent mode')).toHaveValue('pair')
+    await expect(settings.getByRole('spinbutton', { name: 'Chance of twins (%)' })).toHaveValue('80')
+    await expect(settings.getByRole('spinbutton', { name: 'Speed mutation chance (%)' })).toHaveValue('35')
   } finally {
     await recipient.close()
   }
@@ -2514,7 +2579,7 @@ test('a replay applies the predation threshold saved with its setup', async ({ p
       buffer: Buffer.from(JSON.stringify({ ...setup, version, species })),
     })
     if (version === LEGACY_RULE_VERSION) {
-      await advancedSettings(page, 'Inheritance and timing')
+      await advancedSettings(page, 'Inheritance and reproduction')
       await expect(page.getByRole('spinbutton', { name: 'σ² Size', exact: true })).toHaveValue('0.25')
     }
     await advancedSettings(page, 'Hunting')

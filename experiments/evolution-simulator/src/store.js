@@ -655,8 +655,8 @@ export const useLab = defineStore('lab', () => {
     if (!settings.value) restorePlay = playing.value
     stopPlayback()
     if (setup || !draft.value || branchFrom.value != null) {
-      // Rule version 7 defaults reproduce version 6, including for branches and imported setups.
-      const initial = setup?.version === STEERING_RULE_VERSION
+      // Guided and imported legacy setups keep their original rules.
+      const initial = setup?.version >= STEERING_RULE_VERSION
         ? setupForNewRun(setup)
         : setup ?? setupForNewRun(run.value?.setup ?? starter())
       openingDraft = JSON.stringify(initial)

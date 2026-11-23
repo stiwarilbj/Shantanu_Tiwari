@@ -6,7 +6,8 @@ export const WALKTHROUGH_RULE_VERSION = 4
 export const REFUGE_RULE_VERSION = 5
 export const STEERING_RULE_VERSION = 6
 export const HABITAT_RULE_VERSION = 7
-export const VERSION = HABITAT_RULE_VERSION
+export const REPRODUCTION_RULE_VERSION = 8
+export const VERSION = REPRODUCTION_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -18,17 +19,41 @@ export const HABITAT_DEFAULTS = Object.freeze({
   huntingAdvantage: 25,
   firstHuntingDay: 1,
 })
+export const REPRODUCTION_DEFAULTS = Object.freeze({
+  parentMode: 'single',
+  minimumBreedingAge: 0,
+  birthWait: 0,
+  birthChance: 100,
+  twinChance: 0,
+})
+export const INHERITANCE_DEFAULTS = Object.freeze({
+  mutationPattern: 'normal',
+  mutationChance: Object.freeze({ speed: 100, size: 100, sense: 100 }),
+})
 export const endsWhenSettled = config => config.version >= SETTLED_RULE_VERSION && config.endMode === 'settled'
 export const usesStandardDeviation = config => config.version >= WALKTHROUGH_RULE_VERSION
 export const usesWalkthroughForaging = config => usesStandardDeviation(config) && config.foraging === 'walkthrough'
 export const usesRefugeBorder = config => config.version >= REFUGE_RULE_VERSION
 export const usesImprovedSteering = config => config.version >= STEERING_RULE_VERSION && !usesWalkthroughForaging(config)
 export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
+export const usesReproductionRules = config => config.version >= REPRODUCTION_RULE_VERSION
 export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
-function setupWithHabitatDefaults(setup) {
-  return usesHabitatRules(setup) ? { ...setup, ...HABITAT_DEFAULTS } : setup
+export function setupWithRuleDefaults(setup) {
+  if (usesHabitatRules(setup)) setup = { ...HABITAT_DEFAULTS, ...setup }
+  if (!usesReproductionRules(setup)) return setup
+  return {
+    ...setup,
+    reproduction: { ...REPRODUCTION_DEFAULTS, ...setup.reproduction },
+    species: setup.species.map(item => ({
+      ...item,
+      inheritance: {
+        ...INHERITANCE_DEFAULTS, ...item.inheritance,
+        mutationChance: { ...INHERITANCE_DEFAULTS.mutationChance, ...item.inheritance?.mutationChance },
+      },
+    })),
+  }
 }
 
 export function speciesTemplate(id, name, color, count = 10, enabled = true, version = VERSION) {
@@ -37,11 +62,14 @@ export function speciesTemplate(id, name, color, count = 10, enabled = true, ver
     : { variance: { speed: 0.25, size: 0.25, sense: 0.25 } }
   return { id, name, color, count, enabled, energy: 500, speed: 10, size: 10, sense: 20,
     ...spread,
+    ...(usesReproductionRules({ version }) && {
+      inheritance: { ...INHERITANCE_DEFAULTS, mutationChance: { ...INHERITANCE_DEFAULTS.mutationChance } },
+    }),
     mutation: { speed: true, size: true, sense: true } }
 }
 
 export function starter(version = VERSION) {
-  return setupWithHabitatDefaults({
+  return setupWithRuleDefaults({
     version, name: 'Starter field', days: 50, endMode: 'settled', duration: 100, seed: 18, food: 50,
     mode: 'prepare', predation: true, sameSpecies: true, stride: 'linked', metabolism: 'walkthrough',
     plantReward: 0, preyReward: 0, schedule: [], scheduleMode: 'constant',
@@ -90,6 +118,14 @@ export function validate(config) {
       number('firstHuntingDay', 'First hunting day', config.firstHuntingDay, 1, Number.isInteger(config.days) ? config.days : 1000)
     }
   }
+  if (usesReproductionRules(config) && config.reproduction !== undefined) {
+    const rules = config.reproduction
+    if (!['single', 'pair'].includes(rules?.parentMode)) errors.parentMode = 'Choose a parent mode.'
+    number('minimumBreedingAge', 'Minimum breeding age', rules?.minimumBreedingAge, 0, 30)
+    number('birthWait', 'Wait after a birth', rules?.birthWait, 0, 30)
+    number('birthChance', 'Chance of a birth', rules?.birthChance, 0, 100)
+    number('twinChance', 'Chance of twins', rules?.twinChance, 0, 100)
+  }
   if (!Array.isArray(config.schedule) || !['constant', 'ramp', 'step'].includes(config.scheduleMode)) {
     errors.schedule = 'Choose a supported food schedule.'
   } else {
@@ -119,6 +155,10 @@ export function validate(config) {
     colors.add(color)
     number(item.id + '.count', 'Starting creatures', item.count, 10, 1000)
     number(item.id + '.energy', 'Starting energy', item.energy, 10, 1000)
+    const inheritance = usesReproductionRules(config) ? item.inheritance : undefined
+    if (inheritance !== undefined && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
+      errors[item.id + '.mutationPattern'] = 'Choose a mutation pattern.'
+    }
     for (const trait of TRAITS) {
       number(item.id + '.' + trait, trait, item[trait], 1, 100)
       if (usesStandardDeviation(config)) {
@@ -126,7 +166,10 @@ export function validate(config) {
       } else {
         number(item.id + '.variance.' + trait, 'Variance', item.variance?.[trait], 0.01, 10, false)
       }
-      if (typeof item.mutation?.[trait] !== 'boolean') errors[item.id + '.mutation'] = 'Specify which traits mutate.'
+      if (typeof item.mutation?.[trait] !== 'boolean') errors[item.id + '.mutation.' + trait] = 'Specify which traits mutate.'
+      if (inheritance !== undefined) {
+        number(item.id + '.mutationChance.' + trait, 'Mutation chance', inheritance?.mutationChance?.[trait], 0, 100)
+      }
     }
   }
   return errors
@@ -175,12 +218,12 @@ export function randomSeed(exclude = 0) {
 }
 
 export function setupForNewRun(setup) {
-  if (setup.version >= WALKTHROUGH_RULE_VERSION && setup.version < VERSION) {
-    return setupWithHabitatDefaults({ ...setup, version: VERSION })
+  if (setup.version >= WALKTHROUGH_RULE_VERSION && setup.version <= VERSION) {
+    return setupWithRuleDefaults({ ...setup, version: VERSION })
   }
   if (setup.version !== SETTLED_RULE_VERSION) return setup
   const species = setup.species.map(({ variance, ...item }) => ({
     ...item, standardDeviation: Object.fromEntries(TRAITS.map(trait => [trait, Math.sqrt(variance[trait])])),
   }))
-  return setupWithHabitatDefaults({ ...setup, version: VERSION, species })
+  return setupWithRuleDefaults({ ...setup, version: VERSION, species })
 }

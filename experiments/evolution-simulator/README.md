@@ -8,6 +8,7 @@ Watch blobs look for food, hunt, and have babies. Small changes in speed, size, 
 
 - **World** plays one day at a time. Pick a blob to follow it, or use **Quick Sim** to jump ahead. If the last blob dies, select the extinction tile to watch the ending.
 - **Settings** lets you make species, change their traits, and decide how much food to put out. Open **Advanced** to grow food in patches, widen the refuge, or set when hunting begins and how much bigger a hunter has to be. Use **Preview day** to see where the plants will appear.
+- **Inheritance and reproduction** lets you try two-parent families, set the odds of twins, and decide how often each species’ traits change. Open Creature Details during a replay to see who the parents were.
 - **Trends** shows how the population changes over time. Choose **Walk through age**, then pick a day to see the ages behind the average. **Compare** lets you look at two runs side by side.
 - **About** lets you try a stride race or follow a newborn as it searches for food. Run the 600-generation experiment to see how changing size mutation affects the whole group, then replay hunts from each run.
 

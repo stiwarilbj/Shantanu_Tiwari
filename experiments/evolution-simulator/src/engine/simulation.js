@@ -1,4 +1,5 @@
-import { endsWhenSettled, huntingOnDay, TRAITS, usesImprovedSteering, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
+import { endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
+  usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
 import { summaries } from './stats.js'
 import { forage } from './foraging.js'
@@ -308,13 +309,56 @@ export function step(ctx, config, count = 1, skipIdle = false) {
   return ctx.tick === limit || (ctx.limit == null && !hasActive()) ? dusk(ctx, config) : null
 }
 
+function breed(ctx, config, time, settings, rules, first, second) {
+  const { blob, survivor } = first
+  const partner = second?.blob
+  const { seed } = config
+  const { day } = ctx
+  const partnerId = partner?.id ?? 0
+  if (rules.birthChance < 100 && random(seed, 45, day, blob.id, partnerId) * 100 >= rules.birthChance) return []
+  const twins = rules.twinChance > 0 && random(seed, 46, day, blob.id, partnerId) * 100 < rules.twinChance
+  if (usesReproductionRules(config)) {
+    survivor.lastBirthDay = day
+    if (second) second.survivor.lastBirthDay = day
+  }
+  const standard = usesStandardDeviation(config)
+  const inheritance = usesReproductionRules(config) ? settings.inheritance ?? INHERITANCE_DEFAULTS : INHERITANCE_DEFAULTS
+  const children = []
+  for (let index = 0; index < (twins ? 2 : 1); index++) {
+    const child = { id: ctx.nextId++, species: blob.species, parent: blob.id, age: 0, born: day,
+      ...(partner && { secondParent: partner.id }), ...(survivor.edge && { edge: survivor.edge }) }
+    for (const [traitIndex, trait] of TRAITS.entries()) {
+      const inherited = partner ? (blob[trait] + partner[trait]) / 2 : blob[trait]
+      child[trait] = inherited
+      const chance = inheritance.mutationChance[trait]
+      if (!settings.mutation[trait] ||
+          (chance < 100 && random(seed, 47, day, child.id, traitIndex) * 100 >= chance)) continue
+      const deviation = standard ? settings.standardDeviation[trait] : Math.sqrt(settings.variance[trait])
+      const draw = inheritance.mutationPattern === 'bounded'
+        ? Math.sqrt(3) * (2 * random(seed, 48, day, child.id, traitIndex) - 1)
+        : normal(seed, day, child.id, traitIndex)
+      const minimum = standard ? (trait === 'sense' ? 0 : MIN_POSITIVE_TRAIT) : 1
+      child[trait] = Math.max(minimum, inherited + deviation * draw)
+    }
+    children.push(child)
+    const newborn = { ...child, x: blob.x, y: blob.y, angle: blob.angle, r: radius(child.size),
+      capacity: settings.energy, energy: settings.energy, credits: 0, preyCredits: 0, state: 7, alive: true }
+    record(ctx, newborn, time, 'birth', { parent: blob.id, ...(partner && { secondParent: partner.id }) })
+    ctx.newborns ??= []
+    ctx.newborns.push(newborn)
+  }
+  return children
+}
+
 export function dusk(ctx, config) {
   if (ctx.settled) return ctx.settled
   const closing = []
   const time = (ctx.limit ?? ctx.tick) * (ctx.stepSeconds ?? DT)
   const species = new Map(config.species.map(s => [s.id, s]))
-  const standard = usesStandardDeviation(config)
   const foraging = usesWalkthroughForaging(config)
+  const currentRules = usesReproductionRules(config)
+  const rules = currentRules ? config.reproduction ?? REPRODUCTION_DEFAULTS : REPRODUCTION_DEFAULTS
+  const candidates = rules.parentMode === 'pair' ? new Map() : null
   for (const b of ctx.blobs) {
     if (!b.alive) continue
     if (!b.home && ctx.refugeWidth && b.credits && b.energy > 0 && refugeDistance(b, ctx.refugeWidth) <= 1e-9) {
@@ -326,24 +370,34 @@ export function dusk(ctx, config) {
     }
     const survivor = { id: b.id, species: b.species, parent: b.parent, born: b.born,
       age: ++b.age, speed: b.speed, size: b.size, sense: b.sense }
+    if (b.secondParent != null) survivor.secondParent = b.secondParent
+    if (currentRules && b.lastBirthDay != null) survivor.lastBirthDay = b.lastBirthDay
     if (foraging && !ctx.refugeWidth) survivor.edge = b.target
-    if (!foraging || b.credits < 2) closing.push(survivor)
-    if (b.credits < 2) continue
-    const settings = species.get(b.species)
-    const child = { ...survivor, age: 0, id: ctx.nextId++, parent: b.id, born: ctx.day }
-    for (const [index, trait] of TRAITS.entries()) {
-      if (!settings.mutation[trait]) continue
-      const deviation = standard ? settings.standardDeviation[trait] : Math.sqrt(settings.variance[trait])
-      const minimum = standard ? (trait === 'sense' ? 0 : MIN_POSITIVE_TRAIT) : 1
-      child[trait] = Math.max(minimum, b[trait] + deviation * normal(config.seed, ctx.day, child.id, index))
+    if (!foraging || candidates) closing.push(survivor)
+    const eligible = b.credits >= 2 && b.age - 1 >= rules.minimumBreedingAge &&
+      (survivor.lastBirthDay == null || ctx.day - survivor.lastBirthDay > rules.birthWait)
+    if (eligible) {
+      const parent = { blob: b, survivor }
+      if (candidates) {
+        if (!candidates.has(b.species)) candidates.set(b.species, [])
+        candidates.get(b.species).push(parent)
+      } else {
+        closing.push(...breed(ctx, config, time, species.get(b.species), rules, parent))
+      }
     }
-    closing.push(child)
-    if (foraging) closing.push(survivor)
-    const newborn = { ...child, x: b.x, y: b.y, angle: b.angle, r: radius(child.size),
-      capacity: settings.energy, energy: settings.energy, credits: 0, preyCredits: 0, state: 7, alive: true }
-    record(ctx, newborn, time, 'birth', { parent: b.id })
-    ctx.newborns ??= []
-    ctx.newborns.push(newborn)
+    if (foraging && !candidates) closing.push(survivor)
+  }
+  if (candidates) {
+    for (const [id, group] of candidates) {
+      // Give each eligible parent a seeded order independent of roster position.
+      const order = group.map(parent => ({ parent, key: random(config.seed, 44, ctx.day, parent.blob.id) }))
+      order.sort((a, b) => a.key - b.key || a.parent.blob.id - b.parent.blob.id)
+      for (let i = 0; i + 1 < order.length; i += 2) {
+        const a = order[i].parent, b = order[i + 1].parent
+        const [first, second] = a.blob.id < b.blob.id ? [a, b] : [b, a]
+        closing.push(...breed(ctx, config, time, species.get(id), rules, first, second))
+      }
+    }
   }
   ctx.events.sort((a, b) => a.time - b.time)
   ctx.settled = { summary: summaries(ctx.day, config, ctx.opening, closing, ctx.events, ctx.plants.length,

@@ -459,20 +459,7 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .spring-track{flex:1;position:relative;height:25px;touch-action:none;cursor:ew-resize}
 .spring-track i{position:absolute;inset:11px 0 auto;height:2px;background:var(--tint)}
 .spring-track span{position:absolute;top:50%;width:10px;height:10px;background:var(--ink);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
-.variance-meta{display:flex;gap:4px 10px;align-items:center;justify-content:space-between;flex-wrap:wrap;color:var(--muted);font-size:12px;padding:3px 0}
 .mutation-note{max-width:600px;margin:0 auto 3px;font-size:10px;line-height:1.15;text-align:center}
-.mutation-stack{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;max-width:600px;margin:auto}
-.mutation-stack .variance-row{min-width:0}
-.mutation-stack .number-shell{grid-template-columns:minmax(0,1fr) 54px;grid-template-rows:24px 25px;min-height:49px}
-.mutation-stack .number-shell>label{grid-column:1;grid-row:1;min-width:0;padding:2px 4px;font-size:10px;white-space:nowrap}
-.mutation-stack .number-shell>.spring{grid-column:2;grid-row:1;min-width:0}
-.mutation-stack .number-shell>.spring button{width:15px;min-height:20px}
-.mutation-stack .number-shell .spring-track{height:19px}
-.mutation-stack .number-shell .spring-track i{top:8px}
-.mutation-stack .number-shell>input{grid-column:1/-1;grid-row:2;min-height:24px;padding:1px 5px;font-size:12px}
-.mutation-meta{display:flex;align-items:center;justify-content:space-between;gap:3px;padding:1px 2px;color:var(--muted);font-size:9px;line-height:1.1}
-.mutation-meta label{display:flex;align-items:center;gap:3px;white-space:nowrap}
-.mutation-meta input[type=checkbox]{width:12px;height:12px;margin:0}
 .daily-cards,.start-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-width:600px;margin:3px auto}
 .daily-card{min-width:0;background:transparent;border:0;border-top:1px solid var(--daily-rule);border-radius:0;padding:3px 4px}
 .setting-inset{background:#1c1c1b;border:1px solid var(--subtle);border-radius:5px;padding:5px}
@@ -515,8 +502,7 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .settings-pages button{border-bottom:2px solid transparent}
 .settings-pages button[aria-pressed=true]{color:var(--focus);border-color:var(--focus)}
 .settings-pages button:hover,.advanced-groups button:hover{color:var(--ink)}
-.mutation-switches{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:12px}
-.mutation-switches label,.advanced-toggle{display:flex;align-items:center;gap:5px;min-height:28px}
+.advanced-toggle{display:flex;align-items:center;gap:5px;min-height:28px}
 .advanced-summary{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 10px;
   text-align:left;color:var(--cream);background:#1c1c1b;border:1px solid var(--subtle);border-radius:5px}
 .advanced-summary:hover{border-color:var(--teal)}
@@ -533,9 +519,12 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .advanced-select{display:flex;justify-content:space-between;align-items:center;gap:6px 14px;flex-wrap:wrap;color:var(--cream)}
 .advanced-actions{display:flex;gap:8px}
 .advanced-block .number-shell{grid-template-columns:minmax(0,1fr) minmax(60px,32%) 65px}
-.advanced-block .mutation-stack .number-shell{grid-template-columns:minmax(0,1fr) 54px}
 .advanced-block .number-shell input{min-width:0}
 .advanced-block .species-tabs{justify-content:flex-start;margin-bottom:0}
+.inheritance-trait,.inheritance-preview{border-top:1px solid var(--subtle);padding-top:6px}
+.inheritance-trait{display:grid;gap:6px;padding-bottom:4px}
+.inheritance-trait .advanced-toggle{color:var(--cream);min-height:36px}
+.inheritance-preview h4{font-size:14px;margin:0 0 4px}
 .energy-calculation{font-family:var(--mono);color:var(--cream)}
 .energy-calculation small{display:block;color:var(--quiet);margin-top:4px}
 .habitat-preview{grid-template-columns:minmax(0,1fr) minmax(96px,30%);align-items:center;gap:8px 14px}
@@ -766,26 +755,24 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .advanced-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .advanced-groups button{min-height:34px;font-size:13px}
   .advanced-block{padding:9px}
-  .advanced-block .mutation-stack .number-shell{grid-template-columns:minmax(0,1fr)}
   .daily-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
-  .mutation-stack{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
   .final-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
   .species-editor{gap:2px 6px;font-size:10px}
   .species-editor input:not([type=color],[type=checkbox]){width:100px}
   .species-trait-fields{gap:3px}
-  .species-trait-fields .number-shell,.mutation-stack .number-shell,.final-fields .number-shell{
+  .species-trait-fields .number-shell,.final-fields .number-shell{
     grid-template-columns:minmax(0,1fr);grid-template-rows:16px 18px 20px;min-height:54px
   }
-  .species-trait-fields .number-shell>label,.mutation-stack .number-shell>label,.final-fields .number-shell>label{
+  .species-trait-fields .number-shell>label,.final-fields .number-shell>label{
     grid-column:1;grid-row:1;min-width:0;padding:1px 3px;font-size:9px
   }
-  .species-trait-fields .number-shell>.spring,.mutation-stack .number-shell>.spring,.final-fields .number-shell>.spring{
+  .species-trait-fields .number-shell>.spring,.final-fields .number-shell>.spring{
     grid-column:1;grid-row:2;min-width:0;gap:1px;padding:0 2px
   }
-  .species-trait-fields .spring button,.mutation-stack .spring button,.final-fields .spring button{width:15px;min-height:17px}
-  .species-trait-fields .spring-track,.mutation-stack .spring-track,.final-fields .spring-track{height:17px}
-  .species-trait-fields .spring-track i,.mutation-stack .spring-track i,.final-fields .spring-track i{top:7px}
-  .species-trait-fields .number-shell>input,.mutation-stack .number-shell>input,.final-fields .number-shell>input{
+  .species-trait-fields .spring button,.final-fields .spring button{width:15px;min-height:17px}
+  .species-trait-fields .spring-track,.final-fields .spring-track{height:17px}
+  .species-trait-fields .spring-track i,.final-fields .spring-track i{top:7px}
+  .species-trait-fields .number-shell>input,.final-fields .number-shell>input{
     grid-column:1;grid-row:3;min-width:0;min-height:20px;padding:1px 3px;font-size:11px
   }
   .daily-card{padding:2px 1px}
@@ -793,9 +780,6 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .daily-card .number-shell>label{padding:2px 3px;font-size:10px}
   .daily-card .number-shell>.spring button{width:13px;min-height:25px}
   .daily-card .number-shell input[type=number]{min-width:0;min-height:28px;padding:2px 3px;font-size:11px}
-  .mutation-meta{justify-content:center;flex-wrap:wrap;font-size:8px;gap:2px}
-  .mutation-meta label{gap:2px}
-  .mutation-meta input[type=checkbox]{width:11px;height:11px}
   .final-fields>.run-name:first-child,.final-fields>.run-name:nth-of-type(3),.final-fields>small{grid-column:1/-1}
   .final-fields>.quick-picks,.final-fields>.seed-actions{grid-column:1/-1}
   .quick-picks{flex-wrap:nowrap}

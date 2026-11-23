@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
+import { HABITAT_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
   rulesFor, setupForNewRun, speciesTemplate, validate, validateRevisions } from '../src/engine/config.js'
 import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthroughStepCost } from '../src/engine/geometry.js'
 import { normal } from '../src/engine/random.js'
@@ -125,7 +125,7 @@ test('patches divide the scheduled supply, respawn inside the refuge boundary an
 test('new habitat defaults preserve version 6 and custom fields stay deterministic when replayed or resumed', () => {
   for (const foraging of [undefined, 'walkthrough']) {
     const old = { ...starter(STEERING_RULE_VERSION), foraging }
-    const upgraded = setupForNewRun(old)
+    const upgraded = { ...setupForNewRun(old), version: HABITAT_RULE_VERSION }
     const original = dawn(old, 1, founders(old))
     const same = dawn(upgraded, 1, founders(upgraded))
     assert.deepEqual(same, original)
@@ -516,6 +516,137 @@ test('the video mutation rules allow sub-one traits and zero sight while older r
   const result = step(field, current)
   assert.equal(result.summary.rows.all.population, 0)
   assert.equal(result.summary.rows.all.causes.Starvation, 1)
+})
+
+test('default reproduction preserves version 7 results with either foraging model', () => {
+  for (const foraging of [undefined, 'walkthrough']) {
+    const old = { ...starter(HABITAT_RULE_VERSION), foraging, foodPlacement: 'patches',
+      food: 120, refugePercent: 15, huntingAdvantage: 40 }
+    const current = setupForNewRun(old)
+    assert.deepEqual([current.foodPlacement, current.refugePercent, current.huntingAdvantage], ['patches', 15, 40])
+    let oldCheckpoint = founders(old), checkpoint = founders(current)
+    for (let day = 1; day <= 10; day++) {
+      const before = dawn(old, day, oldCheckpoint)
+      const after = dawn(current, day, checkpoint)
+      const previous = step(before, old, Infinity, true)
+      const result = step(after, current, Infinity, true)
+      assert.deepEqual(result.summary, previous.summary)
+      assert.deepEqual(after.events, before.events)
+      assert.deepEqual(result.checkpoint.roster.map(({ lastBirthDay, ...blob }) => blob), previous.checkpoint.roster)
+      assert.equal(result.checkpoint.nextId, previous.checkpoint.nextId)
+      oldCheckpoint = previous.checkpoint
+      checkpoint = result.checkpoint
+    }
+  }
+})
+
+test('two-parent births average traits, keep both parent IDs, and count each twin once', () => {
+  const config = starter()
+  const [blue, orange] = config.species
+  orange.enabled = true
+  Object.assign(config.reproduction, { parentMode: 'pair', twinChance: 100 })
+  const initial = founders(config)
+  const roster = initial.roster.filter(blob => [1, 2, 3, 51, 52, 53].includes(blob.id))
+  for (const blob of roster) Object.assign(blob, { speed: 4 + blob.id % 5, size: 10 + blob.id % 4, sense: 20 + blob.id % 3 })
+  for (const species of [blue, orange]) {
+    species.mutation.size = false
+    species.inheritance.mutationChance.sense = 0
+    species.inheritance.mutationPattern = 'bounded'
+  }
+  blue.inheritance.mutationChance.speed = 0
+  orange.standardDeviation.speed = 2
+  const field = dawn(config, 4, { roster, nextId: initial.nextId })
+  for (const blob of field.blobs) Object.assign(blob, { home: true, credits: blob.id === 53 ? 1 : 2 })
+  const result = dusk(field, config)
+  const births = field.events.filter(event => event.type === 'birth')
+  const children = result.checkpoint.roster.filter(blob => blob.age === 0)
+  assert.equal(births.length, 4)
+  assert.equal(result.summary.rows.all.births, 4)
+  assert.equal(result.summary.rows.all.population, 10)
+  for (const child of children) {
+    const parents = roster.filter(blob => blob.id === child.parent || blob.id === child.secondParent)
+    assert.equal(parents.length, 2)
+    assert.ok(parents.every(parent => parent.species === child.species && parent.id !== 53))
+    const mean = key => (parents[0][key] + parents[1][key]) / 2
+    const event = births.find(event => event.id === child.id)
+    assert.deepEqual([event.parent, event.secondParent], [child.parent, child.secondParent])
+    assert.equal(child.lastBirthDay, undefined)
+    assert.equal(child.size, mean('size'))
+    assert.equal(child.sense, mean('sense'))
+    if (child.species === blue.id) assert.equal(child.speed, mean('speed'))
+    else assert.ok(Math.abs(child.speed - mean('speed')) <= 2 * Math.sqrt(3))
+  }
+  const orangeTwins = children.filter(child => child.species === orange.id)
+  assert.notEqual(orangeTwins[0].speed, orangeTwins[1].speed)
+  assert.equal(result.checkpoint.roster.filter(blob => blob.lastBirthDay === 4).length, 4)
+})
+
+test('breeding age and wait use completed days and only a successful birth starts a wait', () => {
+  const config = starter()
+  Object.assign(config.reproduction, { minimumBreedingAge: 1, birthWait: 1, birthChance: 0, twinChance: 100 })
+  const initial = founders(config)
+  let checkpoint = { roster: [initial.roster[0]], nextId: initial.nextId }
+  function finish(day) {
+    const field = dawn(config, day, structuredClone(checkpoint))
+    for (const blob of field.blobs) Object.assign(blob, { home: true, credits: blob.id === 1 ? 2 : 1 })
+    const result = dusk(field, config)
+    checkpoint = result.checkpoint
+    return result.summary.rows.all.births
+  }
+  assert.equal(finish(1), 0)
+  assert.equal(finish(2), 0)
+  assert.equal(checkpoint.roster[0].lastBirthDay, undefined)
+  config.reproduction.birthChance = 100
+  config.reproduction.minimumBreedingAge = 3
+  assert.equal(finish(3), 0)
+  assert.equal(finish(4), 2)
+  assert.equal(finish(5), 0)
+  assert.equal(finish(6), 2)
+})
+
+test('paired breeding agrees across ticks, batch execution and a restored checkpoint', () => {
+  const config = starter()
+  config.food = 250
+  Object.assign(config.reproduction, { parentMode: 'pair', birthChance: 90, twinChance: 60, birthWait: 1 })
+  const mutation = config.species[0].inheritance
+  mutation.mutationPattern = 'bounded'
+  mutation.mutationChance.speed = 45
+  let checkpoint = founders(config)
+  let births = 0
+  for (let day = 1; day <= 5; day++) {
+    const live = dawn(config, day, checkpoint)
+    step(live, config, 10)
+    const partiallySaved = structuredClone(live)
+    let result
+    while (!result) result = step(live, config)
+    const replay = dawn(config, day, JSON.parse(JSON.stringify(checkpoint)))
+    assert.deepEqual(step(partiallySaved, config, Infinity, true), result)
+    assert.deepEqual(step(replay, config, Infinity, true), result)
+    assert.deepEqual(snapshot(replay), snapshot(live))
+    checkpoint = result.checkpoint
+    births += result.summary.rows.all.births
+  }
+  assert.ok(births > 0)
+})
+
+test('a branch applies breeding rules after its fork and starts recording birth waits from older checkpoints', () => {
+  const old = starter(HABITAT_RULE_VERSION)
+  const branch = setupForNewRun(old)
+  Object.assign(branch.reproduction, { parentMode: 'pair', birthWait: 1 })
+  const revisions = [{ day: 1, setup: old }, { day: 2, setup: branch }]
+  assert.equal(validateRevisions(branch, revisions), true)
+  let checkpoint = founders(old)
+  for (let day = 1; day <= 4; day++) {
+    const rules = rulesFor(branch, revisions, day)
+    const field = dawn(rules, day, structuredClone(checkpoint))
+    for (const blob of field.blobs) Object.assign(blob, { home: true, credits: blob.id <= 2 ? 2 : 1 })
+    const { summary, checkpoint: next } = dusk(field, rules)
+    assert.equal(summary.rows.all.births, [2, 1, 0, 1][day - 1])
+    const parents = next.roster.filter(blob => blob.id <= 2)
+    const lastBirth = [undefined, 2, 2, 4][day - 1]
+    assert.deepEqual(parents.map(blob => blob.lastBirthDay), [lastBirth, lastBirth])
+    checkpoint = next
+  }
 })
 
 test('a natural day can settle at the emergency limit even with a zero-cost moving blob', () => {

@@ -63,7 +63,7 @@ const rateText = computed(() => Number(playbackSpeed.value.toFixed(3))+'×')
 const liveRate = computed(() => !lab.replay && lab.playing && !lab.loading && !lab.batch ? playbackSpeed.value : null)
 const events = computed(() => (lab.frame?.events ?? []).filter(e => e.time <= (lab.frame?.time ?? 0)))
 const creatureEvents = computed(() => events.value.filter(e => e.id===lab.selected || e.target===lab.selected && e.type==='prey' ||
-  e.type==='birth' && e.parent===lab.selected))
+  e.type==='birth' && (e.parent===lab.selected || e.secondParent===lab.selected)))
 const visibleEvents = computed(() => creatureEvents.value.filter(e => eventFilter.value==='all' || e.type===eventFilter.value))
 const living = computed(() => lab.frame?.blobs.filter(b => b.alive) ?? [])
 const speedRange = computed(() => layers.value.speed ? runSpeedRange(lab.run) : undefined)
@@ -127,7 +127,11 @@ function eventName(e) {
   if (e.type === 'plant') return 'Ate a plant'
   if (e.type === 'prey') return 'Hunted #'+e.target
   if (e.type === 'home') return 'Reached refuge'
-  return e.id===lab.selected ? 'Born to #'+e.parent : 'Offspring #'+e.id
+  return e.id===lab.selected ? 'Born to '+parentNames(e) : 'Offspring #'+e.id
+}
+function parentNames({ parent, secondParent }) {
+  if (secondParent != null) return `#${parent} and #${secondParent}`
+  return parent == null ? 'Founder' : '#'+parent
 }
 async function copyStats() {
   const blob = visible.value
@@ -277,7 +281,7 @@ defineExpose({ select, overhead })
             ['Age',visible.age+' days'],['Food credits',visible.credits],...traitStats,
             ['Travel rate',format(travel(visible,rules),1)+' units/s'],
             ['Body radius',format(radius(visible.size),2)],['Energy cost',movementCost],
-            ['Born', 'Day '+visible.born],['Parent',visible.parent ? '#'+visible.parent : 'Founder']
+            ['Born', 'Day '+visible.born],[visible.secondParent != null ? 'Parents' : 'Parent',parentNames(visible)]
           ]" :key="name"><dt>{{ name }}</dt><dd>{{ value }}</dd></template></dl>
           <h3>Events</h3>
           <select v-model="eventFilter" aria-label="Filter creature events">

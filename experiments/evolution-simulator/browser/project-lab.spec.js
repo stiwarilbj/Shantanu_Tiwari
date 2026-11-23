@@ -252,11 +252,13 @@ test.describe('short touch viewports', () => {
       expect(initial.y).toBeGreaterThanOrEqual(closeBox.y + closeBox.height)
       expect(initial.y + initial.height).toBeLessThanOrEqual((await evolve.boundingBox()).y)
 
+      await settings.getByRole('button', { name: /^Inheritance and reproduction/ }).tap()
       const mutation = settings.getByRole('checkbox', { name: 'Allow size mutation' })
       const checked = await mutation.isChecked()
       await mutation.tap()
       await expect(mutation).toHaveJSProperty('checked', !checked)
 
+      await settings.getByRole('button', { name: 'Basic', exact: true }).tap()
       const days = settings.getByRole('spinbutton', { name: 'Days to run' })
       await days.fill('1')
       await evolve.tap()

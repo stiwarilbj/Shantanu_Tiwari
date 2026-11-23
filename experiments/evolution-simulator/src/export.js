@@ -1,7 +1,26 @@
 import { METRICS } from './engine/stats.js'
+import { HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
+  usesReproductionRules } from './engine/config.js'
+
+function omitDefaults(values, defaults) {
+  const entries = Object.entries(values ?? {}).filter(([key, value]) => value !== defaults[key])
+  return entries.length ? Object.fromEntries(entries) : undefined
+}
 
 export function setupLink(setup) {
-  const bytes=new TextEncoder().encode(JSON.stringify(setup))
+  let compact = setup
+  if (usesReproductionRules(setup)) {
+    compact = {
+      ...omitDefaults(setup, HABITAT_DEFAULTS),
+      reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
+      species: setup.species.map(item => {
+        const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
+        const mutationPattern = item.inheritance?.mutationPattern
+        return { ...item, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
+      }),
+    }
+  }
+  const bytes=new TextEncoder().encode(JSON.stringify(compact))
   if(bytes.length>1350) return null
   const token=btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'')
   const link=location.origin+location.pathname+'#/setup/'+token
@@ -12,7 +31,10 @@ export function setupFromLink(hash) {
   if(!hash.startsWith('#/setup/')) return null
   const token=hash.slice(8)
   const bytes=Uint8Array.from(atob(token.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0))
-  return JSON.parse(new TextDecoder().decode(bytes))
+  const setup = JSON.parse(new TextDecoder().decode(bytes))
+  // Share links omit defaults to keep common configurations within the URL limit.
+  return setup && usesReproductionRules(setup) && Array.isArray(setup.species) &&
+    setup.species.every(item => item && typeof item === 'object') ? setupWithRuleDefaults(setup) : setup
 }
 
 export function download(name, mime, content) {
