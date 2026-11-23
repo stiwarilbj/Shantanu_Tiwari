@@ -72,6 +72,7 @@ const series = computed(() => [{
   value: row => row[metric.value.key],
   primary: true,
   zero: metric.value.key === 'growthRate',
+  prediction: { min:metric.value.key === 'growthRate' ? -100 : metric.value.min, max:metric.value.max },
 }])
 
 const readings = computed(() => {

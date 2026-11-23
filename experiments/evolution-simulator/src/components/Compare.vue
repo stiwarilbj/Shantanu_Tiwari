@@ -83,6 +83,7 @@ const videoPair=computed(()=>{
 const sequenceReady=computed(()=>days.value[0]===6 && days.value[1]===77 && tracks.value.every(Boolean))
 const sequenceButtonText=computed(()=>sequence.value ? 'Stop video sequence' : 'Play video sequence')
 const huntMetric={ key:'hunts', label:'Successful hunts', color:'#D38C80', count:true }
+const trendMetrics=[...METRICS,huntMetric]
 const comparisonMetrics=[
   ...METRICS,
   { key:'births', label:'Births', color:'#A1BD67', count:true },
@@ -98,10 +99,13 @@ function measure(metric, side) {
   const a=valueFor(summary.value[0],metric), b=valueFor(summary.value[1],metric)
   return format(side==='delta' ? (a!=null && b!=null ? b-a : null) : side==='a' ? a : b,digits)
 }
-const series=metric=>[
-  { label:left.value.setup.name+' · Left', color:'#83B3CE', value:r=>valueFor(r.a,metric), zero:metric.count || metric.key==='population' },
-  { label:right.value.setup.name+' · Right', color:'#F6AD73', value:r=>valueFor(r.b,metric), zero:metric.count || metric.key==='population' },
-]
+const trendSeries=computed(()=>Object.fromEntries(trendMetrics.map(metric=>[metric.key,
+  [['a',left.value,'Left','#83B3CE'],['b',right.value,'Right','#F6AD73']].map(([side,run,name,color])=>({
+    label:run.setup.name+' · '+name, color, value:row=>valueFor(row[side],metric),
+    integer:metric.count || metric.key==='population', zero:metric.count || metric.key==='population',
+    prediction:metric.key==='population'?{extinct:row=>row[side]?.population===0}:undefined,
+  })),
+])))
 function stop(index=null) {
   const sides=index==null ? [0,1] : [index]
   for (const side of sides) {
@@ -436,8 +440,8 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
       </section>
       <div class="compact-plots">
         <p class="quiet compare-trend-note">Trend charts line up the runs by generation. The two world views above can show different days.</p>
-        <TrendPlot v-for="m in [...METRICS,huntMetric]" :key="m.key" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows"
-          :pin="day" :series="series(m)" :focus="focus===m.key" legend @watch="seekDay" @pin="seekDay" @focus="focus=focus===m.key?'':m.key"/>
+        <TrendPlot v-for="m in trendMetrics" :key="m.key" :title="m.label" :unit="m.unit ?? 'hunts per day'" :color="m.heading ?? m.color" :rows="rows"
+          :pin="day" :series="trendSeries[m.key]" :focus="focus===m.key" legend @watch="seekDay" @pin="seekDay" @focus="focus=focus===m.key?'':m.key"/>
       </div>
     </template>
   </main>

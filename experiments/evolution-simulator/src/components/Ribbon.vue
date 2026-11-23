@@ -3,6 +3,8 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Bookmark, ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
+import { predict } from '../forecast.js'
+import { forecastPreferences } from '../forecast-preferences.js'
 import Flower from './Flower.vue'
 import ExtinctionIcon from './ExtinctionIcon.vue'
 
@@ -17,6 +19,20 @@ let observer
 legend.value = innerWidth >= 620
 const order = computed(() => mode.value === 'classic' ? [1,3,4,5,0] : [1,2,3,4,5,0])
 const rows = computed(() => lab.run.summaries.map(record => record.rows[lab.scope]))
+const miniKey = computed(() => METRICS[order.value[rotation.value] ?? 1])
+const forecasts = computed(() => {
+  if (mode.value !== 'line' || !forecastPreferences.enabled || lab.extinctDay) return []
+  const { key } = miniKey.value
+  return predict(rows.value, row=>metricValue(row,key), forecastPreferences.cycles, {
+    integer: key === 'population', extinct: row=>key === 'population' && row?.population === 0,
+  })
+})
+const forecastEnd = computed(() => lab.completed + forecasts.value.length)
+const forecastForDay = day => forecasts.value[day - lab.completed - 1]
+function forecastText(value) {
+  return format(value,miniKey.value.key === 'population' ? 0 : 2)
+}
+const forecastLabel = day => 'Predicted · Day '+day+' · '+miniKey.value.short+' '+forecastText(forecastForDay(day))
 const bookmarks = computed(() => new Set(lab.run.bookmarks ?? []))
 const bookmarkAction = day => bookmarks.value.has(day) ? 'Remove bookmark for Day '+day : 'Bookmark Day '+day
 const bounds = computed(() => {
@@ -30,7 +46,7 @@ const bounds = computed(() => {
 })
 const tiles = computed(() => {
   const limit = lab.run.setup.days
-  const visible = lab.extinctDay ? lab.completed : Math.min(limit,Math.max(lab.completed+8, lab.viewing+2))
+  const visible = lab.extinctDay ? lab.completed : Math.min(limit,Math.max(lab.completed+8, lab.viewing+2, forecastEnd.value))
   return Array.from({length:visible},(_,i) => {
     const row = rows.value[i]
     return { day:i+1,row,values: row ? Object.fromEntries(METRICS.map(m => [m.key,metricValue(row,m.key)])) : null }
@@ -50,22 +66,26 @@ const visibleFrame = computed(() => {
   return { population:living.length, age:average(living,'age'), deathAge:average(deaths,'age'),
     speed:average(living,'speed'),size:average(living,'size'),sense:average(living,'sense') }
 })
-const miniKey = computed(() => METRICS[order.value[rotation.value] ?? 1])
+const extraForecastDays = computed(() => Array.from({ length:Math.max(0, forecastEnd.value-tiles.value.length) },
+  (_,index)=>tiles.value.length+index+1))
 const miniSeries = computed(() => {
   const { key } = miniKey.value
-  const scale = bounds.value[key].max || 1
+  const scale = Math.max(bounds.value[key].max,...forecasts.value) || 1
+  const point = (day,value) => ({ day, x:(day-.5)*100, y:58-value/scale*50 })
   const points = []
   let path = ''
   for (const tile of tiles.value) {
     const value = tile.values?.[key]
     if (value == null) continue
-    const x = (tile.day - .5) * 100
-    const y = 58 - value / scale * 50
+    const { x,y } = point(tile.day,value)
     const command = points.at(-1)?.day === tile.day - 1 ? 'L' : 'M'
     path += ` ${command}${x} ${y}`
     points.push({ day: tile.day, x, y })
   }
-  return { path, points }
+  const future = forecasts.value.map((value,index)=>point(lab.completed+index+1,value))
+  const predictedPath = future.length ? [points.at(-1), ...future]
+    .map(({ x,y },index)=>`${index ? 'L' : 'M'}${x} ${y}`).join(' ') : ''
+  return { path, points, future, predictedPath }
 })
 const firstExtinct = computed(() => rows.value.find(row => row?.population === 0)?.day)
 function center(smooth, day = lab.viewing) {
@@ -120,7 +140,7 @@ function keys(event,day) {
   if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
   event.preventDefault()
   const next = event.key === 'Home' ? 1 : event.key === 'End' ? Math.max(lab.completed,1) :
-    Math.max(1,Math.min(tiles.value.length,day+(event.key === 'ArrowLeft' ? -1 : 1)))
+    Math.max(1,Math.min(tiles.value.length+extraForecastDays.value.length,day+(event.key === 'ArrowLeft' ? -1 : 1)))
   scroll.value.querySelector('[data-day="'+next+'"]')?.focus({ preventScroll:true })
   center(false,next)
 }
@@ -175,9 +195,12 @@ function escapeRibbon(event) {
       <div ref="scroll" class="ribbon-scroll" @wheel="wheel" @scroll.passive="anchorDetail">
         <div class="tile-track">
           <button v-for="tile in tiles" :key="tile.day" type="button" class="day-tile"
-            :class="{ current:lab.viewing===tile.day, pending:!tile.row, 'line-tile':mode==='line' }" :data-day="tile.day"
+            :class="{ current:lab.viewing===tile.day, pending:!tile.row, 'line-tile':mode==='line',
+              'predicted-tile':forecastForDay(tile.day)!=null }" :data-day="tile.day"
             :aria-current="lab.viewing===tile.day ? 'true' : undefined"
-            :aria-label="'Day '+tile.day+(tile.row ? ', population '+tile.row.population : ', '+(tile.day===lab.liveDay && !lab.batch ? 'live' : 'pending'))+(bookmarks.has(tile.day) ? ', bookmarked' : '')"
+            :aria-label="'Day '+tile.day+(tile.row ? ', population '+tile.row.population : ', '+(tile.day===lab.liveDay && !lab.batch ? 'live' : 'pending'))+(bookmarks.has(tile.day) ? ', bookmarked' : '')+
+              (forecastForDay(tile.day)!=null ? ', '+forecastLabel(tile.day) : '')"
+            :title="forecastForDay(tile.day)!=null ? forecastLabel(tile.day) : undefined"
             :tabindex="tile.day===focusDay ? 0 : -1" :aria-keyshortcuts="tile.row ? 'I Shift+F10' : undefined"
             @focus="focusDay=tile.day" @click="clickTile($event,tile)" @keydown="keys($event,tile.day)"
             @contextmenu="tile.row && ($event.preventDefault(),inspect(tile.day))">
@@ -186,16 +209,27 @@ function escapeRibbon(event) {
             <span class="day-number">{{ tile.day }}<Bookmark v-if="bookmarks.has(tile.day)" class="bookmark-mark" :size="11" aria-hidden="true"/></span>
             <small v-if="!tile.row">{{ tile.day===lab.liveDay && !lab.batch ? 'Live' : 'Pending' }}</small>
             <small v-else-if="!lab.extinctDay && tile.day===firstExtinct">Extinct</small>
+            <small v-if="forecastForDay(tile.day)!=null" class="mini-prediction">≈ {{ forecastText(forecastForDay(tile.day)) }}</small>
           </button>
+          <div v-for="day in extraForecastDays" :key="day" class="day-tile line-tile predicted-tile" :data-day="day"
+            :tabindex="focusDay===day ? 0 : -1" role="img" :aria-label="forecastLabel(day)" :title="forecastLabel(day)"
+            @focus="focusDay=day" @keydown="keys($event,day)">
+            <span class="day-number">{{ day }}</span><small class="mini-prediction">Predicted</small>
+            <small class="mini-prediction">≈ {{ forecastText(forecastForDay(day)) }}</small>
+          </div>
           <button v-if="lab.extinctDay" class="day-tile extinction-tile" :aria-label="'Extinct on Day '+lab.extinctDay+' · Watch final scene'" @click="lab.openDay(lab.extinctDay, Infinity)">
             <ExtinctionIcon/>
             <span>Extinct</span><small>Day {{ lab.extinctDay }}</small>
           </button>
           <button v-else class="day-tile more-tile" aria-label="More Generations" @click="lab.modal='extend'"><Layers :size="25"/><span>More</span></button>
-          <svg v-if="mode==='line'" class="ribbon-line" :viewBox="'0 0 '+tiles.length*100+' 65'"
-            :style="{width:'calc(var(--tile) * '+tiles.length+')'}" preserveAspectRatio="none" aria-hidden="true">
+          <svg v-if="mode==='line'" class="ribbon-line" :viewBox="'0 0 '+(tiles.length+extraForecastDays.length)*100+' 65'"
+            :style="{width:'calc(var(--tile) * '+(tiles.length+extraForecastDays.length)+')'}" preserveAspectRatio="none" aria-hidden="true">
             <path :d="miniSeries.path" :stroke="miniKey.color" fill="none" stroke-width="2"/>
             <circle v-for="point in miniSeries.points" :key="point.day" :cx="point.x" :cy="point.y" r="3" :fill="miniKey.color"/>
+            <g v-if="miniSeries.future.length">
+              <path :d="miniSeries.predictedPath" :stroke="miniKey.color" fill="none" stroke-width="2" stroke-dasharray="6 5"/>
+              <circle v-for="point in miniSeries.future" :key="point.day" :cx="point.x" :cy="point.y" r="3" fill="#1B2A33" :stroke="miniKey.color"/>
+            </g>
           </svg>
         </div>
       </div>

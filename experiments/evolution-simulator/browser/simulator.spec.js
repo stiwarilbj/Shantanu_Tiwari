@@ -749,8 +749,9 @@ test('Mini line shows a point as soon as the first day is completed', async ({ p
   await quickThrough(page, 3)
   await expect(batchStatus(page, 'Saved through')).toHaveText('Day 3')
   await page.getByRole('button', { name: 'Close', exact: true }).click()
-  await expect(chart.locator('circle')).toHaveCount(3)
-  await expect(chart.locator('path')).toHaveAttribute('d', /M.*L.*L/)
+  await expect(chart.locator(':scope > circle')).toHaveCount(3)
+  await expect(chart.locator(':scope > path')).toHaveAttribute('d', /M.*L.*L/)
+  await expect(chart.locator('g circle')).toHaveCount(5)
 })
 
 test('Mini line points stay above their generation tiles when the window shrinks', async ({ page }) => {
@@ -762,7 +763,7 @@ test('Mini line points stay above their generation tiles when the window shrinks
   await page.getByRole('button', { name: 'Generation options' }).click()
   await page.getByRole('button', { name: 'Mini line', exact: true }).click()
 
-  const line = page.locator('.ribbon-line path')
+  const line = page.locator('.ribbon-line > path')
   for (const viewport of [
     { width: 1280, height: 900 },
     { width: 640, height: 750 },
@@ -777,6 +778,118 @@ test('Mini line points stay above their generation tiles when the window shrinks
         Math.abs(endpoints[i].matrixTransform(screen).x - (left + width / 2))))
     }), { message: `Chart alignment at ${viewport.width} × ${viewport.height}` }).toBeLessThan(1)
   }
+})
+
+test('graph predictions respect the visible range, saved controls and recorded-day actions', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page)
+    await page.getByRole('spinbutton', { name:'Food', exact:true }).fill('400')
+  })
+  await quickThrough(page, 6)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 6')
+  await page.getByRole('button', { name:'Close', exact:true }).click()
+  await page.getByRole('link', { name:'Trends', exact:true }).click()
+
+  const population = page.getByRole('article', { name:'Population chart', exact:true })
+  const chart = population.getByRole('img')
+  const reading = population.getByRole('status')
+  await page.getByRole('combobox', { name:'Range', exact:true }).selectOption('custom')
+  await page.getByRole('spinbutton', { name:'From day' }).fill('2')
+  await page.getByRole('spinbutton', { name:'To day' }).fill('3')
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(reading).toBeEmpty()
+  await page.getByRole('spinbutton', { name:'To day' }).fill('4')
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(reading).toContainText('Predicted · Day 5')
+  await chart.press('Enter')
+  await chart.press('Space')
+  await expect(page.getByRole('button', { name:'Watch day', exact:true })).toHaveAccessibleDescription(/Day 4 · Pinned/)
+  await expect(reading).toContainText('Predicted · Day 5')
+  for (let i=0; i<4; i++) await chart.press('ArrowRight')
+  await expect(reading).toContainText('Predicted · Day 9')
+
+  const bounds = await chart.boundingBox()
+  await page.mouse.move(bounds.x + bounds.width*.83, bounds.y + bounds.height*.5)
+  await expect(reading).toContainText('Predicted · Day')
+  await page.mouse.click(bounds.x + bounds.width*.83, bounds.y + bounds.height*.5)
+  await expect(population).toBeVisible()
+
+  await page.getByRole('button', { name:'Simulation Settings' }).click()
+  await advancedSettings(page, 'Graph predictions')
+  const cycles = page.getByRole('spinbutton', { name:'Cycles ahead' })
+  await expect(cycles).toHaveValue('5')
+  await cycles.fill('26')
+  await expect(cycles).toHaveAttribute('aria-invalid','true')
+  await cycles.fill('2')
+  await cycles.press('Enter')
+  const show = page.getByRole('checkbox', { name:'Show predictions' })
+  await show.uncheck()
+  await expect(cycles).toBeDisabled()
+  await page.getByRole('button', { name:'Close settings' }).click()
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(reading).toBeEmpty()
+
+  await page.reload()
+  await page.getByRole('button', { name:'Simulation Settings' }).click()
+  await advancedSettings(page, 'Graph predictions')
+  await expect(show).not.toBeChecked()
+  await expect(cycles).toHaveValue('2')
+  await show.check()
+  await page.getByRole('button', { name:'Close settings' }).click()
+  await page.getByRole('link', { name:'Trends', exact:true }).click()
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(reading).toContainText('Predicted · Day 7')
+  await chart.press('ArrowRight')
+  await chart.press('ArrowRight')
+  await expect(reading).toContainText('Predicted · Day 8')
+
+  for (const [button, name, start] of [
+    ['Generation table','Generation statistics','Stat trends'],
+    ['Advanced stats','Advanced stats',null],
+  ]) {
+    await page.getByRole('button', { name:button, exact:true }).click()
+    const dialog = page.getByRole('dialog', { name })
+    if (start) await dialog.getByRole('button', { name:start }).click()
+    const graph = dialog.getByRole('img', { name:/by generation/ })
+    await graph.press('End')
+    await graph.press('ArrowRight')
+    await expect(dialog.locator('.prediction-reading')).toContainText('Predicted · Generation 7')
+    await page.keyboard.press('Escape')
+  }
+  expect(errors).toEqual([])
+})
+
+test('Compare forecasts both runs from the end of their shared history', async ({ page }) => {
+  await openSimulator(page)
+  for (const [name, days, food] of [['Longer run', 5, '500'], ['Shorter run', 3, '350']]) {
+    await startRun(page, '10', async () => {
+      await fixedDay(page)
+      await page.getByRole('spinbutton', { name:'Food', exact:true }).fill(food)
+      await page.getByLabel('Run name').fill(name)
+    })
+    await quickThrough(page, days)
+    await expect(batchStatus(page, 'Saved through')).toHaveText('Day '+days)
+    await page.getByRole('button', { name:'Close', exact:true }).click()
+  }
+  await openRunLibrary(page)
+  await page.getByRole('dialog', { name:'Run Library' }).locator('article').filter({ hasText:'Longer run' })
+    .getByRole('button', { name:'Compare', exact:true }).click()
+  const population = page.getByRole('article', { name:'Population chart', exact:true })
+  const chart = population.getByRole('img')
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(population.getByRole('status')).toHaveText(/Predicted · Day 4 · Shorter run · Left\s+\d+ · Longer run · Right\s+\d+/)
+  await population.getByRole('button', { name:'Shorter run · Left' }).click()
+  await chart.press('End')
+  await chart.press('ArrowRight')
+  await expect(population.getByRole('status')).toHaveText(/Predicted · Day 4 · Longer run · Right\s+\d+/)
 })
 
 test('the generation spreadsheet and stat trends update after each live generation @pages', async ({ page }) => {
@@ -982,7 +1095,7 @@ test('Mini line can plot Population and Age at Death', async ({ page }) => {
   const legend = page.locator('.flower-legend')
   const population = legend.getByRole('button', { name: 'Population', exact: true })
   const deathAge = legend.getByRole('button', { name: 'Age at Death', exact: true })
-  const line = page.locator('.ribbon-line path')
+  const line = page.locator('.ribbon-line > path')
   const table = page.getByRole('dialog', { name: 'Generation statistics' })
 
   await options.click()

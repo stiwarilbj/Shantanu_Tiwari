@@ -8,6 +8,7 @@ import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_V
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
+import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
 
 const lab = useLab()
 const draft = lab.draft
@@ -20,6 +21,13 @@ const copied = ref(false), discarding = ref(false), applying = ref(false)
 const fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
 const groups = {
   habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
+  predictions: 'Graph predictions',
+}
+const forecastCycles = ref(String(forecastPreferences.cycles))
+const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
+function editForecastCycles(event) {
+  forecastCycles.value = event.target.value
+  if (forecastCyclesValid.value) setForecastPreferences({ cycles: event.target.valueAsNumber })
 }
 const advancedFields = {
   schedule: 'habitat', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
@@ -336,6 +344,22 @@ onMounted(()=>dialog.value.showModal())
               </template>
             </div>
           </template>
+          <div v-else-if="group === 'predictions'" class="advanced-block" @keydown.enter.prevent>
+            <h3>Graph predictions</h3>
+            <label class="advanced-toggle">
+              <input type="checkbox" :checked="forecastPreferences.enabled"
+                @change="setForecastPreferences({ enabled: $event.target.checked })">
+              Show predictions
+            </label>
+            <label class="advanced-select forecast-cycles">Cycles ahead
+              <input type="number" :value="forecastCycles" min="1" :max="maxForecastCycles" step="1"
+                :disabled="!forecastPreferences.enabled" :aria-invalid="!forecastCyclesValid || undefined"
+                :aria-describedby="forecastCyclesValid ? 'forecast-help' : 'forecast-error'"
+                @input="editForecastCycles" @blur="forecastCycles = String(forecastPreferences.cycles)">
+            </label>
+            <small v-if="!forecastCyclesValid" id="forecast-error" class="issue">Enter a whole number from 1 to {{ maxForecastCycles }}.</small>
+            <p id="forecast-help" class="quiet">Dashed predictions use the last 3 to 10 visible generations. Changes apply to all runs right away.</p>
+          </div>
           <template v-else>
             <div class="advanced-block">
               <h3>Reproduction</h3>

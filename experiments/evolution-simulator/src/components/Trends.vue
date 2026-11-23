@@ -88,21 +88,24 @@ const basic=['population','age','speed','size','sense']
 const titles={ population:'Population',age:'Age',speed:'Speed',size:'Size',sense:'Sense Range',deathAge:'Age at Death' }
 const m=key=>METRICS.find(metric=>metric.key===key)
 const line=(label,color,value,rest={})=>({label,color,value,...rest})
+const extinct=(run, scope)=>row=>run.summaries[row.day-1]?.rows[scope]?.population===0
 function distribution(key) {
   const metric=m(key), useSD=spread.value==='sd'
   const ink=basic.includes(key)?metric.petal:metric.color
   const band={ width:1, area:2, fill:ink+'1A', tooltip:false }
+  const read=row=>row[key]
+  const predictField=field=>({read,field})
   return [
-    line('Max',metric.outer+(useSD?'40':'66'),r=>r[key]?.max,{width:1,dash:useSD?undefined:[2,2]}),
+    line('Max',metric.outer+(useSD?'40':'66'),r=>r[key]?.max,{width:1,dash:useSD?undefined:[2,2],prediction:predictField('max')}),
     useSD
-      ? line('Mean + sample SD',ink+'26',r=>r[key]?.n?Math.min(r[key].max,r[key].mean+r[key].sd):null,band)
-      : line('P75',metric.inner+'A6',r=>r[key]?.p75,{width:1.5}),
+      ? line('Mean + sample SD',ink+'26',r=>r[key]?.n?Math.min(r[key].max,r[key].mean+r[key].sd):null,{...band,prediction:predictField('upper')})
+      : line('P75',metric.inner+'A6',r=>r[key]?.p75,{width:1.5,prediction:predictField('p75')}),
     line('Mean',ink,r=>r[key]?.mean,{primary:true,width:basic.includes(key)?1.7:2.2,zero:key==='age'||key==='deathAge',
-      spread:useSD?(r=>r?.[key]?.sd):undefined}),
+      spread:useSD?(r=>r?.[key]?.sd):undefined,prediction:predictField('mean')}),
     useSD
-      ? line('Mean − sample SD',ink+'26',r=>r[key]?.n?Math.max(r[key].min,r[key].mean-r[key].sd):null,band)
-      : line('P25',metric.inner+'A6',r=>r[key]?.p25,{width:1.5,dash:[4,2]}),
-    line('Min',metric.outer+(useSD?'40':'66'),r=>r[key]?.min,{width:1,dash:useSD?undefined:[2,2]})
+      ? line('Mean − sample SD',ink+'26',r=>r[key]?.n?Math.max(r[key].min,r[key].mean-r[key].sd):null,{...band,prediction:predictField('lower')})
+      : line('P25',metric.inner+'A6',r=>r[key]?.p25,{width:1.5,dash:[4,2],prediction:predictField('p25')}),
+    line('Min',metric.outer+(useSD?'40':'66'),r=>r[key]?.min,{width:1,dash:useSD?undefined:[2,2],prediction:predictField('min')})
   ]
 }
 function pairedDistribution(key) {
@@ -110,17 +113,19 @@ function pairedDistribution(key) {
   const series=[]
   for (const [side,label,color] of [['wide','Wide · σ 1.00',ink],['narrow','Narrow · σ 0.50',metric.heading ?? metric.inner]]) {
     const offset=series.length
+    const read=row=>row[side]?.[key]
+    const predictField=field=>({read,field})
     const value=(row,field)=>row?.[side]?.[key]?.[field]
     const bound=field=>row=>row?.[side]?.[key]?.n ?
       field==='max' ? row[side][key].max : row[side][key].min : null
     series.push(
-      line(label+' max',metric.outer+'40',bound('max'),{width:1,tooltip:false}),
+      line(label+' max',metric.outer+'40',bound('max'),{width:1,tooltip:false,prediction:predictField('max')}),
       line(label+' mean + SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.min(row[side][key].max,row[side][key].mean+row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false}),
-      line(label,color,row=>value(row,'mean'),{primary:true,width:1.8,spread:row=>value(row,'sd')}),
+        {width:1,area:offset+2,fill:color+'18',tooltip:false,prediction:predictField('upper')}),
+      line(label,color,row=>value(row,'mean'),{primary:true,width:1.8,spread:row=>value(row,'sd'),prediction:predictField('mean')}),
       line(label+' mean − SD',color+'1A',row=>row?.[side]?.[key]?.n?Math.max(row[side][key].min,row[side][key].mean-row[side][key].sd):null,
-        {width:1,area:offset+2,fill:color+'18',tooltip:false}),
-      line(label+' min',metric.outer+'40',bound('min'),{width:1,tooltip:false})
+        {width:1,area:offset+2,fill:color+'18',tooltip:false,prediction:predictField('lower')}),
+      line(label+' min',metric.outer+'40',bound('min'),{width:1,tooltip:false,prediction:predictField('min')})
     )
   }
   return series
@@ -128,34 +133,41 @@ function pairedDistribution(key) {
 const options=computed(()=>{
   const charts={}
   const paired=Boolean(ageDemoPair.value)
+  const populationPrediction={extinct:extinct(activeRun.value,lab.scope)}
   for(const key of [...basic,'deathAge']) charts[key]={
     id:key,title:titles[key],color:m(key).heading ?? m(key).color,
     unit:key==='deathAge'?'Deaths during the day · days':cohortLabel.value+' · '+m(key).unit,
     guide:key==='size'&&transition.value?100:undefined, hideable:true,legend:paired || key!=='population'||otherPopulation.value||compareSpecies.value,
     series:paired && key==='population' ? [
-      line('Wide · σ 1.00',m(key).color,r=>r.wide?.population,{primary:true,integer:true,width:1.7}),
-      line('Narrow · σ 0.50','#BDBAB0',r=>r.narrow?.population,{integer:true,width:1.5,dash:[4,3]}),
+      line('Wide · σ 1.00',m(key).color,r=>r.wide?.population,{primary:true,integer:true,width:1.7,prediction:populationPrediction}),
+      line('Narrow · σ 0.50','#BDBAB0',r=>r.narrow?.population,{integer:true,width:1.5,dash:[4,3],
+        prediction:{extinct:extinct(ageDemoPair.value[1],lab.scope)}}),
     ]:paired ? pairedDistribution(key) : key==='population' ? [
-      line(atDawn.value?'Opening population':'Closing population',m(key).color,r=>r.population,{primary:true,integer:true,width:1.7}),
+      line(atDawn.value?'Opening population':'Closing population',m(key).color,r=>r.population,{primary:true,integer:true,width:1.7,prediction:populationPrediction}),
       ...(otherPopulation.value?[line(atDawn.value?'Closing population':'Opening population','#BDBAB0',
-        atDawn.value?(r=>r.closing):(r=>r.opening),{integer:true,dash:[4,3],width:1.5})]:[]),
-      ...(compareSpecies.value?species.value.map((s,i)=>line(s.name,s.color,r=>r.scopes[s.id]?.population,{integer:true,dash:[i*2+2,3]})):[])
+        atDawn.value?(r=>r.closing):(r=>r.opening),{integer:true,dash:[4,3],width:1.5,prediction:populationPrediction})]:[]),
+      ...(compareSpecies.value?species.value.map((s,i)=>line(s.name,s.color,r=>r.scopes[s.id]?.population,{
+        integer:true,dash:[i*2+2,3],prediction:{extinct:extinct(activeRun.value,s.id)}
+      })):[])
     ]:distribution(key)
   }
   if (!ageDemoVisible.value) charts.population.peakDay=peakDay.value
   charts.overview={id:'overview',title:'Overview',unit:'Traits · left axis   /   Population · right axis',right:true,legend:true,
     series:METRICS.filter(metric=>!hidden.value.includes(metric.key)).map(metric=>line(metric.short,metric.color,r=>metricValue(r,metric.key),{
-      axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined
+      axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined,
+      prediction:metric.key==='population'?populationPrediction:undefined
     }))}
   charts.births={id:'births',title:'Births and Deaths',unit:'Births above zero · deaths below zero',legend:true,hideable:true,
-    series:[line('Births','#A1BD67',r=>r.births,{bar:true,integer:true}),line('Deaths','#BD5558',r=>-r.deaths,{bar:true,integer:true}),
-      line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10'}),
+    series:[line('Births','#A1BD67',r=>r.births,{bar:true,integer:true}),
+      line('Deaths','#BD5558',r=>-r.deaths,{bar:true,integer:true,prediction:{min:-Infinity,max:0}}),
+      line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10',prediction:{min:-Infinity}}),
       ...(causes.value?DEATH_CAUSES.map((cause,i)=>
-        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>-(r.causes?.[cause]??0),{integer:true,dash:[3+i,3],width:1.3})):[])
+        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>-(r.causes?.[cause]??0),
+          {integer:true,dash:[3+i,3],width:1.3,prediction:{min:-Infinity,max:0}})):[])
     ]}
   charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,series:[
-    line(lab.scope==='all'?'Food available':'Shared plant supply','#BDBAB0',r=>r.food,{dash:[4,3],integer:true,zero:true}),
-    line('Food eaten','#B7D65A',r=>r.plants,{integer:true,area:'origin',fill:'#B7D65A12'}),
+    line(lab.scope==='all'?'Food available':'Shared plant supply','#BDBAB0',r=>r.food,{dash:[4,3],integer:true,zero:true,prediction:{max:1000}}),
+    line('Food eaten','#B7D65A',r=>r.plants,{integer:true,area:'origin',fill:'#B7D65A12',prediction:{max:1000}}),
     line('Creatures eaten','#D38C80',r=>r.hunts,{dash:[6,3,2,3],integer:true})
   ]}
   return charts

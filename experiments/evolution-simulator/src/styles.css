@@ -196,6 +196,8 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .extinction-tile>span{margin-top:2px}
 .ribbon-line{position:absolute;left:max(0px,calc(50vw - var(--tile)/2));top:5px;height:51px;z-index:1;pointer-events:none}
 .day-tile.line-tile{padding-top:61px}
+.day-tile.predicted-tile{background:#83b3ce17}
+.day-tile.predicted-tile .mini-prediction{color:#c4e5f4;margin-top:0;font-size:9px}
 .flower-legend{position:absolute;inset:0 auto 0 0;width:138px;background:#0c0c0c;border-right:1px solid #282821;padding:3px 7px;z-index:2}
 .legend-key,.legend-help{min-height:15px;display:flex;align-items:center;gap:8px;color:var(--cream);font:11px var(--mono);padding:1px 3px;white-space:nowrap}
 .flower-legend.mini-line-legend{display:grid;grid-auto-rows:minmax(0,1fr);padding-block:3px}
@@ -262,6 +264,10 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .trend-plot:hover .plot-focus,.plot-focus:focus-visible{opacity:1}
 .chart-unit{font-size:12px;color:var(--quiet);padding:0 0 1px 24px;min-height:18px}
 .chart-canvas{height:195px;position:relative}.chart-canvas canvas{display:block;max-width:100%}
+.prediction-reading{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%)}
+.prediction-reading.is-visible{inset:auto 12px 32px;inline-size:auto;block-size:auto;clip-path:none;
+  max-block-size:45%;overflow:auto;border:1px solid #507184;border-radius:4px;padding:6px 8px;
+  color:#c4e5f4;background:#202f37;font:12px/1.4 var(--mono)}
 .chart-empty{position:absolute;top:44%;left:50%;transform:translateX(-50%);color:var(--quiet);font-size:14px;text-align:center;pointer-events:none}
 .chart-keys{display:flex;gap:4px 12px;flex-wrap:wrap;align-items:center;margin-top:8px;color:var(--muted)}
 .chart-keys button{display:flex;align-items:center;gap:5px;padding:3px 1px;font-size:12px}
@@ -517,6 +523,7 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .advanced-block h3{font-size:16px}
 .advanced-group .quiet{font-size:13px;line-height:1.3}
 .advanced-select{display:flex;justify-content:space-between;align-items:center;gap:6px 14px;flex-wrap:wrap;color:var(--cream)}
+.forecast-cycles input{width:5rem;padding:6px 8px}
 .advanced-actions{display:flex;gap:8px}
 .advanced-block .number-shell{grid-template-columns:minmax(0,1fr) minmax(60px,32%) 65px}
 .advanced-block .number-shell input{min-width:0}

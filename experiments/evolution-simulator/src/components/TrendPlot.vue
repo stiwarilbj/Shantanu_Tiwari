@@ -4,57 +4,103 @@ import { Chart, LineController, LineElement, PointElement, BarController, BarEle
   Tooltip, Filler } from 'chart.js'
 import { Maximize2, Minimize2, Minus } from 'lucide-vue-next'
 import { format } from '../engine/stats.js'
+import { predict, predictDistribution } from '../forecast.js'
+import { forecastPreferences } from '../forecast-preferences.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String, min:Number, max:Number,
   pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
+const predictedIndex = ref(null), showPredictionReading = ref(false)
 let chart, brush, ignoreClick = false
 const hidden = ref([])
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
   [hovered.value, props.pin].find(day => day != null && props.rows.some(row => row.day === day)) ?? null)
 const hasSamples = computed(() => props.series.some(series => props.rows.some(row => series.value(row) != null)))
+const projections = computed(() => {
+  if (!forecastPreferences.enabled) return []
+  const cycles = forecastPreferences.cycles
+  const distributions = new Map()
+  return props.series.map((series, index) => {
+    if (hidden.value.includes(series.label)) return null
+    const { read, field, ...bounds } = series.prediction ?? {}
+    if (read && !distributions.has(read)) distributions.set(read, predictDistribution(props.rows, read, cycles))
+    const samples = distributions.get(read)
+    const values = samples ? samples.map(sample => sample[field] ?? null) :
+      predict(props.rows, series.value, cycles, { ...bounds, integer:series.integer })
+    if (!values.some(Number.isFinite)) return null
+    return { series, index, values, samples }
+  }).filter(Boolean)
+})
+const predictionDays = computed(() => projections.value.length
+  ? Array.from({ length:forecastPreferences.cycles }, (_, i) => props.rows.at(-1).day + i + 1) : [])
+const predictionReading = computed(() => predictionDays.value[predictedIndex.value] == null ? '' :
+  ['Predicted · '+(props.embedded ? 'Generation ' : 'Day ')+predictionDays.value[predictedIndex.value],
+    ...projections.value.filter(p=>Number.isFinite(p.values[predictedIndex.value]))
+      .map(p=>seriesReading(p.series, p.values[predictedIndex.value], p.series.spread ? p.samples?.[predictedIndex.value]?.sd : null))
+  ].join(' · '))
+
+function seriesReading(series, value, spread) {
+  if (series.bar && value < 0) value = -value
+  return series.label+'  '+format(value, series.digits ?? (series.integer ? 0 : 2))+
+    (series.suffix ?? '')+(spread == null ? '' : ' ± '+format(spread))
+}
+function inspectPrediction(index, showReading = false) {
+  predictedIndex.value = index
+  showPredictionReading.value = showReading && index != null
+  if (index != null) hovered.value = null
+  chart?.draw()
+}
 function findPeak() {
   hovered.value = null
+  inspectPrediction(null)
   emit('peak',props.peakDay)
-  chart?.draw()
 }
 function toggle(label) {
   hidden.value=hidden.value.includes(label) ? hidden.value.filter(x=>x!==label) : [...hidden.value,label]
 }
 function move(event) {
   if(!props.rows.length) return
+  if (predictedIndex.value != null && ['Enter',' '].includes(event.key)) {
+    event.preventDefault()
+    return
+  }
   if(event.key==='Enter' && active.value) { event.preventDefault(); emit('watch',active.value); return }
   if(event.key===' ' && active.value) { event.preventDefault(); emit('pin',active.value); return }
   if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
   event.preventDefault()
-  const index = props.rows.findIndex(row => row.day === active.value)
+  const index = predictedIndex.value == null ? props.rows.findIndex(row => row.day === active.value) :
+    props.rows.length + predictedIndex.value
   const last = props.rows.length - 1
   let next = 0
   if (event.key === 'End') next = last
   else if (event.key !== 'Home' && index >= 0) {
     const step = event.key === 'ArrowRight' ? 1 : -1
-    next = Math.max(0, Math.min(last, index + step))
+    next = Math.max(0, Math.min(last + predictionDays.value.length, index + step))
   }
+  if (next > last) { inspectPrediction(next - last - 1, true); return }
+  inspectPrediction(null)
   const day=props.rows[next].day
   hovered.value=day
   emit('pin',day)
+  chart?.draw()
 }
 function indexAt(event) {
   const x=event.clientX-canvas.value.getBoundingClientRect().left
-  return Math.max(0,Math.min(props.rows.length-1,chart.scales.x.getValueForPixel(x)))
+  return Math.max(0,chart.scales.x.getValueForPixel(x))
 }
 function startBrush(event) {
-  if (props.embedded || !event.shiftKey || !props.rows.length || event.button!==0) return
+  if (!chart || props.embedded || !event.shiftKey || !props.rows.length || event.button!==0) return
   const index=indexAt(event)
+  if (index >= props.rows.length) return
   brush={ start:index, end:index }
   canvas.value.setPointerCapture(event.pointerId)
 }
 function moveBrush(event) {
   if (!brush) return
-  brush.end=indexAt(event)
+  brush.end=Math.min(props.rows.length-1,indexAt(event))
   chart.draw()
 }
 function endBrush() {
@@ -66,6 +112,11 @@ function endBrush() {
   ignoreClick=true
   setTimeout(()=>{ignoreClick=false},80)
   emit('range',props.rows[Math.min(start,end)].day,props.rows[Math.max(start,end)].day)
+}
+function forecastBoundary(instance) {
+  if (!predictionDays.value.length) return null
+  const x = instance.scales.x
+  return (x.getPixelForValue(props.rows.length-1) + x.getPixelForValue(props.rows.length)) / 2
 }
 const marker = {
   id:'day-marker',
@@ -90,34 +141,64 @@ const marker = {
       ctx.lineTo(x,area.bottom)
       ctx.stroke()
     }
+    const boundary = forecastBoundary(instance)
+    if (boundary != null) {
+      ctx.fillStyle='#83B3CE17'
+      ctx.fillRect(boundary,area.top,area.right-boundary,area.bottom-area.top)
+      mark(boundary,'#83B3CE99',[3,4])
+    }
     for (const annotation of props.annotations ?? []) {
       const i=props.rows.findIndex(row=>row.day===annotation.day)
       if(i>=0) mark(dayX(i),annotation.color,[3,4])
     }
     if(index>=0) mark(dayX(index),props.pin===active.value?'#BDBAB0':'#777268')
+    if(predictedIndex.value!=null) mark(dayX(props.rows.length+predictedIndex.value),'#A9D2E7',[2,3])
     ctx.restore()
   },
   afterDatasetsDraw(instance) {
-    if(props.guide==null) return
-    const area=instance.chartArea, y=instance.scales.y.getPixelForValue(props.guide)
-    if (!area || y<area.top || y>area.bottom) return
+    const area=instance.chartArea
+    if (!area) return
     const ctx=instance.ctx
-    ctx.save()
-    ctx.strokeStyle='#99958a'
-    ctx.fillStyle='#BDBAB0'
-    ctx.setLineDash([4,4])
-    ctx.beginPath()
-    ctx.moveTo(area.left,y)
-    ctx.lineTo(area.right,y)
-    ctx.stroke()
-    ctx.fillText('Size 100',area.left+5,y-5)
-    ctx.restore()
+    if (props.guide != null) {
+      const y = instance.scales.y.getPixelForValue(props.guide)
+      if (y>=area.top && y<=area.bottom) {
+        ctx.save()
+        ctx.strokeStyle='#99958a'
+        ctx.fillStyle='#BDBAB0'
+        ctx.setLineDash([4,4])
+        ctx.beginPath()
+        ctx.moveTo(area.left,y)
+        ctx.lineTo(area.right,y)
+        ctx.stroke()
+        ctx.fillText('Size 100',area.left+5,y-5)
+        ctx.restore()
+      }
+    }
+    if (predictionDays.value.length) {
+      ctx.save()
+      ctx.font='11px "Lab Mono", monospace'
+      const width=ctx.measureText('Prediction').width+10
+      const x=area.right-width
+      ctx.fillStyle='#202F37'
+      ctx.fillRect(x,area.top+2,width,17)
+      ctx.fillStyle='#C4E5F4'
+      ctx.fillText('Prediction',x+5,area.top+14)
+      ctx.restore()
+    }
   }
 }
 const axis = { color:'#BDBAB0',font:{family:'Source Sans',size:12},maxTicksLimit:6 }
+function isPrediction(index) {
+  return index >= props.rows.length && index < props.rows.length + predictionDays.value.length
+}
+function isTouch(event) {
+  return event?.pointerType === 'touch' || event?.sourceCapabilities?.firesTouchEvents ||
+    event?.type.startsWith('touch') || matchMedia('(pointer:coarse)').matches
+}
 function update() {
   if(!chart) return
-  chart.data.labels=props.rows.map(r=>r.day)
+  const history = props.rows.length
+  chart.data.labels=[...props.rows.map(r=>r.day), ...predictionDays.value]
   chart.data.datasets=props.series.map(s=>({
     type:s.bar?'bar':'line', label:s.label, data:props.rows.map(s.value), borderColor:s.color,
     backgroundColor:s.fill ?? s.color, borderDash:s.dash ?? [], borderWidth:s.width ?? (s.bar ? 0 : 2.2),
@@ -126,6 +207,21 @@ function update() {
     yAxisID:s.axis ?? 'y', fill:s.area ?? false, categoryPercentage:.8, barPercentage:.84,
     grouped:!s.bar, order:s.bar?2:!s.primary && s.width && s.width<2?1:0
   }))
+  const forecastFills = new Map(projections.value.map((p, i) => [p.index, props.series.length+i]))
+  for (const projection of projections.value) {
+    const { series:s, index, values } = projection
+    const actual = chart.data.datasets[index]
+    const data = Array(history).fill(null)
+    if (!s.bar) data[history-1] = actual.data[history-1]
+    chart.data.datasets.push({
+      ...actual, projection, data:[...data,...values], borderDash:[5,4], borderWidth:s.bar ? 1.5 : Math.max(1,s.width ?? 2),
+      borderColor:s.color.length === 9 ? s.color.slice(0,7)+'80' : s.color,
+      backgroundColor:s.bar ? s.color.slice(0,7)+'29' : s.fill ? s.fill.slice(0,7)+'10' : s.color,
+      borderSkipped:false,
+      pointRadius:0, pointHoverRadius:s.bar ? 0 : 3,
+      fill:typeof s.area==='number' ? forecastFills.get(s.area) ?? false : actual.fill,
+    })
+  }
   chart.options.scales.y.beginAtZero=props.series.some(s=>s.bar || s.zero)
   if (props.embedded) chart.options.scales.y.ticks.precision=props.series[0]?.integer ? 0 : undefined
   chart.options.scales.y1.display=!!props.right
@@ -137,17 +233,29 @@ function create() {
     type:'line', plugins:[marker],data:{labels:[],datasets:[]},
     options:{
       responsive:true,maintainAspectRatio:false,animation:false, interaction:{ mode:'index', intersect:false },
-      onHover(_,elements) {
+      onHover(event,elements) {
+        if (isTouch(event.native)) return
+        const index = chart.scales.x.getValueForPixel(event.x)
+        if (isPrediction(index)) {
+          inspectPrediction(index-props.rows.length)
+          return
+        }
         hovered.value=elements.length ? props.rows[elements[0].index]?.day : null
-        chart.draw()
+        inspectPrediction(null)
       },
       onClick(event,elements) {
         if(ignoreClick) return
-        const index=props.embedded && Number.isFinite(event.x)
-          ? chart.scales.x.getValueForPixel(event.x) : elements[0]?.index
+        const xIndex=chart.scales.x.getValueForPixel(event.x)
+        const touch=isTouch(event.native)
+        if (isPrediction(xIndex)) {
+          inspectPrediction(xIndex-props.rows.length,touch)
+          return
+        }
+        inspectPrediction(null)
+        const index=props.embedded ? xIndex : elements[0]?.index
         const day=props.rows[index]?.day
         if(day==null) return
-        if(props.embedded || event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
+        if(props.embedded || touch || event.native?.shiftKey) emit('pin',day)
         else emit('watch',day)
       },
       layout:{padding:{left:8,right:12,top:6}},
@@ -156,16 +264,18 @@ function create() {
         padding:11, borderColor:'#56534A', borderWidth:1, cornerRadius:4,
         titleFont:{family:'Lab Mono',size:15},bodyFont:{family:'Lab Mono',size:12},
         displayColors:true,
-        filter:item=>props.series[item.datasetIndex]?.tooltip!==false,
+        filter:item=>item.dataset.projection
+          ? item.dataIndex >= props.rows.length && !showPredictionReading.value : props.series[item.datasetIndex]?.tooltip!==false,
         callbacks:{
-          title:items=>(props.embedded ? 'Generation ' : 'Day ')+items[0]?.label,
+          title:items=>(items[0]?.dataset.projection ? 'Predicted · ' : '')+
+            (props.embedded ? 'Generation ' : 'Day ')+items[0]?.label,
           afterTitle:()=>props.scope ?? '',
           label(item) {
-            const s=props.series[item.datasetIndex]
-            let value=item.raw
-            if(s.bar && value<0) value=-value
-            const spread=s.spread?.(props.rows[item.dataIndex])
-            return s.label+'  '+format(value,s.digits??(s.integer?0:2))+(s.suffix??'')+(spread==null?'':' ± '+format(spread))
+            const p=item.dataset.projection
+            const series=p?.series ?? props.series[item.datasetIndex]
+            const spread=p ? (series.spread ? p.samples?.[item.dataIndex-props.rows.length]?.sd : null) :
+              series.spread?.(props.rows[item.dataIndex])
+            return seriesReading(series,item.raw,spread)
           }
         }
       }},
@@ -182,7 +292,12 @@ function create() {
 }
 onMounted(create)
 onBeforeUnmount(()=>chart?.destroy())
-watch(()=>[props.rows,props.series,props.right,props.guide,hidden.value],update)
+watch(()=>[props.rows,props.series,props.right,props.guide,hidden.value,projections.value],()=>{
+  predictedIndex.value=null
+  showPredictionReading.value=false
+  brush=null
+  update()
+})
 watch(()=>[props.pin,props.annotations],([pin],[previous])=>{
   if (props.embedded && pin == null && previous != null) hovered.value=null
   chart?.draw()
@@ -216,10 +331,13 @@ function downloadChart() {
       </button>
     </header>
     <div v-if="unit || !embedded" class="chart-unit">{{ unit }}</div>
-    <div class="chart-canvas" @mouseleave="hovered=null; chart?.draw()">
-      <canvas ref="canvas" tabindex="0" role="img" :aria-label="title+' by generation. Arrow keys select a day. Enter watches it and Space pins it.'"
-        @keydown="move" @pointerdown="startBrush" @pointermove="moveBrush" @pointerup="endBrush" @pointercancel="brush=null;chart?.draw()"></canvas>
+    <div class="chart-canvas" @mouseleave="!showPredictionReading && (hovered=null, inspectPrediction(null))">
+      <canvas ref="canvas" tabindex="0" role="img"
+        :aria-label="title+' by generation. Arrow keys select a day or inspect a prediction. Enter watches a recorded day and Space pins it.'"
+        @keydown="move" @blur="showPredictionReading && inspectPrediction(null)"
+        @pointerdown="startBrush" @pointermove="moveBrush" @pointerup="endBrush" @pointercancel="brush=null;chart?.draw()"></canvas>
       <span v-if="!hasSamples" class="chart-empty">{{ rows.length ? 'No samples in this range' : 'No completed days in this range' }}</span>
+      <span class="prediction-reading" :class="{ 'is-visible': showPredictionReading && predictionReading }" role="status">{{ predictionReading }}</span>
     </div>
     <div v-if="legend" class="chart-keys">
       <button v-for="s in keys" :key="s.label" :aria-pressed="!hidden.includes(s.label)" @click="toggle(s.label)">
@@ -227,7 +345,7 @@ function downloadChart() {
       </button>
     </div>
     <div v-if="focus || spotlight" class="focused-actions">
-      <button class="secondary" :disabled="!active" @click="emit('pin',active)">Pin day</button>
+      <button class="secondary" :disabled="!active || predictedIndex!=null" @click="emit('pin',active)">Pin day</button>
       <button class="secondary" @click="downloadChart">Download chart PNG</button>
     </div>
   </article>

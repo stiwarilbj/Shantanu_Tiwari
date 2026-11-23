@@ -34,6 +34,7 @@ const column = computed(() => columns.find(item => item.key === stat.value))
 const trendRows = computed(() => generations.value.map(({ day, rows }) => ({
   day,
   value: valueOf(rows[lab.scope], column.value) ?? null,
+  population: rows[lab.scope]?.population,
 })))
 const trendColor = computed(() => column.value.color ?? '#71D2C0')
 const series = computed(() => [{
@@ -42,6 +43,11 @@ const series = computed(() => [{
   value: row => row.value,
   integer: !column.value.average,
   zero: !column.value.average,
+  prediction: {
+    min: column.value.key === 'net' ? -Infinity : 0,
+    max: ['food','plants','plantsLeft'].includes(column.value.key) ? 1000 : Infinity,
+    extinct: ['opening','population'].includes(column.value.key) ? row=>row.population===0 : undefined,
+  },
 }])
 const trendScope = computed(() => column.value.unit === 'field total'
   ? 'Whole field'
