@@ -21,13 +21,21 @@ async function startRun(page, days = '10', configure) {
 }
 
 async function advancedSettings(page, group = 'Habitat and food') {
+  const categories = {
+    'Habitat and food': 'Environment', 'Starting territories': 'Environment',
+    'Movement and energy': 'Survival', 'Foraging decisions': 'Survival', 'Hunting': 'Survival',
+    'Inheritance and reproduction': 'Life cycle', 'Aging and lifespan': 'Life cycle',
+    'Day length': 'Run & charts', 'Graph predictions': 'Run & charts',
+  }
   const advanced = page.getByRole('button', { name: 'Advanced', exact: true })
   if (await advanced.getAttribute('aria-pressed') !== 'true') await advanced.click()
-  await page.getByRole('button', { name: group, exact: true }).click()
+  const category = categories[group]
+  await page.getByRole('navigation', { name: 'Advanced settings categories' }).getByRole('button', { name: category }).click()
+  await page.getByRole('navigation', { name: category + ' topics', exact: true }).getByRole('button', { name: group, exact: true }).click()
 }
 
 async function fixedDay(page, seconds = '10') {
-  await advancedSettings(page, 'Movement and energy')
+  await advancedSettings(page, 'Day length')
   await page.getByRole('combobox', { name: 'End each day' }).selectOption('timed')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill(seconds)
   await page.getByRole('button', { name: 'Basic', exact: true }).click()
@@ -225,8 +233,9 @@ test('the production build runs a new experiment and shows its charts @pages', a
     await expect(sizeRow.getByText('Variance (σ²) = 1', { exact: true })).toBeVisible()
     await size.fill('0.50')
     await expect(sizeRow.getByText('Variance (σ²) = 0.25', { exact: true })).toBeVisible()
-    await advancedSettings(page, 'Movement and energy')
+    await advancedSettings(page, 'Day length')
     await expect(page.getByRole('combobox', { name: 'End each day' })).toHaveValue('settled')
+    await advancedSettings(page, 'Movement and energy')
     await expect(page.getByRole('spinbutton', { name: 'Plant reward' })).toHaveValue('0')
     await expect(page.getByRole('spinbutton', { name: 'Prey reward' })).toHaveValue('0')
     await advancedSettings(page, 'Hunting')
@@ -1304,7 +1313,7 @@ test('a food-only branch keeps the day length at the fork', async ({ page }) => 
   await branch.click()
   await page.getByLabel('Branch after day').fill('2')
   await page.getByRole('button', { name: 'Edit branch rules' }).click()
-  await advancedSettings(page, 'Movement and energy')
+  await advancedSettings(page, 'Day length')
   await page.getByRole('spinbutton', { name: 'Seconds per day', exact: true }).fill('2')
   await create.click()
   await expect(runOptions).toHaveText('Day 3 / 10 · Ready')
@@ -1864,9 +1873,10 @@ test('foraging decisions preview responds to species and settings on a phone @pa
   page.on('pageerror', error => errors.push(error.message))
   await page.setViewportSize({ width:375, height:650 })
   await openSimulator(page)
-  await page.getByRole('button', { name:'Simulation Settings' }).press('Enter')
+  await page.getByRole('button', { name:'Simulation Settings' }).click()
   const dialog = page.getByRole('dialog', { name:'Simulation Settings' })
   await dialog.getByRole('button', { name:'Advanced', exact:true }).press('Enter')
+  await dialog.getByRole('button', { name:'Survival', exact:true }).press('Enter')
   await dialog.getByRole('button', { name:'Foraging decisions', exact:true }).press('Enter')
   const group = dialog.getByRole('region', { name:'Foraging decisions' })
   const species = group.getByRole('combobox', { name:'Foraging decisions for' })
@@ -2033,7 +2043,7 @@ test('Settings rejects invalid day lengths instead of rounding them', async ({ p
   const evolve = settings.getByRole('button', { name: 'Evolve!' })
   await settings.getByRole('spinbutton', { name: 'Days to run' }).fill('10')
   await settings.getByRole('button', { name: /^Watch live/ }).click()
-  await advancedSettings(page, 'Movement and energy')
+  await advancedSettings(page, 'Day length')
 
   for (const [value, error] of [
     ['10.04', 'Enter seconds in tenths.'],
@@ -2041,7 +2051,10 @@ test('Settings rejects invalid day lengths instead of rounding them', async ({ p
     ['60.04', 'Seconds per day must be from 1 to 60.'],
   ]) {
     await seconds.fill(value)
+    await advancedSettings(page, 'Hunting')
     await evolve.click()
+    await expect(page.getByRole('button', { name: 'Run & charts' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(seconds).toBeFocused()
     await expect(seconds).toHaveAccessibleDescription(error)
     await expect(seconds).toHaveValue(value)
   }
@@ -4149,7 +4162,7 @@ test('retry after a crash in full screen keeps completed days and restarts unche
 test('starting territories validate and keep field inheritance editable on a phone @pages', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 650 })
   await openSimulator(page)
-  await page.getByRole('button', { name: 'Simulation Settings' }).press('Enter')
+  await page.getByRole('button', { name: 'Simulation Settings' }).click()
   await page.getByRole('button', { name: 'Advanced', exact: true }).press('Enter')
   await page.getByRole('button', { name: 'Starting territories', exact: true }).press('Enter')
   const dialog = page.getByRole('dialog', { name: 'Simulation Settings' })
