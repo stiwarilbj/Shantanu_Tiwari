@@ -7,6 +7,7 @@ import { improvedIntent, steer } from './steering.js'
 import { FIELD, DT, WALKTHROUGH_STEP, Grid, clamp, radius, travel, cost, walkthroughStepCost,
   canHunt, turn, edgePoint, homePoints, refugeContact, refugeDistance, pathOf, contact } from './geometry.js'
 import { openingHabitat } from './habitat.js'
+import { agingRules, oldAgeRisk, travelSpeedPercent } from './aging.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -49,12 +50,14 @@ export function dawn(config, day, checkpoint) {
       ? { ...(original.edge ?? edgePoint(FIELD * random(config.seed, 3, day, original.id, 0),
         FIELD * random(config.seed, 3, day, original.id, 1))), angle: 0 }
       : standardSpawn({ id: original.id, r }, slots.get(original.id), roster.length, edges, config.seed, day, refugeWidth)
-    const energy = species.get(original.species).energy
+    const settings = species.get(original.species)
+    const energy = settings.energy
+    const speedMultiplier = travelSpeedPercent(agingRules(config, settings), original.age) / 100
     const moveCost = walkthrough ? walkthroughStepCost(original, config) : null
     return { ...original, ...position, r, energy, capacity: energy, credits: 0, preyCredits: 0,
       state: 0, alive: true, home: false, returning: false, target: null,
       velocityX: 0, velocityY: 0, rate: walkthrough ? moveCost / stepSeconds : cost(original, config),
-      speedWorld: travel(original, config), moveCost }
+      speedWorld: travel(original, config) * speedMultiplier, moveCost }
   })
   if (!foraging) blobs.sort((a, b) => a.id - b.id)
   const limit = endsWhenSettled(config) ? null : Math.round(config.duration / 10 / stepSeconds)
@@ -368,8 +371,15 @@ export function dusk(ctx, config) {
       kill(ctx, b, time, b.credits ? 'Missed home' : 'Starvation')
       continue
     }
+    const attainedAge = ++b.age
+    const settings = species.get(b.species)
+    const risk = oldAgeRisk(agingRules(config, settings), attainedAge)
+    if (risk > 0 && (risk === 100 || random(config.seed, 49, ctx.day, b.id) * 100 < risk)) {
+      kill(ctx, b, time, 'Old age')
+      continue
+    }
     const survivor = { id: b.id, species: b.species, parent: b.parent, born: b.born,
-      age: ++b.age, speed: b.speed, size: b.size, sense: b.sense }
+      age: attainedAge, speed: b.speed, size: b.size, sense: b.sense }
     if (b.secondParent != null) survivor.secondParent = b.secondParent
     if (currentRules && b.lastBirthDay != null) survivor.lastBirthDay = b.lastBirthDay
     if (foraging && !ctx.refugeWidth) survivor.edge = b.target
@@ -382,7 +392,7 @@ export function dusk(ctx, config) {
         if (!candidates.has(b.species)) candidates.set(b.species, [])
         candidates.get(b.species).push(parent)
       } else {
-        closing.push(...breed(ctx, config, time, species.get(b.species), rules, parent))
+        closing.push(...breed(ctx, config, time, settings, rules, parent))
       }
     }
     if (foraging && !candidates) closing.push(survivor)

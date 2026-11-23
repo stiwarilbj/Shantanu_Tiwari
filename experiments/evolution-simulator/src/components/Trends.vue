@@ -179,7 +179,7 @@ const options=computed(()=>{
       line('Deaths','#BD5558',r=>r.deaths == null ? null : -r.deaths,{bar:true,integer:true}),
       line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10'}),
       ...(causes.value?DEATH_CAUSES.map((cause,i)=>
-        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>r.causes && -r.causes[cause],
+        line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A','#BEABE9'][i],r=>r.causes && -(r.causes[cause] ?? 0),
           {integer:true,dash:[3+i,3],width:1.3})):[])
     ]}
   charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,series:[

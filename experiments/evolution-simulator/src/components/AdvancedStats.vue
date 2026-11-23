@@ -87,7 +87,7 @@ const readings = computed(() => {
     ['Closing population', format(row.population, 0)],
     ['Births', format(row.births, 0)],
     ['Deaths', format(row.deaths, 0)],
-    ...DEATH_CAUSES.map(cause => [cause, format(row.causes?.[cause], 0)]),
+    ...DEATH_CAUSES.map(cause => [cause, format(row.causes?.[cause] ?? 0, 0)]),
   ]
   if (view.value === 'traits') return [
     ['Creatures sampled', format(row.n, 0)],

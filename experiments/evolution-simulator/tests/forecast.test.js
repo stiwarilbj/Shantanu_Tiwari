@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { REPRODUCTION_RULE_VERSION, REFUGE_RULE_VERSION, rulesFor, starter } from '../src/engine/config.js'
+import { REPRODUCTION_RULE_VERSION, REFUGE_RULE_VERSION, rulesFor, setupForNewRun, starter } from '../src/engine/config.js'
 import { dawn, founders, step } from '../src/engine/simulation.js'
 import { openingSummary, openingTrends } from '../src/engine/stats.js'
 import { forecastCheckpoint, forecastEndpoint, simulateForecast } from '../src/forecast.js'
@@ -72,4 +72,18 @@ test('keeps the extinction generation and stops there without inventing trait sa
   assert.equal(projected.summaries[0].rows.all.population, 0)
   assert.equal(projected.summaries[0].rows.all.speed.mean, null)
   assert.deepEqual((await preview(actual, 4, 5)).summaries, [])
+})
+
+test('predictions cross an aging revision and match subsequent generations', async () => {
+  const setup = { ...starter(REPRODUCTION_RULE_VERSION), seed:118, food:500, predation:false, days:10,
+    endMode:'timed', duration:100 }
+  const revised = setupForNewRun(setup)
+  Object.assign(revised.aging, { enabled:true, onsetAge:1, riskIncrease:0, speedLoss:10, maxAge:4 })
+  const revisions = [{ day:1, setup }, { day:4, setup:revised }]
+  const current = record(setup, revisions, 3)
+  const full = record(setup, revisions, 8)
+  const forecast = await preview(current, 3, 5)
+  assert.ok(forecast.summaries[0].rows.all.causes['Old age'] > 0)
+  assert.deepEqual(forecast.summaries, full.summaries.slice(3))
+  assert.deepEqual(await preview(full, 3, 5), forecast)
 })

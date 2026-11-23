@@ -280,7 +280,7 @@ defineExpose({ select, overhead })
           <small>{{ format(visible.energy,1) }} / {{ visible.capacity }} energy</small>
           <dl><template v-for="[name,value] in [
             ['Age',visible.age+' days'],['Food credits',visible.credits],...traitStats,
-            ['Travel rate',format(travel(visible,rules),1)+' units/s'],
+            ['Travel rate',format(visible.speedWorld ?? travel(visible,rules),1)+' units/s'],
             ['Body radius',format(radius(visible.size),2)],['Energy cost',movementCost],
             ['Born', 'Day '+visible.born],[visible.secondParent != null ? 'Parents' : 'Parent',parentNames(visible)]
           ]" :key="name"><dt>{{ name }}</dt><dd>{{ value }}</dd></template></dl>

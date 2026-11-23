@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { HABITAT_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
+import { HABITAT_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, REPRODUCTION_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
   rulesFor, setupForNewRun, speciesTemplate, validate, validateRevisions } from '../src/engine/config.js'
 import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthroughStepCost } from '../src/engine/geometry.js'
 import { normal } from '../src/engine/random.js'
@@ -522,7 +522,7 @@ test('default reproduction preserves version 7 results with either foraging mode
   for (const foraging of [undefined, 'walkthrough']) {
     const old = { ...starter(HABITAT_RULE_VERSION), foraging, foodPlacement: 'patches',
       food: 120, refugePercent: 15, huntingAdvantage: 40 }
-    const current = setupForNewRun(old)
+    const current = { ...setupForNewRun(old), version: REPRODUCTION_RULE_VERSION }
     assert.deepEqual([current.foodPlacement, current.refugePercent, current.huntingAdvantage], ['patches', 15, 40])
     let oldCheckpoint = founders(old), checkpoint = founders(current)
     for (let day = 1; day <= 10; day++) {

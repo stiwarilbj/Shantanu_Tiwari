@@ -3,9 +3,10 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, speciesTemplate, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
+  randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
   usesStandardDeviation, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
+import AgingSettings from './AgingSettings.vue'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
@@ -18,10 +19,11 @@ const customReproduction = usesReproductionRules(draft)
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpecies = ref(null)
 const copied = ref(false), discarding = ref(false), applying = ref(false)
+const agingSpecies = ref(null)
 const fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
 const groups = {
   habitat: 'Habitat and food', hunting: 'Hunting', movement: 'Movement and energy', inheritance: 'Inheritance and reproduction',
-  predictions: 'Graph predictions',
+  aging: 'Aging and lifespan', predictions: 'Graph predictions',
 }
 const forecastCycles = ref(String(forecastPreferences.cycles))
 const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
@@ -36,7 +38,7 @@ const advancedFields = {
   plantReward: 'movement', preyReward: 'movement', endMode: 'movement', duration: 'movement', rules: 'movement',
   parentMode: 'inheritance', minimumBreedingAge: 'inheritance', birthWait: 'inheritance',
   birthChance: 'inheritance', twinChance: 'inheritance',
-  mutation: 'inheritance', mutationChance: 'inheritance', mutationPattern: 'inheritance',
+  aging: 'aging', mutation: 'inheritance', mutationChance: 'inheritance', mutationPattern: 'inheritance',
 }
 const customHabitat = computed(() => usesHabitatRules(draft))
 const previewDay = ref((fork ?? 0) + 1)
@@ -108,6 +110,7 @@ function remove() {
   if (draft.species.length<2) return
   const index=draft.species.findIndex(s=>s.id===tab.value)
   const [value]=draft.species.splice(index,1)
+  if (agingSpecies.value === value.id) agingSpecies.value = null
   savedSpecies.value={value,index}
   tab.value=draft.species[Math.max(0,index-1)].id
 }
@@ -138,6 +141,7 @@ function discard() {
   lab.resetDraft()
   tab.value=draft.species[0].id
   savedSpecies.value=null
+  agingSpecies.value=null
   issue.value={}
   discarding.value=false
 }
@@ -155,8 +159,9 @@ async function apply() {
   if (first) {
     const forSpecies = draft.species.find(s => first.startsWith(s.id + '.'))
     if (forSpecies) tab.value = forSpecies.id
-    const key = forSpecies ? first.slice(forSpecies.id.length + 1).split('.')[0] : first
+    const key = (forSpecies ? first.slice(forSpecies.id.length + 1) : first).split('.')[0]
     const target = key === spreadKey ? 'inheritance' : advancedFields[key]
+    if (target === 'aging') agingSpecies.value = forSpecies?.id ?? null
     showPage(target ? 'advanced' : 'basic', target)
     await nextTick()
     const field = document.getElementById(first)
@@ -343,6 +348,10 @@ onMounted(()=>dialog.value.showModal())
                 <small class="quiet">Up to {{ ((draft.days*seconds)/60).toFixed(1) }} min of playback at 1×</small>
               </template>
             </div>
+          </template>
+          <template v-else-if="group === 'aging'">
+            <AgingSettings v-if="usesAgingRules(draft)" v-model:species="agingSpecies" :draft="draft" :issue="issue"/>
+            <p v-else class="quiet">This setup uses its original lifespan rules.</p>
           </template>
           <div v-else-if="group === 'predictions'" class="advanced-block" @keydown.enter.prevent>
             <h3>Graph predictions</h3>
