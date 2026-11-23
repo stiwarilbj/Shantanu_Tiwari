@@ -7,8 +7,8 @@ import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String,
-  pin:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean })
-const emit = defineEmits(['hide','focus','pin','watch','range'])
+  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean })
+const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
 let chart, brush, ignoreClick = false
 const hidden = ref([])
@@ -16,6 +16,11 @@ const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
   [hovered.value, props.pin].find(day => day != null && props.rows.some(row => row.day === day)) ?? null)
 const hasSamples = computed(() => props.series.some(series => props.rows.some(row => series.value(row) != null)))
+function findPeak() {
+  hovered.value = null
+  emit('peak',props.peakDay)
+  chart?.draw()
+}
 function toggle(label) {
   hidden.value=hidden.value.includes(label) ? hidden.value.filter(x=>x!==label) : [...hidden.value,label]
 }
@@ -197,6 +202,7 @@ function downloadChart() {
     <header class="plot-heading">
       <button v-if="hideable && !focus && !spotlight" class="chart-hide" :aria-label="'Hide '+title" @click="emit('hide')"><Minus :size="13"/></button>
       <h2>{{ title }}</h2>
+      <button v-if="peakDay!==undefined" type="button" class="secondary plot-peak" :disabled="peakDay===null" @click="findPeak">Find peak</button>
       <button class="icon plot-focus" :aria-label="focus || spotlight ? 'Close focus chart' : 'Focus '+title" @click="emit('focus')">
         <Minimize2 v-if="focus || spotlight" :size="16"/><Maximize2 v-else :size="16"/>
       </button>

@@ -250,10 +250,12 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .compact-plot{min-height:0}
 .compact-plot .chart-canvas{height:clamp(145px,calc((100dvh - 345px)/2),260px)}
 .compact-plot .plot-heading{justify-content:center;position:relative}
+.compact-plot .plot-heading:has(.plot-peak){padding-inline-end:32px}
 .compact-plot .plot-focus{position:absolute;right:0}
 .compact-plot .chart-unit{position:absolute;width:1px;height:1px;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%)}
 .plot-heading{display:flex;align-items:center;gap:8px;color:var(--plot);height:32px}
 .plot-heading h2{font-size:17px;color:inherit;text-transform:uppercase;letter-spacing:.025em}
+.plot-peak{font-size:12px;min-height:28px;padding:3px 8px;white-space:nowrap}
 .chart-hide{width:16px;height:16px;display:grid;place-items:center;padding:0;border-radius:3px;background:var(--plot);color:#1b1b1b;flex:none}
 .chart-hide:hover{background:var(--ink)}
 .plot-focus{margin-left:auto;width:32px;height:32px;opacity:.65}

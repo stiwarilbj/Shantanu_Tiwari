@@ -11,7 +11,7 @@ const props = defineProps({ active: Boolean })
 const emit = defineEmits(['watch','example','reroll','restart'])
 const lab=useLab()
 const range=ref('all'), from=ref(1), to=ref(50), pin=ref(null), focused=ref(null)
-const focusDialog=ref()
+const focusDialog=ref(), pinSummary=ref(), watchPinnedDay=ref()
 const spread=ref('sd'), cohort=ref('dawn'), hidden=ref([]), order=ref('classic'), tab=ref('Trends')
 const separate=ref(false), otherPopulation=ref(false), compareSpecies=ref(false), causes=ref(false), transition=ref(false)
 const ageDemoVisible=ref(false), ageDemoPhase=ref('long'), ageDemoRuns=ref({}), ageDemoProgress=ref(null), ageDemoError=ref(''), ageDemoRetryPhase=ref('long')
@@ -43,6 +43,13 @@ const rows=computed(()=>{
   }))
 })
 const pinned=computed(()=>rows.value.find(row=>row.day===pin.value)?.scopes[lab.scope])
+const peakDay=computed(()=>{
+  let peak=null
+  for (const row of rows.value) {
+    if (Number.isFinite(row.population) && (!peak || row.population>peak.population)) peak=row
+  }
+  return peak?.day ?? null
+})
 const sightComparison=computed(()=>{
   let narrow, wide, eligibleDays=0
   for (const { day, sense } of rows.value) {
@@ -135,6 +142,7 @@ const options=computed(()=>{
       ...(compareSpecies.value?species.value.map((s,i)=>line(s.name,s.color,r=>r.scopes[s.id]?.population,{integer:true,dash:[i*2+2,3]})):[])
     ]:distribution(key)
   }
+  if (!ageDemoVisible.value) charts.population.peakDay=peakDay.value
   charts.overview={id:'overview',title:'Overview',unit:'Traits · left axis   /   Population · right axis',right:true,legend:true,
     series:METRICS.filter(metric=>!hidden.value.includes(metric.key)).map(metric=>line(metric.short,metric.color,r=>metricValue(r,metric.key),{
       axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined
@@ -164,6 +172,13 @@ function jump(event) {
   event.target.value=''
 }
 function focus(key) { focused.value=focused.value===key?null:key }
+async function pinPeak(day) {
+  pin.value=day
+  focused.value=null
+  await nextTick()
+  pinSummary.value?.scrollIntoView({block:'nearest'})
+  watchPinnedDay.value?.focus()
+}
 function customRange(a,b) { from.value=a; to.value=b; range.value='custom' }
 function centerAgePanel() {
   nextTick(()=>ageWalkthrough.value?.scrollIntoView({
@@ -375,10 +390,10 @@ onBeforeUnmount(()=>ageDemoController?.abort())
         <button class="link" @click="hidden=[]">Restore all</button></div>
       <div v-if="!ageDemoVisible && !rows.length" class="notice" role="status">{{ lab.completed?'Choose a different range.':'Complete Day 1 to see trends.' }}
         <button v-if="!lab.completed" class="secondary" @click="emit('watch',1)">Watch World</button></div>
-      <div v-if="pinned && !ageDemoVisible" class="pinned-summary">
-        <div><strong>Day {{ pin }} · Pinned</strong><small>{{ scopeName }} · {{ pinned.population }} blobs at {{ cohort }} · {{ pinned.births }} births · {{ pinned.deaths }} deaths</small></div>
+      <div v-if="pinned && !ageDemoVisible" ref="pinSummary" class="pinned-summary">
+        <div id="pinned-day-details"><strong>Day {{ pin }} · Pinned</strong><small>{{ scopeName }} · {{ pinned.population }} blobs at {{ cohort }} · {{ pinned.births }} births · {{ pinned.deaths }} deaths</small></div>
         <button class="secondary" @click="lab.modal='table'">View table</button><button class="secondary" @click="watchSight(pin)">Show sense circles</button>
-        <button class="primary" @click="emit('watch',pin)">Watch day</button><button class="icon" aria-label="Clear pinned day" @click="pin=null">×</button>
+        <button ref="watchPinnedDay" class="primary" aria-describedby="pinned-day-details" @click="emit('watch',pin)">Watch day</button><button class="icon" aria-label="Clear pinned day" @click="pin=null">×</button>
       </div>
       <details v-if="!ageDemoVisible" class="sight-comparison">
         <summary>Compare sight ranges</summary>
@@ -404,13 +419,13 @@ onBeforeUnmount(()=>ageDemoController?.abort())
         <div v-if="section==='compact'" class="compact-plots walkthrough-plots" :class="{'spotlight-layout':focused==='age'}">
           <TrendPlot v-for="key in basic.filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]"
             compact :spotlight="focused==='age' && focused===key" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations"
-            @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
+            @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
         </div>
         <section v-else-if="section==='overview'" id="trends-overview" class="overview">
           <button class="secondary overview-mode" :aria-pressed="separate" @click="separate=!separate">{{ separate?'Combined scales':'Separate scales' }}</button>
           <div v-if="separate" class="compact-plots" :class="{'spotlight-layout':focused==='age'}">
             <TrendPlot v-for="key in [...basic,'deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="{...options[key],series:options[key].series.filter(s=>s.primary),hideable:false}"
-              :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
+              :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
           </div>
           <TrendPlot v-else v-bind="options.overview" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" @focus="focus('overview')" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
         </section>
@@ -423,7 +438,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
     <Teleport to="body">
       <dialog ref="focusDialog" class="focus-dialog" aria-label="Focused chart" @cancel.prevent="focused=null">
         <TrendPlot v-if="focused && focused!=='age'" v-bind="options[focused]" :rows="rows" :pin="pin" :scope="scopeName" :annotations="annotations" focus
-          @focus="focused=null" @pin="pin=$event" @watch="focused=null; watchPlot($event)" @range="customRange"/>
+          @focus="focused=null" @pin="pin=$event" @peak="pinPeak" @watch="focused=null; watchPlot($event)" @range="customRange"/>
       </dialog>
     </Teleport>
   </main>
