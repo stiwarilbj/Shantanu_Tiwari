@@ -4,6 +4,7 @@ import { CircleX, Download, FastForward, Upload } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
 import { csv, download, setupLink } from '../export.js'
+import AdvancedStats from './AdvancedStats.vue'
 import GenerationTable from './GenerationTable.vue'
 
 const lab=useLab()
@@ -54,7 +55,7 @@ const exportRowCount = computed(() => {
 })
 const titles={quick:'Quick Sim','quick-progress':'Simulating generations','quick-done':'Simulation complete',
   'quick-stopped':'Simulation stopped',extend:'More Generations',
-  library:'Run Library',download:'Download',table:'Generation statistics',branch:'Branch here'}
+  library:'Run Library',download:'Download',table:'Generation statistics','advanced-stats':'Advanced stats',branch:'Branch here'}
 watch(()=>lab.modal,key=>{
   message.value=''
   if(key!=='library') actionsId.value=null
@@ -78,6 +79,7 @@ watch(()=>lab.modal,key=>{
 function close() {
   if(lab.modal==='quick'&&resumeLive.value&&!lab.replay&&!lab.playing) lab.play()
   if(lab.modal==='branch') lab.cancelBranch()
+  if(lab.modal==='advanced-stats') dialog.value.close()
   lab.modal=null
 }
 function simulate() {
@@ -140,7 +142,7 @@ async function createBranch(edit=false) {
 onMounted(()=>dialog.value.showModal())
 </script>
 <template>
-  <dialog ref="dialog" class="task-dialog" :class="{'wide-dialog':lab.modal==='library','generation-dialog':lab.modal==='table'}" @cancel.prevent="close" aria-labelledby="dialog-title">
+  <dialog ref="dialog" class="task-dialog" :class="{'wide-dialog':lab.modal==='library','generation-dialog':lab.modal==='table','advanced-stats-dialog':lab.modal==='advanced-stats'}" @cancel.prevent="close" aria-labelledby="dialog-title">
     <header><h2 id="dialog-title">{{ lab.modal==='quick-done' && lab.extinctDay ? 'Population extinct' : titles[lab.modal] }}</h2><button class="icon" aria-label="Close dialog" @click="close"><CircleX :size="23"/></button></header>
     <template v-if="lab.modal==='quick'">
       <p>Advance the active run without animation.</p>
@@ -197,6 +199,10 @@ onMounted(()=>dialog.value.showModal())
     <template v-else-if="lab.modal==='table'">
       <GenerationTable @watch="lab.modal=null;emit('watch',$event)"/>
       <footer><button class="secondary" @click="lab.openDownload()">Download</button><button class="primary" @click="close">Done</button></footer>
+    </template>
+    <template v-else-if="lab.modal==='advanced-stats'">
+      <AdvancedStats @watch="lab.modal=null;emit('watch',$event)"/>
+      <footer><button class="primary" @click="close">Done</button></footer>
     </template>
     <template v-else-if="lab.modal==='library'">
       <div class="library-tools"><input v-model="search" type="search" placeholder="Search name or seed" aria-label="Search runs by name or seed">

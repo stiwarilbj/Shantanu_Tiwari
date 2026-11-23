@@ -6,6 +6,7 @@ export const METRICS = [
   { key: 'size', label: 'Average Size', short: 'Size', unit: 'points', color: '#1CC1AA', heading: '#70BAAB', petal: '#1CC1AA', inner: '#6BD6C7', outer: '#B0E8DF' },
   { key: 'sense', label: 'Average Sense Range', short: 'Sense Range', unit: 'world units', color: '#07C7FB', heading: '#7EC1DF', petal: '#07C7FB', inner: '#5EDAFB', outer: '#A8EAFC' },
 ]
+export const DEATH_CAUSES = ['Starvation', 'Missed home', 'Predation', 'Energy depletion']
 
 export function distribution(values) {
   const n = values.length
@@ -34,7 +35,7 @@ export function summaries(day, config, opening, closing, events, supply, plantsL
       deaths: deaths.length, net: births - deaths.length, food: supply, plantsLeft,
       plants: scoped.filter(e => e.type === 'plant').length,
       hunts: scoped.filter(e => e.type === 'prey').length,
-      causes: Object.fromEntries(['Starvation', 'Missed home', 'Predation', 'Energy depletion']
+      causes: Object.fromEntries(DEATH_CAUSES
         .map(cause => [cause, deaths.filter(e => e.cause === cause).length])),
       age: distribution(lives.map(b => b.age)), deathAge: distribution(deaths.map(e => e.age)),
       speed: distribution(lives.map(b => b.speed)), size: distribution(lives.map(b => b.size)),
@@ -46,6 +47,44 @@ export function summaries(day, config, opening, closing, events, supply, plantsL
 
 export function metricValue(row, key) {
   return key === 'population' ? row?.population : row?.[key]?.mean
+}
+
+function difference(left, right) {
+  return Number.isFinite(left) && Number.isFinite(right) ? left - right : null
+}
+
+function rate(numerator, denominator, scale = 1) {
+  return Number.isFinite(numerator) && Number.isFinite(denominator) && denominator > 0
+    ? (numerator / denominator) * scale : null
+}
+
+export function survivalStats(row) {
+  const { opening, population, births, deaths, causes } = row ?? {}
+  return {
+    opening, population, births, deaths, causes,
+    survivalRate: rate(difference(opening, deaths), opening, 100),
+    growthRate: rate(difference(population, opening), opening, 100),
+    birthRate: rate(births, opening, 100),
+  }
+}
+
+export function traitSpread(sample) {
+  return {
+    ...sample,
+    iqr: difference(sample?.p75, sample?.p25),
+    sd: sample?.n >= 2 && Number.isFinite(sample.sd) ? sample.sd : null,
+  }
+}
+
+export function foragingStats(row, field) {
+  const { opening, plants, hunts } = row ?? {}
+  const { food, plantsLeft } = field ?? {}
+  return {
+    opening, plants, hunts, food, plantsLeft,
+    plantsPerStarter: rate(plants, opening),
+    huntsPerStarter: rate(hunts, opening),
+    fieldUse: rate(difference(food, plantsLeft), food, 100),
+  }
 }
 
 const cohortKeys = ['age', 'speed', 'size', 'sense']

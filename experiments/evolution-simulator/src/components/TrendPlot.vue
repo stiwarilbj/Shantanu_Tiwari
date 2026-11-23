@@ -6,7 +6,7 @@ import { Maximize2, Minimize2, Minus } from 'lucide-vue-next'
 import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
-const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String,
+const props = defineProps({ id:String, title:String, rows:Array, series:Array, unit:String, color:String, min:Number, max:Number,
   pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
@@ -143,7 +143,9 @@ function create() {
       },
       onClick(event,elements) {
         if(ignoreClick) return
-        const day=props.rows[elements[0]?.index]?.day
+        const index=props.embedded && Number.isFinite(event.x)
+          ? chart.scales.x.getValueForPixel(event.x) : elements[0]?.index
+        const day=props.rows[index]?.day
         if(day==null) return
         if(props.embedded || event.native?.sourceCapabilities?.firesTouchEvents || matchMedia('(pointer:coarse)').matches || event.native?.shiftKey) emit('pin',day)
         else emit('watch',day)
@@ -163,14 +165,15 @@ function create() {
             let value=item.raw
             if(s.bar && value<0) value=-value
             const spread=s.spread?.(props.rows[item.dataIndex])
-            return s.label+'  '+format(value,s.integer?0:2)+(spread==null?'':' ± '+format(spread))
+            return s.label+'  '+format(value,s.digits??(s.integer?0:2))+(s.suffix??'')+(spread==null?'':' ± '+format(spread))
           }
         }
       }},
       scales:{
         x:{ ticks:{...ticks,minRotation:0,maxRotation:0},grid:{display:false},border:{color:props.compact?'#3D3A35':'#56534A'},
           title:{display:props.embedded,text:'Generation',color:ticks.color,font:ticks.font} },
-        y:{ ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0?'#545147':'#33332F'},border:{color:props.compact?'#3D3A35':'#45433F'},grace:'7%' },
+        y:{ min:props.min,max:props.max,ticks,grid:{display:!props.compact,color:ctx=>ctx.tick.value===0?'#545147':'#33332F'},
+          border:{color:props.compact?'#3D3A35':'#45433F'},grace:'7%' },
         y1:{ position:'right', display:false, beginAtZero:true, ticks:{...axis,color:'#EEEDD6'},grid:{drawOnChartArea:false},border:{color:'#45433F'} }
       }
     }
@@ -180,7 +183,10 @@ function create() {
 onMounted(create)
 onBeforeUnmount(()=>chart?.destroy())
 watch(()=>[props.rows,props.series,props.right,props.guide,hidden.value],update)
-watch(()=>[props.pin,props.annotations],()=>chart?.draw())
+watch(()=>[props.pin,props.annotations],([pin],[previous])=>{
+  if (props.embedded && pin == null && previous != null) hovered.value=null
+  chart?.draw()
+})
 function downloadChart() {
   const source = canvas.value
   const image = document.createElement('canvas')

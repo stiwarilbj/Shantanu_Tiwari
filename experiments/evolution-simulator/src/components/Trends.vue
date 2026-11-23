@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
-import { METRICS, metricValue, format, openingTrends } from '../engine/stats.js'
+import { ChartNoAxesCombined, Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
+import { DEATH_CAUSES, METRICS, metricValue, format, openingTrends } from '../engine/stats.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
 import TrendPlot from './TrendPlot.vue'
@@ -150,7 +150,7 @@ const options=computed(()=>{
   charts.births={id:'births',title:'Births and Deaths',unit:'Births above zero · deaths below zero',legend:true,hideable:true,
     series:[line('Births','#A1BD67',r=>r.births,{bar:true,integer:true}),line('Deaths','#BD5558',r=>-r.deaths,{bar:true,integer:true}),
       line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10'}),
-      ...(causes.value?['Starvation','Missed home','Predation','Energy depletion'].map((cause,i)=>
+      ...(causes.value?DEATH_CAUSES.map((cause,i)=>
         line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A'][i],r=>-(r.causes?.[cause]??0),{integer:true,dash:[3+i,3],width:1.3})):[])
     ]}
   charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,series:[
@@ -330,6 +330,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
       </div>
       <div class="trend-actions">
         <button class="secondary" :disabled="ageDemoVisible" @click="lab.modal='table'"><Table2 :size="17" aria-hidden="true"/> Generation table</button>
+        <button class="secondary" :disabled="ageDemoVisible" aria-haspopup="dialog" @click="lab.modal='advanced-stats'"><ChartNoAxesCombined :size="17" aria-hidden="true"/> Advanced stats</button>
         <button class="secondary" :disabled="ageDemoVisible" :title="ageDemoVisible?'Close the age walkthrough to download your run':''" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
         <button class="icon" title="Run again" aria-label="Run again" :disabled="ageDemoVisible" @click="emit('restart')"><RotateCcw :size="17"/></button>
         <button class="icon" title="Reroll seed" aria-label="Reroll seed" :disabled="ageDemoVisible" @click="emit('reroll')"><Dices :size="17"/></button>

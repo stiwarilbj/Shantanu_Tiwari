@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
+import { Bookmark, ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
 import Flower from './Flower.vue'
@@ -253,6 +253,9 @@ function escapeRibbon(event) {
       <div class="stats-heading">
         <h2>Current Generation Stats</h2>
         <button class="icon compact stat-info" title="View generation table" aria-label="View generation table" @click="emit('table')"><Info :size="15"/></button>
+        <button class="icon compact" type="button" title="Advanced stats" aria-label="Advanced stats" aria-haspopup="dialog" @click="lab.modal='advanced-stats'">
+          <ChartNoAxesCombined :size="15" aria-hidden="true"/>
+        </button>
         <select v-model="lab.scope" aria-label="Generation statistics species">
           <option value="all">All species</option>
           <option v-for="s in lab.run.setup.species.filter(s=>s.enabled)" :key="s.id" :value="s.id">{{ s.name }}</option>

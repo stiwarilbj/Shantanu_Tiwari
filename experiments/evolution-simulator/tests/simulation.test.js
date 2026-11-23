@@ -5,7 +5,7 @@ import { LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, SETTLED_RULE_VERSIO
 import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthroughStepCost } from '../src/engine/geometry.js'
 import { normal } from '../src/engine/random.js'
 import { dawn, dusk, founders, snapshot, step } from '../src/engine/simulation.js'
-import { distribution, openingTrends } from '../src/engine/stats.js'
+import { distribution, foragingStats, openingTrends, survivalStats, traitSpread } from '../src/engine/stats.js'
 import { adjacentFrameTime, prepareTrack, trackFrame } from '../src/track.js'
 import { createLivePlayback } from '../src/live-playback.js'
 import { csv } from '../src/export.js'
@@ -35,6 +35,40 @@ test('live, partially saved, headless, and replay execution agree for every comp
     assert.equal(row.population, rows.blue.population + rows.orange.population)
     checkpoint = result.checkpoint
   }
+})
+
+test('advanced population stats distinguish extinction, empty populations, and missing counts', () => {
+  const causes = { Starvation:2, Predation:2 }
+  assert.deepEqual(survivalStats({ opening:20, population:25, births:9, deaths:4, causes }), {
+    opening:20, population:25, births:9, deaths:4, causes,
+    survivalRate:80, growthRate:25, birthRate:45,
+  })
+  const extinction = survivalStats({ opening:5, population:0, births:0, deaths:5 })
+  assert.equal(extinction.survivalRate, 0)
+  assert.equal(extinction.growthRate, -100)
+  assert.equal(extinction.birthRate, 0)
+  assert.equal(survivalStats({ opening:0, population:0, births:0, deaths:0 }).survivalRate, null)
+  assert.equal(survivalStats({ opening:5, population:5, births:0 }).survivalRate, null)
+  assert.equal(survivalStats().growthRate, null)
+})
+
+test('advanced trait spread uses saved quartiles and needs two samples for standard deviation', () => {
+  const sample = distribution([1, 2, 3, 4])
+  assert.deepEqual(traitSpread(sample), { ...sample, iqr:1.5 })
+  assert.deepEqual(traitSpread(distribution([4])), { n:1, mean:4, min:4, p25:4, p75:4, max:4, iqr:0, sd:null })
+  assert.equal(traitSpread(distribution([])).iqr, null)
+  assert.deepEqual(traitSpread(null), { iqr:null, sd:null })
+})
+
+test('advanced food stats keep species rates separate from shared field usage', () => {
+  const field = { food:20, plantsLeft:5 }
+  assert.deepEqual(foragingStats({ opening:4, plants:3, hunts:0 }, field), {
+    opening:4, plants:3, hunts:0, food:20, plantsLeft:5, plantsPerStarter:.75, huntsPerStarter:0, fieldUse:75,
+  })
+  assert.equal(foragingStats({ opening:0, plants:0, hunts:0 }, field).plantsPerStarter, null)
+  assert.equal(foragingStats({}, { food:20, plantsLeft:20 }).fieldUse, 0)
+  assert.equal(foragingStats({}, { food:0, plantsLeft:0 }).fieldUse, null)
+  assert.equal(foragingStats({}, { food:20 }).fieldUse, null)
 })
 
 test('dawn balances all four edges, resets credits and capacity, and keys food by day', () => {
