@@ -7,7 +7,7 @@ Watch blobs look for food, hunt, and have babies. Small changes in speed, size, 
 ## Try it
 
 - **World** plays one day at a time. Pick a blob to follow it, or use **Quick Sim** to jump ahead. If the last blob dies, select the extinction tile to watch the ending.
-- **Adjust living traits** pauses the live day. Find it under **Playback actions** to add or subtract points from every living blob’s speed, size, or sense range. Survivors carry those changes into the next day. Open a blob’s **Creature Details** in replay to jump to the moment you made the change.
+- **Adjust living traits** pauses the day so you can change speed, size, or sense range for all living blobs, one species, or blobs active in the field or settled in refuge. Pick a species and an activity under **Playback actions → Adjust living traits** to narrow the group and preview its new averages. Survivors carry the changes into the next day, and you can jump to the moment of the change in **Creature Details** during replay.
 - **Settings** lets you make species and change their starting traits. Open **Advanced** to browse **Field & food**, **Creature behavior**, **Life cycle**, and **Run & charts**. Use **Plant supply** to change how many plants grow and **Field layout** to change where they grow. Both show a preview of the day you pick.
 - **Starting territories** lets you choose which edges each species starts on and how close together the blobs begin. Preview their spots at dawn, then try it for one generation or every day.
 - **Optional rules** let you turn off reproduction, meal energy refills, or custom foraging and keep the values you set. A blob can still survive and collect food when reproduction and refills are off.

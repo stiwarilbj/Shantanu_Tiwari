@@ -1,6 +1,6 @@
 import { applyTraitAdjustment, dawnForRun, founders, step, snapshot } from './simulation.js'
 import { rulesFor } from './config.js'
-import { validTraitAdjustment } from './trait-adjustments.js'
+import { traitAdjustmentGroup, validTraitAdjustment } from './trait-adjustments.js'
 import { simulateForecast } from '../forecast.js'
 import { tracksForagingDecisions } from './foraging-decisions.js'
 import { TRACK_FIELDS } from '../track.js'
@@ -131,17 +131,26 @@ async function replay(message) {
     opening, plants, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
 }
 
-function adjustTraits({ day, tick, changes }) {
+function adjustTraits({ day, tick, changes, group = {} }) {
   if (busy || !canAdvance() || day !== committed + 1 || tick !== current().tick) {
     emit('trait-adjustment', { error: 'The live day has moved on. Check the preview and try again.' })
     return
   }
   const state = current()
-  if (!validTraitAdjustment(changes) || !applyTraitAdjustment(state, rulesFor(config, records, day), changes)) {
+  const adjustment = { day, tick, changes }
+  if (group.speciesId !== null || group.activity !== 'any') {
+    adjustment.creatureIds = traitAdjustmentGroup(state.blobs, group).map(blob => blob.id)
+    if (adjustment.creatureIds.length === 0) {
+      emit('trait-adjustment', { error: 'No living blobs match this group.' })
+      return
+    }
+  }
+  if (!validTraitAdjustment(changes) ||
+      !applyTraitAdjustment(state, rulesFor(config, records, day), changes, adjustment.creatureIds)) {
     emit('trait-adjustment', { error: 'Enter an adjustment that changes at least one living blob.' })
     return
   }
-  emit('trait-adjustment', { adjustment: { day, tick, changes }, partial: state, frame: snapshot(state) })
+  emit('trait-adjustment', { adjustment, partial: state, frame: snapshot(state) })
 }
 
 self.onmessage = async ({ data }) => {

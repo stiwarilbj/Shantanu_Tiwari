@@ -12,6 +12,11 @@ export function validTraitAdjustment(changes) {
     TRAITS.some(trait => changes[trait] !== 0)
 }
 
+export function traitAdjustmentGroup(blobs, { speciesId, activity }) {
+  return blobs.filter(blob => blob.alive && (speciesId === null || blob.species === speciesId) &&
+    (activity === 'any' || activity === (blob.home ? 'home' : 'active')))
+}
+
 export function adjustedTrait(blob, trait, delta, rules) {
   const floor = trait === 'sense' && usesStandardDeviation(rules) ? 0 : Math.min(1, blob[trait])
   return Math.max(floor, blob[trait] + delta)

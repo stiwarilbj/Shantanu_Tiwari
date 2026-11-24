@@ -93,13 +93,14 @@ function movementTraits(blob, config, species, stepSeconds) {
     rate: moveCost == null ? cost(blob, config) : moveCost / stepSeconds }
 }
 
-export function applyTraitAdjustment(ctx, config, changes) {
+export function applyTraitAdjustment(ctx, config, changes, creatureIds) {
   if (ctx.settled) return 0
   const species = new Map(config.species.map(s => [s.id, s]))
+  const targets = creatureIds == null ? null : new Set(creatureIds)
   const time = ctx.tick * ctx.stepSeconds
   let affected = 0
   for (const blob of ctx.blobs) {
-    if (!blob.alive) continue
+    if (!blob.alive || (targets && !targets.has(blob.id))) continue
     const [speed, size, sense] = TRAITS.map(trait => adjustedTrait(blob, trait, changes[trait], config))
     if (speed === blob.speed && size === blob.size && sense === blob.sense) continue
     const traits = { speed, size, sense, r: radius(size),
@@ -114,7 +115,7 @@ export function applyTraitAdjustment(ctx, config, changes) {
 function applyScheduledAdjustments(ctx, config) {
   let edit = ctx.scheduledAdjustments?.[ctx.nextAdjustment]
   while (edit?.tick === ctx.tick) {
-    applyTraitAdjustment(ctx, config, edit.changes)
+    applyTraitAdjustment(ctx, config, edit.changes, edit.creatureIds)
     edit = ctx.scheduledAdjustments[++ctx.nextAdjustment]
   }
 }

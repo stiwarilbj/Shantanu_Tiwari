@@ -622,13 +622,13 @@ export const useLab = defineStore('lab', () => {
     modal.value = 'traits'
   }
 
-  function adjustTraits(changes) {
+  function adjustTraits(changes, group) {
     if (!canAdjustTraits.value || !validTraitAdjustment(changes)) return
     const { day, time, stepSeconds } = frame.value
     adjustingTraits.value = true
     traitAdjustmentError.value = ''
     adjustmentTimer = setTimeout(() => reportFailure('The trait adjustment timed out.'), WORKER_STARTUP_TIMEOUT)
-    try { writer.postMessage({ type: 'adjust-traits', day, tick: Math.round(time / stepSeconds), changes }) }
+    try { writer.postMessage({ type: 'adjust-traits', day, tick: Math.round(time / stepSeconds), changes, group }) }
     catch { reportFailure('The trait adjustment could not reach the simulation.') }
   }
 

@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs hunt, gather food, and pass on traits like size and speed. Give each species a food strategy, or change every living blob’s speed, size, and sense range in the middle of a generation. Use Quick Sim to jump ahead, replay a hunt, or check the trend charts to see what changed.
+Watch blobs hunt, gather food, and pass on traits like size and speed. Give each species a food strategy, or change the speed, size, and sense range of a group of blobs mid-generation. Use Quick Sim to jump ahead, replay a hunt, or check the trend charts to see what changed.
 
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 

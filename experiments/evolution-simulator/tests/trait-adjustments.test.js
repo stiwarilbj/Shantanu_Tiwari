@@ -3,7 +3,7 @@ import test from 'node:test'
 import { starter } from '../src/engine/config.js'
 import { radius, travel, walkthroughStepCost } from '../src/engine/geometry.js'
 import { applyTraitAdjustment, dawnForRun, dusk, founders, snapshot, step } from '../src/engine/simulation.js'
-import { validTraitAdjustment, validTraitChange } from '../src/engine/trait-adjustments.js'
+import { traitAdjustmentGroup, validTraitAdjustment, validTraitChange } from '../src/engine/trait-adjustments.js'
 import { simulateForecast } from '../src/forecast.js'
 import { prepareTrack, trackFrame } from '../src/track.js'
 
@@ -48,17 +48,19 @@ test('changes living blobs across species and refuge without touching deaths, en
 
 test('live, resumed, batched, and forecast runs apply each intervention at the same tick', () => {
   const setup = { ...starter(), food: 500, predation: false, days: 10, endMode: 'timed', duration: 100 }
+  setup.species[1].enabled = true
   const initial = founders(setup)
   const live = dawnForRun(setup, [], 1, initial)
+  const orangeIds = traitAdjustmentGroup(live.blobs, { speciesId: 'orange', activity: 'active' }).map(blob => blob.id)
   const traitAdjustments = [
     { day: 1, tick: 0, changes: { speed: 0.25, size: 0, sense: 0 } },
-    { day: 1, tick: 3, changes: { speed: 2.5, size: -1, sense: 10 } },
+    { day: 1, tick: 3, changes: { speed: 2.5, size: -1, sense: 10 }, creatureIds: orangeIds },
     { day: 1, tick: 3, changes: { speed: -0.75, size: 0, sense: 0 } },
     { day: 1, tick: 9, changes: { speed: 0, size: 0, sense: -2 } },
   ]
-  for (const { tick, changes } of traitAdjustments) {
+  for (const { tick, changes, creatureIds } of traitAdjustments) {
     if (live.tick < tick) assert.equal(step(live, setup, tick - live.tick), null)
-    assert.ok(applyTraitAdjustment(live, setup, changes) > 0)
+    assert.ok(applyTraitAdjustment(live, setup, changes, creatureIds) > 0)
   }
   const resumed = structuredClone(live)
   const scheduled = dawnForRun(setup, [], 1, initial, traitAdjustments)
@@ -70,6 +72,29 @@ test('live, resumed, batched, and forecast runs apply each intervention at the s
   const next = step(dawnForRun(setup, [], 2, result.checkpoint), setup, Infinity, true)
   const forecast = simulateForecast({ setup, revisions: [], checkpoint: initial, start: 0, end: 0, target: 2, traitAdjustments })
   assert.deepEqual(forecast.summaries, [result.summary, next.summary])
+})
+
+test('group filters intersect species and activity and only edit the selected living IDs', () => {
+  const setup = starter()
+  setup.species[0].count = 2
+  Object.assign(setup.species[1], { enabled: true, count: 3 })
+  const state = dawnForRun(setup, [], 1, founders(setup))
+  const [blueHome, blueActive, orangeHome, orangeActive, orangeDead] = state.blobs
+  blueHome.home = orangeHome.home = orangeDead.home = true
+  orangeDead.alive = false
+  const group = (speciesId, activity) => traitAdjustmentGroup(state.blobs, { speciesId, activity })
+  assert.deepEqual(group(null, 'home'), [blueHome, orangeHome])
+  assert.deepEqual(group('orange', 'any'), [orangeHome, orangeActive])
+  assert.deepEqual(group('orange', 'active'), [orangeActive])
+  const targets = group('orange', 'home').map(blob => blob.id)
+  assert.deepEqual(targets, [orangeHome.id])
+  const before = state.blobs.map(blob => blob.speed)
+  const changes = { speed: 2, size: 0, sense: 0 }
+  assert.equal(applyTraitAdjustment(state, setup, changes, []), 0)
+  assert.equal(applyTraitAdjustment(state, setup, changes, targets), 1)
+  before[2] += 2
+  assert.deepEqual(state.blobs.map(blob => blob.speed), before)
+  assert.deepEqual(state.events.map(event => event.id), targets)
 })
 
 test('replay changes traits on the recorded tick even between saved samples and restores them when rewinding', () => {
