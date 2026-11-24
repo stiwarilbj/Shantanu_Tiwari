@@ -247,6 +247,17 @@
         .settings-card .form-label {
             margin-bottom: 0.1875rem;
         }
+        .filter-feedback {
+            margin: 0.375rem 0 0;
+            color: #a52330;
+            font-size: 0.875em;
+        }
+        .filter-feedback:empty {
+            margin: 0;
+        }
+        .search-container .form-control[aria-invalid="true"] {
+            border-color: #a52330;
+        }
 
         input[type="text"],
         input[type="number"],
@@ -468,12 +479,13 @@
                     </div>
                     <div class="col-6 search-detail">
                         <label for="searchMinLengthInput" class="form-label">Min. characters</label>
-                        <input type="number" id="searchMinLengthInput" class="form-control" placeholder="e.g., 2" min="1" step="1">
+                        <input type="number" id="searchMinLengthInput" class="form-control" placeholder="e.g., 2" min="1" step="1" aria-describedby="searchLengthWarning">
                     </div>
                     <div class="col-6 search-detail">
                         <label for="searchMaxLengthInput" class="form-label">Max. characters</label>
-                        <input type="number" id="searchMaxLengthInput" class="form-control" placeholder="e.g., 10" min="1" step="1">
+                        <input type="number" id="searchMaxLengthInput" class="form-control" placeholder="e.g., 10" min="1" step="1" aria-describedby="searchLengthWarning">
                     </div>
+                    <p id="searchLengthWarning" class="col-12 filter-feedback" role="status"></p>
                 </div>
                 <div class="search-actions">
                     <button id="searchBtn" class="btn btn-secondary">
@@ -493,13 +505,13 @@
                 <div class="row row-cols-2 g-2">
                     <div class="col">
                         <label for="letterSelect" class="form-label">Starting Letter</label>
-                        <select id="letterSelect" class="form-select">
+                        <select id="letterSelect" class="form-select" aria-describedby="roundFilterWarning">
                             <option value="any" selected>Any Letter</option>
                         </select>
                     </div>
                     <div class="col">
                         <label for="endLetterSelect" class="form-label">Ending Letter</label>
-                        <select id="endLetterSelect" class="form-select">
+                        <select id="endLetterSelect" class="form-select" aria-describedby="roundFilterWarning">
                             <option value="any" selected>Any Letter</option>
                         </select>
                     </div>
@@ -514,11 +526,12 @@
                     </div>
                     <div class="col setting-mode">
                         <label for="countrySelect" class="form-label">Country / Game Mode</label>
-                        <select id="countrySelect" class="form-select">
+                        <select id="countrySelect" class="form-select" aria-describedby="roundFilterWarning">
                             <option value="placeAndCountry" selected>Place and Country Mode</option>
                         </select>
                     </div>
                 </div>
+                <p id="roundFilterWarning" class="filter-feedback" role="status"></p>
             </section>
 
             <div class="game-play">
@@ -582,6 +595,7 @@
         let gameActive = false;
         let guessedPlaces = [];
         let filteredPlaces = [];
+        let setupPool;
         const roundPlaceGroups = new Map();
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
@@ -611,6 +625,7 @@
         const startBtn = document.getElementById('startBtn');
         const startLabel = document.getElementById('startLabel');
         const roundLoadStatus = document.getElementById('roundLoadStatus');
+        const roundFilterWarning = document.getElementById('roundFilterWarning');
         const pauseBtn = document.getElementById('pauseBtn');
         const resetBtn = document.getElementById('resetBtn');
         const displayBtn = document.getElementById('displayBtn');
@@ -621,6 +636,7 @@
         const searchExcludeInput = document.getElementById('searchExcludeInput');
         const searchMinLengthInput = document.getElementById('searchMinLengthInput');
         const searchMaxLengthInput = document.getElementById('searchMaxLengthInput');
+        const searchLengthWarning = document.getElementById('searchLengthWarning');
         const searchBtn = document.getElementById('searchBtn');
         const searchResultsContainer = document.getElementById('searchResults');
         const searchStartLetterSelect = document.getElementById('searchStartLetterSelect');
@@ -629,29 +645,9 @@
 
         function setupIntegerInputValidation(inputElement) {
             inputElement.addEventListener('input', function() {
-                let value = this.value;
-                if (value === '') {
-                    this.value = '';
-                    saveSearchFilters();
-                    return;
-                }
-                value = value.replace(/[^\d]/g, '');
-                if (value === '') {
-                    this.value = '';
-                    saveSearchFilters();
-                    return;
-                }
-                let numValue = parseInt(value, 10);
-                if (isNaN(numValue)) {
-                    this.value = '';
-                    saveSearchFilters();
-                    return;
-                }
-                if (numValue < 1) {
-                    numValue = 1;
-                }
-                this.value = numValue;
-                saveSearchFilters();
+                const digits = this.value.replace(/[^\d]/g, '');
+                this.value = digits ? Math.max(1, parseInt(digits, 10)) : '';
+                handleSearchFiltersChange();
             });
 
             inputElement.addEventListener('keydown', function(event) {
@@ -786,40 +782,42 @@
             loadGameState();
 
             countrySelect.addEventListener('change', handleCountryChangeAndSaveSettings);
-            letterSelect.addEventListener('change', saveSettings);
-            endLetterSelect.addEventListener('change', saveSettings);
+            [letterSelect, endLetterSelect].forEach(select => {
+                select.addEventListener('change', () => {
+                    saveSettings();
+                    clearExamples();
+                    updateStartButton();
+                });
+            });
             timeSelect.addEventListener('change', saveSettings);
 
             searchBtn.addEventListener('click', performSearch);
-            [searchIncludeInput, searchExcludeInput].forEach(input => {
+            [searchIncludeInput, searchExcludeInput, searchMinLengthInput, searchMaxLengthInput].forEach(input => {
                 input.addEventListener('keypress', function(e) {
                     if (e.key === 'Enter') performSearch();
                 });
             });
-             [searchMinLengthInput, searchMaxLengthInput].forEach(input => {
-                input.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') performSearch();
-                });
-            });
-
 
             setupIntegerInputValidation(searchMinLengthInput);
             setupIntegerInputValidation(searchMaxLengthInput);
 
-            searchStartLetterSelect.addEventListener('change', saveSearchFilters);
-            searchEndLetterSelect.addEventListener('change', saveSearchFilters);
-            searchCountrySelect.addEventListener('change', saveSearchFilters);
-            searchIncludeInput.addEventListener('input', saveSearchFilters);
-            searchExcludeInput.addEventListener('input', saveSearchFilters);
+            searchStartLetterSelect.addEventListener('change', handleSearchFiltersChange);
+            searchEndLetterSelect.addEventListener('change', handleSearchFiltersChange);
+            searchCountrySelect.addEventListener('change', handleSearchFiltersChange);
+            searchIncludeInput.addEventListener('input', handleSearchFiltersChange);
+            searchExcludeInput.addEventListener('input', handleSearchFiltersChange);
         }
 
+        function clearExamples() {
+            resultRequests.delete(examplePlacesContainer);
+            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+        }
 
         function handleCountryChangeAndSaveSettings() {
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
             updatePlaceInputPlaceholder();
             saveSettings();
-            resultRequests.delete(examplePlacesContainer);
-            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+            clearExamples();
             roundRequest++;
             roundLoadState = 'idle';
             const country = roundCountry();
@@ -848,21 +846,34 @@
             return selection === 'placeAndCountry' ? 'any' : selection || 'any';
         }
 
-        function filterRoundPlaces(places) {
-            const selectedStartLetter = letterSelect.value;
-            const selectedEndLetter = endLetterSelect.value.toLowerCase();
+        function filterPlaces(places, country, startLetter, endLetter) {
+            if (country === 'any' && startLetter === 'any' && endLetter === 'any') return places;
+            const start = startLetter === 'any' ? '' : startLetter.toLowerCase();
+            const end = endLetter === 'any' ? '' : endLetter.toLowerCase();
             return places.filter(place => {
+                if (country !== 'any' && place.country_name !== country) return false;
+                if (!start && !end) return true;
                 const cityLower = place.city.toLowerCase();
-                const matchesStartLetter = selectedStartLetter === 'any' ||
-                                    (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
-                const matchesEndLetter = selectedEndLetter === 'any' ||
-                                    (place.city && cityLower.charAt(cityLower.length - 1) === selectedEndLetter);
-                return matchesStartLetter && matchesEndLetter;
+                return cityLower.startsWith(start) && cityLower.endsWith(end);
             });
         }
 
+        function getSetupPlaces() {
+            const country = roundCountry();
+            const dictionary = loadedPlaces.get(country);
+            if (!dictionary) return null;
+
+            const start = letterSelect.value;
+            const end = endLetterSelect.value;
+            if (setupPool?.dictionary !== dictionary || setupPool.country !== country ||
+                setupPool.start !== start || setupPool.end !== end) {
+                setupPool = { dictionary, country, start, end, places: filterPlaces(dictionary, country, start, end) };
+            }
+            return setupPool.places;
+        }
+
         function setRoundPlaces(places) {
-            filteredPlaces = filterRoundPlaces(places);
+            filteredPlaces = places;
             roundPlaceGroups.clear();
             const needsCountry = currentGameMode === 'placeAndCountry';
             filteredPlaces.forEach((place, index) => {
@@ -884,9 +895,12 @@
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
             const roundInProgress = timeLeft > 0 && !restoringRound;
-            const ready = loadedPlaces.has(roundCountry()) && !restoringRound;
-            startBtn.disabled = roundInProgress;
+            const setupPlaces = loading || roundInProgress || restoringRound ? null : getSetupPlaces();
+            const empty = setupPlaces?.length === 0;
+            startBtn.disabled = roundInProgress || empty;
             startBtn.setAttribute('aria-disabled', String(loading));
+            const warning = empty ? 'No places match these filters. Try another country or letter' : '';
+            if (roundFilterWarning.textContent !== warning) roundFilterWarning.textContent = warning;
 
             let label = 'Load places';
             let status = '';
@@ -894,7 +908,7 @@
             else if (loading) {
                 label = 'Loading places…';
                 status = label;
-            } else if (ready) label = 'Start Game';
+            } else if (setupPlaces) label = 'Start Game';
             else if (roundLoadState === 'failed') {
                 label = 'Retry loading';
                 status = 'Could not load places. Retry loading to try again.';
@@ -909,20 +923,30 @@
             roundLoadState = 'loading';
             updateStartButton();
             try {
-                const places = await loadPlaces(roundCountry());
+                await loadPlaces(roundCountry());
                 if (request !== roundRequest) return;
                 roundLoadState = 'idle';
                 if (restoringRound) {
-                    setRoundPlaces(places);
+                    const places = getSetupPlaces();
                     restoringRound = false;
-                    pauseBtn.disabled = false;
+                    if (places.length) {
+                        setRoundPlaces(places);
+                        pauseBtn.disabled = false;
+                    } else {
+                        // Older versions could save a running round with no eligible places.
+                        timeLeft = 0;
+                        updateTimerDisplay();
+                        pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                        setRoundSettingsDisabled(false);
+                        saveGameState();
+                    }
                 }
             } catch {
                 if (request !== roundRequest) return;
                 roundLoadState = 'failed';
             }
             updateStartButton();
-            if (needsResume && !restoringRound) {
+            if (needsResume && !restoringRound && timeLeft > 0) {
                 roundLoadStatus.textContent = 'Places loaded. Resume your round when ready.';
             }
         }
@@ -941,11 +965,12 @@
 
         startBtn.addEventListener('click', function() {
             if (readingSavedState || roundLoadState === 'loading' || (timeLeft > 0 && !restoringRound)) return;
-            const places = loadedPlaces.get(roundCountry());
+            const places = getSetupPlaces();
             if (restoringRound || !places) {
                 prepareRound();
                 return;
             }
+            if (places.length === 0) return;
 
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
             setRoundPlaces(places);
@@ -1000,6 +1025,7 @@
             score = 0;
             guessedPlaces = [];
             filteredPlaces = [];
+            setupPool = undefined;
             roundPlaceGroups.clear();
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
@@ -1007,7 +1033,7 @@
             roundRequest++;
             roundLoadState = 'idle';
             resultRequests.delete(searchResultsContainer);
-            resultRequests.delete(examplePlacesContainer);
+            clearExamples();
 
             updateTimerDisplay();
             updateScoreDisplay();
@@ -1036,8 +1062,8 @@
             searchExcludeInput.value = '';
             searchMinLengthInput.value = '';
             searchMaxLengthInput.value = '';
+            validateSearchLengthRange();
             showResultMessage(searchResultsContainer, 'Search results will appear here');
-            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
             setPanelVisibility(rulesBtn, rulesContainer, false);
             setPanelVisibility(showSearchBtn, searchContainer, false);
             updateStartButton();
@@ -1163,18 +1189,44 @@
             if (!loadedPlaces.has(country)) showResultMessage(container, 'Loading places…');
             try {
                 const places = await loadPlaces(country);
-                if (resultRequests.get(container) !== request) return null;
                 updateStartButton();
-                return places;
+                return resultRequests.get(container) === request ? places : null;
             } catch {
                 if (resultRequests.get(container) === request) {
                     showResultMessage(container, 'Could not load places.', retry);
                 }
                 return null;
+            } finally {
+                if (resultRequests.get(container) === request) resultRequests.delete(container);
             }
         }
 
+        function validateSearchLengthRange() {
+            const minLength = parseInt(searchMinLengthInput.value || '0', 10);
+            const maxLength = searchMaxLengthInput.value ? parseInt(searchMaxLengthInput.value, 10) : Infinity;
+            const invalid = minLength > maxLength;
+            const warning = invalid ? 'Minimum length must be at most the maximum' : '';
+            if (searchLengthWarning.textContent !== warning) searchLengthWarning.textContent = warning;
+            for (const input of [searchMinLengthInput, searchMaxLengthInput]) {
+                if (invalid) input.setAttribute('aria-invalid', 'true');
+                else input.removeAttribute('aria-invalid');
+            }
+            return invalid ? null : { minLength, maxLength };
+        }
+
+        function handleSearchFiltersChange() {
+            validateSearchLengthRange();
+            if (resultRequests.delete(searchResultsContainer)) {
+                showResultMessage(searchResultsContainer, 'Search results will appear here');
+            }
+            saveSearchFilters();
+        }
+
         async function performSearch() {
+            const range = validateSearchLengthRange();
+            if (!range) return;
+            const { minLength, maxLength } = range;
+
             const includeTerms = searchIncludeInput.value.trim().toLowerCase()
                 .split(',')
                 .map(term => term.trim())
@@ -1187,73 +1239,27 @@
             const selectedSearchStartLetter = searchStartLetterSelect.value;
             const selectedSearchEndLetter = searchEndLetterSelect.value;
             const selectedSearchCountry = searchCountrySelect.value;
-            const minLengthText = searchMinLengthInput.value;
-            const maxLengthText = searchMaxLengthInput.value;
-
-            const minLength = minLengthText ? parseInt(minLengthText) : 0;
-            const maxLength = maxLengthText ? parseInt(maxLengthText) : Infinity;
 
             const places = await loadResultPlaces(selectedSearchCountry, searchResultsContainer, performSearch);
             if (!places) return;
 
-            const isSearchEffectivelyEmpty = includeTerms.length === 0 &&
-                                          excludeTerms.length === 0 &&
-                                          selectedSearchStartLetter === 'any' &&
-                                          selectedSearchEndLetter === 'any' &&
-                                          selectedSearchCountry === 'any' &&
-                                          !minLengthText &&
-                                          !maxLengthText;
-
-            if (isSearchEffectivelyEmpty) {
-                if (places.length > 0) {
-                    const randomPlacesArray = getRandomPlaces(places, 100);
-                    if (randomPlacesArray.length > 0) {
-                        let html = '';
-                        randomPlacesArray.forEach(place => {
-                             html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
-                        });
-                        searchResultsContainer.innerHTML = html;
-                    } else {
-                        searchResultsContainer.innerHTML = '<p class="text-muted">No places available to display at the moment</p>';
-                    }
-                } else {
-                    searchResultsContainer.innerHTML = '<p class="text-muted">No places loaded in the game to search from</p>';
-                }
-                searchResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                return;
+            let matchingPlaces = filterPlaces(places, selectedSearchCountry, selectedSearchStartLetter, selectedSearchEndLetter);
+            if (includeTerms.length || excludeTerms.length || minLength > 0 || maxLength < Infinity) {
+                matchingPlaces = matchingPlaces.filter(place => {
+                    if (place.city.length < minLength || place.city.length > maxLength) return false;
+                    const city = place.city.toLowerCase();
+                    const country = place.country_name.toLowerCase();
+                    const matchesTerm = term => city.includes(term) || country.includes(term);
+                    return includeTerms.every(matchesTerm) && !excludeTerms.some(matchesTerm);
+                });
             }
-
-            const matchingPlaces = places.filter(place => {
-                const cityLower = place.city.toLowerCase();
-                const countryLower = place.country_name.toLowerCase();
-                const cityLength = place.city.length;
-
-                const matchesAllIncludeTerms = includeTerms.length === 0 || includeTerms.every(term =>
-                    cityLower.includes(term) || countryLower.includes(term)
-                );
-
-                const isExcluded = excludeTerms.length > 0 && excludeTerms.some(term =>
-                    cityLower.includes(term) || countryLower.includes(term)
-                );
-
-                if (!matchesAllIncludeTerms || isExcluded) {
-                    return false;
-                }
-
-                const matchesStartLetter = selectedSearchStartLetter === 'any' || cityLower.startsWith(selectedSearchStartLetter.toLowerCase());
-                const matchesEndLetter = selectedSearchEndLetter === 'any' || cityLower.endsWith(selectedSearchEndLetter.toLowerCase());
-                const matchesMinLength = cityLength >= minLength;
-                const matchesMaxLength = cityLength <= maxLength;
-
-                return matchesStartLetter && matchesEndLetter && matchesMinLength && matchesMaxLength;
-            });
 
             if (matchingPlaces.length === 0) {
                 searchResultsContainer.innerHTML = '<p class="text-muted">No places found matching your criteria</p>';
                 return;
             }
 
-            const resultsToDisplay = getRandomPlaces(matchingPlaces, Math.min(matchingPlaces.length, 100));
+            const resultsToDisplay = getRandomPlaces(matchingPlaces, 100);
             let html = '';
             resultsToDisplay.forEach(place => {
                  html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
@@ -1264,9 +1270,12 @@
 
 
         async function showExamples() {
-            const places = await loadResultPlaces(roundCountry(), examplePlacesContainer, showExamples);
-            if (!places) return;
-            displayExamplePlaces(getRandomPlaces(filterRoundPlaces(places), 8));
+            if (timeLeft <= 0 || restoringRound) {
+                const places = await loadResultPlaces(roundCountry(), examplePlacesContainer, showExamples);
+                if (!places) return;
+            }
+            const places = timeLeft > 0 && !restoringRound ? filteredPlaces : getSetupPlaces();
+            displayExamplePlaces(getRandomPlaces(places, 8));
             examplePlacesContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
@@ -1416,6 +1425,7 @@
                 searchExcludeInput.value = search.excludeTerm || '';
                 searchMinLengthInput.value = search.minLength || '';
                 searchMaxLengthInput.value = search.maxLength || '';
+                validateSearchLengthRange();
 
                 if (result.gameState) {
                     const saved = result.gameState;
