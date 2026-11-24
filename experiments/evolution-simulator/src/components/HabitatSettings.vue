@@ -6,8 +6,8 @@ import { FIELD } from '../engine/geometry.js'
 import { openingHabitat } from '../engine/habitat.js'
 import NumberField from './NumberField.vue'
 
-const { draft, fork, run, issue } = defineProps({
-  draft: { type: Object, required: true }, fork: Number, run: Object, issue: Object,
+const { topic, draft, fork, run, issue } = defineProps({
+  topic: { type: String, required: true }, draft: { type: Object, required: true }, fork: Number, run: Object, issue: Object,
 })
 const previewDay = defineModel('day')
 const map = ref(null)
@@ -69,7 +69,7 @@ function addAnchor() {
 </script>
 
 <template>
-  <div class="advanced-block">
+  <div v-if="topic === 'food'" class="advanced-block">
     <h3>Plant supply</h3>
     <label class="advanced-select">Food schedule
       <select id="schedule" v-model="draft.scheduleMode" @change="delete issue.schedule">
@@ -91,34 +91,38 @@ function addAnchor() {
     </template>
     <p v-else-if="draft.schedule.length" class="quiet">Constant runs use the daily food count. Starting the run clears any invalid schedule points.</p>
   </div>
-  <div v-if="custom" class="advanced-block">
+  <div v-else class="advanced-block">
     <h3>Field layout</h3>
-    <label class="advanced-select">Food placement
-      <select id="foodPlacement" v-model="draft.foodPlacement">
-        <option value="scattered">Scattered (patches off)</option><option value="patches">Patches</option>
-      </select>
-    </label>
-    <template v-if="draft.foodPlacement === 'patches'">
-      <p class="quiet">The scheduled supply is divided as evenly as possible among the patches.</p>
-      <NumberField id="patchCount" v-model="draft.patchCount" label="Number of patches" :min="1" :max="8" :error="issue.patchCount"/>
-      <NumberField id="patchRadius" v-model="draft.patchRadius" label="Patch radius" :min="10" :max="60" :error="issue.patchRadius"/>
-      <label class="advanced-select">Patch relocation
-        <select id="patchRelocation" v-model="draft.patchRelocation">
-          <option value="fixed">Fixed for the run</option><option value="interval">Move every N generations</option>
+    <template v-if="custom">
+      <label class="advanced-select">Food placement
+        <select id="foodPlacement" v-model="draft.foodPlacement">
+          <option value="scattered">Scattered (patches off)</option><option value="patches">Patches</option>
         </select>
       </label>
-      <NumberField v-if="draft.patchRelocation === 'interval'" id="patchInterval" v-model="draft.patchInterval" label="Generations between moves"
-        :min="1" :max="100" :error="issue.patchInterval"/>
-      <small class="quiet">Radius is measured in field units. The board is {{ FIELD }} units wide.</small>
+      <template v-if="draft.foodPlacement === 'patches'">
+        <p class="quiet">The scheduled supply is divided as evenly as possible among the patches.</p>
+        <NumberField id="patchCount" v-model="draft.patchCount" label="Number of patches" :min="1" :max="8" :error="issue.patchCount"/>
+        <NumberField id="patchRadius" v-model="draft.patchRadius" label="Patch radius" :min="10" :max="60" :error="issue.patchRadius"/>
+        <label class="advanced-select">Patch relocation
+          <select id="patchRelocation" v-model="draft.patchRelocation">
+            <option value="fixed">Fixed for the run</option><option value="interval">Move every N generations</option>
+          </select>
+        </label>
+        <NumberField v-if="draft.patchRelocation === 'interval'" id="patchInterval" v-model="draft.patchInterval" label="Generations between moves"
+          :min="1" :max="100" :error="issue.patchInterval"/>
+        <small class="quiet">Radius is measured in field units. The board is {{ FIELD }} units wide.</small>
+      </template>
+      <label class="advanced-select">Refuge width
+        <select id="refugePercent" v-model="draft.refugePercent">
+          <option :value="10">Standard · 10%</option><option :value="15">Wide · 15%</option><option :value="20">Extra wide · 20%</option>
+        </select>
+      </label>
+      <p class="quiet">Measure from each edge. A wider home border leaves less space for plants.</p>
     </template>
-    <label class="advanced-select">Refuge width
-      <select id="refugePercent" v-model="draft.refugePercent">
-        <option :value="10">Standard · 10%</option><option :value="15">Wide · 15%</option><option :value="20">Extra wide · 20%</option>
-      </select>
-    </label>
-    <p class="quiet">Measure from each edge. A wider home border leaves less space for plants.</p>
+    <p v-else class="quiet">This setup uses its original field layout.</p>
   </div>
   <div class="advanced-block habitat-preview">
+    <h3>Dawn preview</h3>
     <div class="schedule-preview">
       <label>Preview day
         <input id="food-preview-day" v-model.number="previewDay" type="number" min="1" :max="draft.days"
