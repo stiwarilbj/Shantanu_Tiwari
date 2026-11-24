@@ -569,7 +569,7 @@
         </div>
     </main>
 
-    <script src="PlacesData.js"></script>
+    <script src="places.compact.js"></script>
     <script>
         let timer;
         let timeLeft = 0;
@@ -577,7 +577,6 @@
         let gameActive = false;
         let guessedPlaces = [];
         let allPlaces = [];
-        let countries = new Set();
         let filteredPlaces = [];
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
@@ -610,8 +609,6 @@
         const searchStartLetterSelect = document.getElementById('searchStartLetterSelect');
         const searchEndLetterSelect = document.getElementById('searchEndLetterSelect');
         const searchCountrySelect = document.getElementById('searchCountrySelect');
-
-        const forbiddenCharRegex = /[\\\/]/;
 
         function setupIntegerInputValidation(inputElement) {
             inputElement.addEventListener('input', function() {
@@ -647,30 +644,26 @@
             });
         }
 
-        function initGame() {
-            const uniquePlacesMap = new Map();
-            if (typeof citiesData !== 'undefined' && Array.isArray(citiesData)) {
-                citiesData.forEach(placeData => {
-                    if (placeData.city && typeof placeData.city === 'string' && placeData.city.trim() !== '' && !forbiddenCharRegex.test(placeData.city) &&
-                        placeData.country_name && typeof placeData.country_name === 'string' && placeData.country_name.trim() !== '' && !forbiddenCharRegex.test(placeData.country_name)) {
-                        const cityClean = placeData.city.trim();
-                        const countryClean = placeData.country_name.trim();
-                        const key = `${cityClean.toLowerCase()}|${countryClean.toLowerCase()}`;
-                        if (!uniquePlacesMap.has(key)) {
-                            uniquePlacesMap.set(key, { city: cityClean, country_name: countryClean });
-                        }
-                    }
-                });
-            }
-            allPlaces = Array.from(uniquePlacesMap.values());
-
-            countries.clear();
-            allPlaces.forEach(place => {
-                if (place.country_name) {
-                    countries.add(place.country_name);
+        function expandPlaceDictionary({ countries, runs }) {
+            const places = [];
+            const nextCityIndexes = countries.map(() => 0);
+            for (const [countryIndex, count] of runs) {
+                const [country, cities] = countries[countryIndex];
+                const first = nextCityIndexes[countryIndex];
+                const end = first + count;
+                for (let cityIndex = first; cityIndex < end; cityIndex++) {
+                    places.push({ city: cities[cityIndex], country_name: country });
                 }
-            });
-            const sortedCountries = Array.from(countries).sort();
+                nextCityIndexes[countryIndex] = end;
+            }
+            return places;
+        }
+
+        function initGame() {
+            const dictionary = typeof placeDictionary === 'undefined' ? { countries: [], runs: [] } : placeDictionary;
+            allPlaces = expandPlaceDictionary(dictionary);
+            const sortedCountries = dictionary.countries.map(([country]) => country).sort();
+            const hasUnitedStates = sortedCountries.includes('United States');
 
             const letterOptionsFragment = document.createDocumentFragment();
             for (let i = 65; i <= 90; i++) {
@@ -698,7 +691,7 @@
             anyCountryOptionForSearch.selected = true;
             searchCountryOptionsFragment.appendChild(anyCountryOptionForSearch);
 
-            if (countries.has("United States")) {
+            if (hasUnitedStates) {
                 const usOption = document.createElement('option');
                 usOption.value = "United States";
                 usOption.textContent = "United States";
@@ -727,7 +720,7 @@
             anyCountryOptionForGame.textContent = 'Any Country';
             gameCountryOptionsFragment.appendChild(anyCountryOptionForGame);
 
-            if (countries.has("United States")) {
+            if (hasUnitedStates) {
                 const usOption = document.createElement('option');
                 usOption.value = "United States";
                 usOption.textContent = "United States";
