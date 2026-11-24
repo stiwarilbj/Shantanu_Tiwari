@@ -582,7 +582,7 @@
         let gameActive = false;
         let guessedPlaces = [];
         let filteredPlaces = [];
-        const exactPlaces = new Map();
+        const roundPlaceGroups = new Map();
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
         let restoringRound = false;
@@ -863,17 +863,21 @@
 
         function setRoundPlaces(places) {
             filteredPlaces = filterRoundPlaces(places);
-            exactPlaces.clear();
+            roundPlaceGroups.clear();
             const needsCountry = currentGameMode === 'placeAndCountry';
             filteredPlaces.forEach((place, index) => {
-                let placesByName = exactPlaces;
-                if (needsCountry) {
-                    const country = place.country_name.toLowerCase();
-                    if (!exactPlaces.has(country)) exactPlaces.set(country, new Map());
-                    placesByName = exactPlaces.get(country);
+                const country = needsCountry ? place.country_name.toLowerCase() : '';
+                let group = roundPlaceGroups.get(country);
+                if (!group) {
+                    group = { byName: new Map(), byLength: new Map() };
+                    roundPlaceGroups.set(country, group);
                 }
                 const city = place.city.toLowerCase();
-                if (!placesByName.has(city)) placesByName.set(city, index);
+                if (group.byName.has(city)) return;
+
+                group.byName.set(city, index);
+                if (!group.byLength.has(city.length)) group.byLength.set(city.length, []);
+                group.byLength.get(city.length).push(city);
             });
         }
 
@@ -996,7 +1000,7 @@
             score = 0;
             guessedPlaces = [];
             filteredPlaces = [];
-            exactPlaces.clear();
+            roundPlaceGroups.clear();
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
             readingSavedState = false;
@@ -1082,70 +1086,59 @@
             const candidatePairs = needsCountry ? parts.slice(0, -1).map((_, index) => [
                 parts.slice(0, index + 1).join(', '),
                 parts.slice(index + 1).join(', '),
-            ]) : [parts];
+            ]) : [[lowerGuess, '']];
 
             // When multiple splits match, keep the first answer in dictionary order.
             let firstIndex = Infinity;
             for (const [guessedCity, guessedCountry] of candidatePairs) {
-                const placesByName = needsCountry ? exactPlaces.get(guessedCountry) : exactPlaces;
-                const index = placesByName?.get(guessedCity);
+                const index = roundPlaceGroups.get(guessedCountry)?.byName.get(guessedCity);
                 if (index !== undefined) firstIndex = Math.min(firstIndex, index);
             }
             if (firstIndex !== Infinity) return filteredPlaces[firstIndex];
 
-            for (const place of filteredPlaces) {
-                const city = place.city.toLowerCase();
-                const country = needsCountry ? place.country_name.toLowerCase() : '';
-                for (const [guessedCity, guessedCountry] of candidatePairs) {
-                    if ((!needsCountry || country === guessedCountry || isCloseMatch(country, guessedCountry)) &&
-                        (city === guessedCity || isCloseMatch(city, guessedCity))) {
-                        return place;
+            for (const [guessedCity, guessedCountry] of candidatePairs) {
+                for (const [country, group] of roundPlaceGroups) {
+                    if (country !== guessedCountry && !isCloseMatch(country, guessedCountry)) continue;
+
+                    for (let length = guessedCity.length - 1; length <= guessedCity.length + 1; length++) {
+                        const cities = group.byLength.get(length);
+                        if (!cities) continue;
+                        for (const city of cities) {
+                            if (city === guessedCity || isCloseMatch(city, guessedCity)) {
+                                // Each bucket lists cities in dictionary order.
+                                firstIndex = Math.min(firstIndex, group.byName.get(city));
+                                break;
+                            }
+                        }
                     }
                 }
             }
-            return null;
+            return firstIndex === Infinity ? null : filteredPlaces[firstIndex];
         }
 
-        function isCloseMatch(str1, str2) {
-            const s1 = str1.toLowerCase();
-            const s2 = str2.toLowerCase();
-            if (Math.abs(s1.length - s2.length) > 1) return false;
+        function isCloseMatch(first, second) {
+            if (Math.abs(first.length - second.length) > 1) return false;
+            if (first.length > second.length) [first, second] = [second, first];
 
-            const distance = levenshteinDistance(s1, s2);
-            if (distance === 1) return true;
+            let firstIndex = 0;
+            while (firstIndex < first.length && first[firstIndex] === second[firstIndex]) firstIndex++;
+            if (firstIndex === first.length) return first.length !== second.length;
 
-            if (s1.length === s2.length && distance === 2) {
-                for (let i = 0; i < s1.length - 1; i++) {
-                    if (s1[i] === s2[i+1] && s1[i+1] === s2[i]) {
-                        const s1Swapped = s1.substring(0, i) + s1[i+1] + s1[i] + s1.substring(i+2);
-                        if (s1Swapped === s2) return true;
-                    }
+            // Skip the extra character in the longer string, or consume a substitution or swap.
+            let secondIndex = firstIndex + 1;
+            if (first.length === second.length) {
+                if (first[firstIndex] === second[secondIndex] && first[secondIndex] === second[firstIndex]) {
+                    secondIndex++;
                 }
+                firstIndex = secondIndex;
             }
-            return false;
-        }
 
-
-        function levenshteinDistance(a, b) {
-            if (a.length === 0) return b.length;
-            if (b.length === 0) return a.length;
-            const matrix = [];
-            for (let i = 0; i <= b.length; i++) {
-                matrix[i] = [i];
+            while (firstIndex < first.length) {
+                if (first[firstIndex] !== second[secondIndex]) return false;
+                firstIndex++;
+                secondIndex++;
             }
-            for (let j = 0; j <= a.length; j++) {
-                matrix[0][j] = j;
-            }
-            for (let i = 1; i <= b.length; i++) {
-                for (let j = 1; j <= a.length; j++) {
-                    if (b.charAt(i-1) === a.charAt(j-1)) {
-                        matrix[i][j] = matrix[i-1][j-1];
-                    } else {
-                        matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, matrix[i][j-1] + 1, matrix[i-1][j] + 1);
-                    }
-                }
-            }
-            return matrix[b.length][a.length];
+            return true;
         }
 
         function showResultMessage(container, message, retry) {
