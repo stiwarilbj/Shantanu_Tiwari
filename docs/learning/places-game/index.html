@@ -822,7 +822,7 @@
             roundRequest++;
             roundLoadState = 'idle';
             const country = roundCountry();
-            if (country !== 'any' && !loadedPlaces.has(country)) prepareRound();
+            if (!loadedPlaces.has(country) && (country !== 'any' || pendingLoads.has(country))) prepareRound();
             else updateStartButton();
         }
 
@@ -920,13 +920,14 @@
 
         startBtn.addEventListener('click', function() {
             if (readingSavedState || roundLoadState === 'loading' || (timeLeft > 0 && !restoringRound)) return;
-            if (restoringRound || startLabel.textContent !== 'Start Game') {
+            const places = loadedPlaces.get(roundCountry());
+            if (restoringRound || !places) {
                 prepareRound();
                 return;
             }
 
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-            filteredPlaces = filterRoundPlaces(loadedPlaces.get(roundCountry()));
+            filteredPlaces = filterRoundPlaces(places);
 
             timeLeft = parseInt(timeSelect.value) * 60;
             score = 0;
