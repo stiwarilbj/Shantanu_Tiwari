@@ -582,6 +582,7 @@
         let gameActive = false;
         let guessedPlaces = [];
         let filteredPlaces = [];
+        const exactPlaces = new Map();
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
         let restoringRound = false;
@@ -860,6 +861,22 @@
             });
         }
 
+        function setRoundPlaces(places) {
+            filteredPlaces = filterRoundPlaces(places);
+            exactPlaces.clear();
+            const needsCountry = currentGameMode === 'placeAndCountry';
+            filteredPlaces.forEach((place, index) => {
+                let placesByName = exactPlaces;
+                if (needsCountry) {
+                    const country = place.country_name.toLowerCase();
+                    if (!exactPlaces.has(country)) exactPlaces.set(country, new Map());
+                    placesByName = exactPlaces.get(country);
+                }
+                const city = place.city.toLowerCase();
+                if (!placesByName.has(city)) placesByName.set(city, index);
+            });
+        }
+
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
             const roundInProgress = timeLeft > 0 && !restoringRound;
@@ -892,7 +909,7 @@
                 if (request !== roundRequest) return;
                 roundLoadState = 'idle';
                 if (restoringRound) {
-                    filteredPlaces = filterRoundPlaces(places);
+                    setRoundPlaces(places);
                     restoringRound = false;
                     pauseBtn.disabled = false;
                 }
@@ -927,7 +944,7 @@
             }
 
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-            filteredPlaces = filterRoundPlaces(places);
+            setRoundPlaces(places);
 
             timeLeft = parseInt(timeSelect.value) * 60;
             score = 0;
@@ -979,6 +996,7 @@
             score = 0;
             guessedPlaces = [];
             filteredPlaces = [];
+            exactPlaces.clear();
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
             readingSavedState = false;
@@ -1065,24 +1083,27 @@
                 parts.slice(0, index + 1).join(', '),
                 parts.slice(index + 1).join(', '),
             ]) : [parts];
-            let typoMatch = null;
+
+            // When multiple splits match, keep the first answer in dictionary order.
+            let firstIndex = Infinity;
+            for (const [guessedCity, guessedCountry] of candidatePairs) {
+                const placesByName = needsCountry ? exactPlaces.get(guessedCountry) : exactPlaces;
+                const index = placesByName?.get(guessedCity);
+                if (index !== undefined) firstIndex = Math.min(firstIndex, index);
+            }
+            if (firstIndex !== Infinity) return filteredPlaces[firstIndex];
+
             for (const place of filteredPlaces) {
                 const city = place.city.toLowerCase();
                 const country = needsCountry ? place.country_name.toLowerCase() : '';
                 for (const [guessedCity, guessedCountry] of candidatePairs) {
-                    const exactCity = city === guessedCity;
-                    const exactCountry = !needsCountry || country === guessedCountry;
-                    if (exactCity && exactCountry) return place;
-
-                    // Keep a typo match in case the filtered list has no exact answer.
-                    if (!typoMatch &&
-                        (exactCountry || isCloseMatch(country, guessedCountry)) &&
-                        (exactCity || isCloseMatch(city, guessedCity))) {
-                        typoMatch = place;
+                    if ((!needsCountry || country === guessedCountry || isCloseMatch(country, guessedCountry)) &&
+                        (city === guessedCity || isCloseMatch(city, guessedCity))) {
+                        return place;
                     }
                 }
             }
-            return typoMatch;
+            return null;
         }
 
         function isCloseMatch(str1, str2) {
