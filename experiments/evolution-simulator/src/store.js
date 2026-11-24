@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
 import { dawnForRun, founders, snapshot } from './engine/simulation.js'
+import { validTraitAdjustment } from './engine/trait-adjustments.js'
 import { DT, clamp } from './engine/geometry.js'
 import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
 import { adjacentFrameTime, prepareTrack, trackFrame } from './track.js'
@@ -79,6 +80,7 @@ export const useLab = defineStore('lab', () => {
   const loading = computed(() => replayDay.value != null)
   const batch = shallowRef(null), saved = ref(0), error = ref('')
   const workerReady = ref(false), connecting = ref(false), workerError = ref('')
+  const pending = ref(false), adjustingTraits = ref(false), traitAdjustmentError = ref('')
   const selected = ref(null), following = ref(false)
   const settings = ref(false), draft = ref(null), modal = ref(null), targetDay = ref(null), branchFrom = ref(null)
   const branchRequest = shallowRef(null)
@@ -95,6 +97,10 @@ export const useLab = defineStore('lab', () => {
   const liveDay = computed(() => liveFrame.value?.day ?? completed.value + 1)
   const canEnterLive = computed(() => workerReady.value && !batch.value && !extinctDay.value &&
     completed.value < (run.value?.setup.days ?? 0))
+  const canOpenTraitAdjustment = computed(() => canEnterLive.value && !replay.value && !loading.value &&
+    frame.value?.day > completed.value && !dayEnded.value && frame.value.blobs.some(blob => blob.alive))
+  const canAdjustTraits = computed(() => canOpenTraitAdjustment.value && !playing.value && !pending.value &&
+    !adjustingTraits.value && frame.value === liveFrame.value)
   const canMoveNext = computed(() => viewing.value < completed.value ||
     (viewing.value === completed.value && canEnterLive.value))
   const status = computed(() => {
@@ -112,7 +118,7 @@ export const useLab = defineStore('lab', () => {
   let writer, ticket = 0, cache = new Map(), track, epoch = 0, finishConnection
   let runRequest = 0, request = 0, batchViewRequest = 0
   let playThroughRequest = null
-  let pending = false, requestedDawn = false, autoPrepare = false, restorePlay = false
+  let requestedDawn = false, autoPrepare = false, restorePlay = false, adjustmentTimer
   let cursor = 0, previous = 0, remainder = 0, renderAt = 0
   let raf, initialised = false, waiting = null
   let persistQueue = Promise.resolve()
@@ -141,6 +147,11 @@ export const useLab = defineStore('lab', () => {
     writer = undefined
     finishConnection?.(false)
     workerReady.value = false
+    if (adjustingTraits.value) {
+      clearTimeout(adjustmentTimer)
+      adjustingTraits.value = false
+      traitAdjustmentError.value = 'The live worker stopped before the adjustment was confirmed.'
+    }
   }
 
   function reportFailure(message) {
@@ -150,7 +161,7 @@ export const useLab = defineStore('lab', () => {
       : ' The unfinished day will restart when you retry.'
     workerError.value = message + recovery
     disconnect()
-    pending = false
+    pending.value = false
     requestedDawn = false
     autoPrepare = false
     waiting = null
@@ -207,7 +218,25 @@ export const useLab = defineStore('lab', () => {
   }
 
   function receive(data) {
-    if (data.type === 'advanced') pending = false
+    if (data.type === 'advanced') pending.value = false
+    if (data.type === 'trait-adjustment') {
+      clearTimeout(adjustmentTimer)
+      if (data.error) {
+        adjustingTraits.value = false
+        traitAdjustmentError.value = data.error
+      } else {
+        const token = epoch
+        run.value = { ...run.value, partial: data.partial,
+          traitAdjustments: [...(run.value.traitAdjustments ?? []), data.adjustment] }
+        liveFrame.value = data.frame
+        void persist().then(() => {
+          if (token !== epoch) return
+          showLiveFrame(data.frame)
+          adjustingTraits.value = false
+          if (modal.value === 'traits') modal.value = null
+        })
+      }
+    }
     if (data.type === 'frame') {
       liveFrame.value = data.frame
       if (data.partial) {
@@ -282,7 +311,7 @@ export const useLab = defineStore('lab', () => {
       })
     } else if (run.value && writer) {
       const oldWriter = writer
-      if (!replay.value && liveFrame.value?.time > 0 && !hasEnded(liveFrame.value)) {
+      if (adjustingTraits.value || !replay.value && liveFrame.value?.time > 0 && !hasEnded(liveFrame.value)) {
         await new Promise(resolve => {
           const timeout = setTimeout(finish, 150)
           function finish() { clearTimeout(timeout); oldWriter.removeEventListener('message', onPartial); resolve() }
@@ -313,7 +342,7 @@ export const useLab = defineStore('lab', () => {
     cache = new Map()
     track = null
     replay.value = false
-    pending = false
+    pending.value = false
     requestedDawn = false
     waiting = null
     batch.value = null
@@ -323,6 +352,7 @@ export const useLab = defineStore('lab', () => {
     following.value = false
     scope.value = 'all'
     through.value = value.setup.mode === 'live'
+    if (modal.value === 'traits') modal.value = null
     run.value = value
     error.value = ''
     workerError.value = ''
@@ -444,7 +474,7 @@ export const useLab = defineStore('lab', () => {
       }
       watchForProgress()
       try {
-        job.postMessage({ type: 'replay', id, setup: value.setup, records: value.revisions,
+        job.postMessage({ type: 'replay', id, setup: value.setup, records: value.revisions, traitAdjustments: value.traitAdjustments,
           start: start.day + 1, checkpoint: start, day })
       } catch { stopped() }
     })
@@ -525,6 +555,7 @@ export const useLab = defineStore('lab', () => {
     stopPlayback()
     replay.value = false
     through.value = true
+    if (run.value.traitAdjustments?.some(edit => edit.day === completed.value + 1)) restart = false
     if (restart && liveFrame.value?.day > completed.value && liveFrame.value.time > 0) {
       const day = completed.value + 1
       const { setup, revisions, latest } = run.value
@@ -565,7 +596,7 @@ export const useLab = defineStore('lab', () => {
 
   function play() {
     if (playing.value || waiting) { stopPlayback(); return }
-    if (loading.value || !frame.value || (!replay.value && (!workerReady.value || batch.value))) return
+    if (loading.value || !frame.value || (!replay.value && (!workerReady.value || batch.value || adjustingTraits.value))) return
     if (replay.value && cursor >= displayDuration.value) seek(0)
     else if (!replay.value && dayEnded.value) {
       if (extinctDay.value || completed.value >= run.value.setup.days) { void openDay(completed.value, 0, true); return }
@@ -578,10 +609,27 @@ export const useLab = defineStore('lab', () => {
   function stepOnce() {
     stopPlayback()
     if (replay.value) seek(cursor + (track?.stepSeconds ?? DT))
-    else if (canEnterLive.value && !loading.value && !pending && frame.value && !dayEnded.value) {
-      pending = true
+    else if (canEnterLive.value && !loading.value && !pending.value && !adjustingTraits.value && frame.value && !dayEnded.value) {
+      pending.value = true
       writer.postMessage({ type: 'advance', ticks: 1, savePartial: true })
     }
+  }
+
+  function openTraitAdjustment() {
+    if (!canOpenTraitAdjustment.value) return
+    stopPlayback()
+    traitAdjustmentError.value = ''
+    modal.value = 'traits'
+  }
+
+  function adjustTraits(changes) {
+    if (!canAdjustTraits.value || !validTraitAdjustment(changes)) return
+    const { day, time, stepSeconds } = frame.value
+    adjustingTraits.value = true
+    traitAdjustmentError.value = ''
+    adjustmentTimer = setTimeout(() => reportFailure('The trait adjustment timed out.'), WORKER_STARTUP_TIMEOUT)
+    try { writer.postMessage({ type: 'adjust-traits', day, tick: Math.round(time / stepSeconds), changes }) }
+    catch { reportFailure('The trait adjustment could not reach the simulation.') }
   }
 
   function moveDay(delta) {
@@ -610,10 +658,10 @@ export const useLab = defineStore('lab', () => {
       } else if (!batch.value) {
         remainder = Math.min(0.4, remainder + delta)
         const seconds = liveFrame.value?.stepSeconds ?? DT
-        if (remainder >= seconds && !pending) {
+        if (remainder >= seconds && !pending.value) {
           const ticks = Math.floor(remainder / seconds)
           remainder -= ticks * seconds
-          pending = true
+          pending.value = true
           writer.postMessage({ type: 'advance', ticks })
         }
       }
@@ -622,7 +670,7 @@ export const useLab = defineStore('lab', () => {
   }
 
   function simulate(target, label = 'Quick Sim') {
-    if (!canEnterLive.value || !Number.isInteger(target) || target <= completed.value || target > run.value.setup.days) return false
+    if (!canEnterLive.value || adjustingTraits.value || !Number.isInteger(target) || target <= completed.value || target > run.value.setup.days) return false
     if (!replay.value) stopPlayback()
     batchViewRequest = request
     batch.value = { target, start: completed.value, label, stopping: false }
@@ -771,6 +819,7 @@ export const useLab = defineStore('lab', () => {
       const after = await checkpointAt(base, day)
       if (!current() || run.value?.id !== base.id) return
       const value = { ...makeRun(setup), source: base.id, forkDay: day, latest: after,
+        traitAdjustments: base.traitAdjustments?.filter(edit => edit.day <= day) ?? [],
         summaries: base.summaries.filter(r => r.day <= day),
         checkpoints: [...base.checkpoints.filter(c => c.day < day), { day, ...after }],
         revisions: [...(base.revisions.length ? base.revisions.filter(r => r.day <= day) : [{ day: 1, setup: base.setup }]),
@@ -791,6 +840,7 @@ export const useLab = defineStore('lab', () => {
   }
 
   return { run, library, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
+    canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
     canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
     stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,

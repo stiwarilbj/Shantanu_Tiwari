@@ -10,6 +10,7 @@ import { openingHabitat } from './habitat.js'
 import { agingRules, oldAgeRisk, travelSpeedPercent } from './aging.js'
 import { DECISION, foragingDecisionsFor, tracksForagingDecisions } from './foraging-decisions.js'
 import { startingPose, territoryPositions } from './starting-territories.js'
+import { adjustedTrait } from './trait-adjustments.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -32,8 +33,16 @@ function standardSpawn(blob, i, count, edges, seed, day, refugeWidth) {
   return startingPose(blob, edge, along, refugeWidth, seed, day)
 }
 
-export function dawnForRun(setup, revisions, day, checkpoint) {
-  return dawn(rulesFor(setup, revisions, day), day, checkpoint, rulesFor(setup, revisions, day - 1))
+export function dawnForRun(setup, revisions, day, checkpoint, adjustments) {
+  const rules = rulesFor(setup, revisions, day)
+  const state = dawn(rules, day, checkpoint, rulesFor(setup, revisions, day - 1))
+  const scheduled = adjustments?.filter(edit => edit.day === day)
+  if (scheduled?.length) {
+    state.scheduledAdjustments = scheduled
+    state.nextAdjustment = 0
+    applyScheduledAdjustments(state, rules)
+  }
+  return state
 }
 
 export function dawn(config, day, checkpoint, previous = config) {
@@ -56,12 +65,10 @@ export function dawn(config, day, checkpoint, previous = config) {
       : standardSpawn({ id: original.id, r }, slots.get(original.id), roster.length, edges, config.seed, day, refugeWidth))
     const settings = species.get(original.species)
     const energy = settings.energy
-    const speedMultiplier = travelSpeedPercent(agingRules(config, settings), original.age) / 100
-    const moveCost = walkthrough ? walkthroughStepCost(original, config) : null
+    const movement = movementTraits(original, config, settings, stepSeconds)
     return { ...original, ...position, r, energy, capacity: energy, credits: 0, preyCredits: 0,
       state: 0, alive: true, home: false, returning: false, target: null,
-      velocityX: 0, velocityY: 0, rate: walkthrough ? moveCost / stepSeconds : cost(original, config),
-      speedWorld: travel(original, config) * speedMultiplier, moveCost,
+      velocityX: 0, velocityY: 0, ...movement,
       ...(trackDecisions && {
         foragingSettings: foragingDecisionsFor(config, settings),
         foragingDecision: DECISION.searching,
@@ -77,6 +84,39 @@ export function dawn(config, day, checkpoint, previous = config) {
 function record(ctx, blob, time, type, extra = {}) {
   ctx.events.push({ day: ctx.day, time, type, id: blob.id, species: blob.species, age: blob.age,
     x: blob.x, y: blob.y, energy: blob.energy, ...extra })
+}
+
+function movementTraits(blob, config, species, stepSeconds) {
+  const speedMultiplier = travelSpeedPercent(agingRules(config, species), blob.age) / 100
+  const moveCost = config.metabolism === 'walkthrough' ? walkthroughStepCost(blob, config) : null
+  return { speedWorld: travel(blob, config) * speedMultiplier, moveCost,
+    rate: moveCost == null ? cost(blob, config) : moveCost / stepSeconds }
+}
+
+export function applyTraitAdjustment(ctx, config, changes) {
+  if (ctx.settled) return 0
+  const species = new Map(config.species.map(s => [s.id, s]))
+  const time = ctx.tick * ctx.stepSeconds
+  let affected = 0
+  for (const blob of ctx.blobs) {
+    if (!blob.alive) continue
+    const [speed, size, sense] = TRAITS.map(trait => adjustedTrait(blob, trait, changes[trait], config))
+    if (speed === blob.speed && size === blob.size && sense === blob.sense) continue
+    const traits = { speed, size, sense, r: radius(size),
+      ...movementTraits({ ...blob, speed, size, sense }, config, species.get(blob.species), ctx.stepSeconds) }
+    Object.assign(blob, traits)
+    record(ctx, blob, time, 'traits', { traits })
+    affected++
+  }
+  return affected
+}
+
+function applyScheduledAdjustments(ctx, config) {
+  let edit = ctx.scheduledAdjustments?.[ctx.nextAdjustment]
+  while (edit?.tick === ctx.tick) {
+    applyTraitAdjustment(ctx, config, edit.changes)
+    edit = ctx.scheduledAdjustments[++ctx.nextAdjustment]
+  }
 }
 
 function kill(ctx, blob, time, cause, extra) {
@@ -303,6 +343,18 @@ function tick(ctx, config) {
 }
 
 export function step(ctx, config, count = 1, skipIdle = false) {
+  if (!ctx.scheduledAdjustments?.[ctx.nextAdjustment]) return advance(ctx, config, count, skipIdle)
+  const end = ctx.tick + count
+  while (ctx.scheduledAdjustments[ctx.nextAdjustment]?.tick <= end) {
+    const edit = ctx.scheduledAdjustments[ctx.nextAdjustment]
+    const result = advance(ctx, config, edit.tick - ctx.tick, skipIdle)
+    if (result) return result
+    applyScheduledAdjustments(ctx, config)
+  }
+  return advance(ctx, config, end - ctx.tick, skipIdle)
+}
+
+function advance(ctx, config, count, skipIdle) {
   if (ctx.settled) return ctx.settled
   const limit = stepLimit(ctx, config)
   const stop = Math.min(limit, ctx.tick + count)

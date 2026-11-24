@@ -98,6 +98,7 @@ function show(view) {
   })
 }
 function beginNavigation() {
+  if (lab.modal==='traits') lab.modal=null
   if (lab.branchPreparing != null) {
     if (lab.settings) lab.closeSettings(false)
     else {
@@ -352,7 +353,7 @@ onUnmounted(() => {
       <Settings v-if="lab.settings"/>
       <Tour v-if="lab.modal==='tour'" @close="lab.modal=null" @world="lab.modal=null; go('viewer')"
         @walkthrough="lab.modal=null; lesson='opening'; go('about')"/>
-      <RunDialog v-else-if="lab.modal && !lab.settings" @compare="compare" @watch="watchDay"
+      <RunDialog v-else-if="lab.modal && lab.modal!=='traits' && !lab.settings" @compare="compare" @watch="watchDay"
         @resume="openRun($event, 'viewer')" @results="openRun($event, 'stats')" @batch-results="openBatchResults"/>
     </template>
     <p v-else class="startup" role="status">Opening the lab…</p>

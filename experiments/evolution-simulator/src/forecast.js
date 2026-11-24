@@ -12,14 +12,14 @@ export function forecastCheckpoint(run, end) {
     : run.checkpoints.findLast(point => point.day <= end)
 }
 
-export function simulateForecast({ setup, revisions, checkpoint, start, end, target }, progress = () => {}) {
+export function simulateForecast({ setup, revisions, checkpoint, start, end, target, traitAdjustments }, progress = () => {}) {
   const summaries = []
   let through = start
   let lastProgress = performance.now()
 
   for (let day = start + 1; day <= target && checkpoint.roster.length; day++) {
     const rules = rulesFor(setup, revisions, day)
-    const state = dawnForRun(setup, revisions, day, checkpoint)
+    const state = dawnForRun(setup, revisions, day, checkpoint, traitAdjustments)
     let result
     do {
       result = step(state, rules, 20, true)

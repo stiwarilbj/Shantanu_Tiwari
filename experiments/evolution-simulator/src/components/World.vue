@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Copy, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
@@ -11,11 +11,12 @@ import { cost, edgePoint, homePoints, radius, refugeDistance, travel, walkthroug
 import Board from './Board.vue'
 import Flower from './Flower.vue'
 import Ribbon from './Ribbon.vue'
+import TraitAdjustment from './TraitAdjustment.vue'
 
 const props = defineProps({ active: Boolean })
 const lab = useLab()
 const emit = defineEmits(['reroll', 'fullscreen-change'])
-const board = ref(), surface = ref(), fullscreenActive = ref(false)
+const board = ref(), surface = ref(), fullscreenActive = ref(false), playbackActions = ref()
 const tool = ref(null), camera = ref('board'), quality = ref('auto'), details = ref(false)
 const copyState = shallowRef(null)
 const eventFilter = ref('all')
@@ -157,6 +158,7 @@ function eventName(e) {
   if (e.type === 'plant') return 'Ate a plant'
   if (e.type === 'prey') return 'Hunted #'+e.target
   if (e.type === 'home') return 'Reached refuge'
+  if (e.type === 'traits') return 'Traits adjusted'
   return e.id===lab.selected ? 'Born to '+parentNames(e) : 'Offspring #'+e.id
 }
 function parentNames({ parent, secondParent }) {
@@ -180,6 +182,11 @@ async function copyStats() {
 }
 watch([details, () => lab.run.id, () => lab.frame?.day, () => visible.value?.id], () => { copyState.value = null })
 watch(() => lab.run.id, () => { details.value=false; tool.value=null; layers.value.cohortSense=false; fit() })
+watch(() => lab.modal, async (current, previous) => {
+  if (current || previous !== 'traits' || !props.active) return
+  await nextTick()
+  playbackActions.value?.focus()
+})
 watch(() => visible.value?.id, id => {
   if (id == null) layers.value.selected = false
 })
@@ -267,7 +274,7 @@ defineExpose({ select, overhead })
       </div>
       <div class="player-actions">
         <button class="quick" :disabled="!!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch ? 'quick-progress' : 'quick'"><FastForward :size="15" fill="currentColor"/>{{ quickLabel }}</button>
-        <button class="icon" aria-label="Playback actions" title="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
+        <button ref="playbackActions" class="icon" aria-label="Playback actions" title="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
         <button class="icon" aria-label="Viewing speed" :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" @click="toggle('rate')"><Clock :size="21"/></button>
       </div>
       <div v-if="tool==='rate'" class="pop rate-panel">
@@ -282,6 +289,7 @@ defineExpose({ select, overhead })
       <div v-if="tool==='player'" class="pop player-menu">
         <button :disabled="!canAdvanceDay" @click="endDay">{{ lab.replay ? 'Go to end' : 'Finish Day' }}</button>
         <button :disabled="!canAdvanceDay" @click="lab.stepOnce(); tool=null">Step one tick</button>
+        <button :disabled="!lab.canOpenTraitAdjustment" @click="lab.openTraitAdjustment(); tool=null">Adjust living traits</button>
         <button v-if="lab.completed" @click="lab.openDay(lab.completed); tool=null">Go to frontier</button>
         <button v-if="lab.replay && lab.canEnterLive" @click="lab.goLive(); tool=null">Back to Live</button>
       </div>
@@ -316,7 +324,7 @@ defineExpose({ select, overhead })
           ]" :key="name"><dt>{{ name }}</dt><dd>{{ value }}</dd></template></dl>
           <h3>Events</h3>
           <select v-model="eventFilter" aria-label="Filter creature events">
-            <option v-for="[type,label] in [['all','All events'],['plant','Plants'],['prey','Hunts'],['home','Refuge'],['death','Deaths'],['birth','Births']]" :key="type" :value="type">{{ label }}</option>
+            <option v-for="[type,label] in [['all','All events'],['plant','Plants'],['prey','Hunts'],['home','Refuge'],['death','Deaths'],['birth','Births'],['traits','Trait adjustments']]" :key="type" :value="type">{{ label }}</option>
           </select>
           <p v-if="!visibleEvents.length" class="quiet">No matching events at this point in the day.</p>
           <button v-for="(event,index) in visibleEvents" :key="index" class="event-row" :disabled="!lab.replay" @click="lab.seek(event.time)">
@@ -352,5 +360,6 @@ defineExpose({ select, overhead })
       </div>
     </div>
     <Ribbon :active="props.active" @reroll="emit('reroll')" @table="lab.modal='table'"/>
+    <TraitAdjustment v-if="props.active && lab.modal==='traits'"/>
   </main>
 </template>

@@ -1,5 +1,6 @@
-import { dawnForRun, founders, step, snapshot } from './simulation.js'
+import { applyTraitAdjustment, dawnForRun, founders, step, snapshot } from './simulation.js'
 import { rulesFor } from './config.js'
+import { validTraitAdjustment } from './trait-adjustments.js'
 import { simulateForecast } from '../forecast.js'
 import { tracksForagingDecisions } from './foraging-decisions.js'
 import { TRACK_FIELDS } from '../track.js'
@@ -55,7 +56,7 @@ async function batch(target) {
 }
 
 async function replay(message) {
-  const { setup, start, day, records, id } = message
+  const { setup, start, day, records, id, traitAdjustments } = message
   let lastProgress = performance.now()
   function advanceReplay(state, rules, end) {
     while (!state.settled && state.tick < end) {
@@ -70,12 +71,12 @@ async function replay(message) {
   let at = message.checkpoint
   for (let i = start; i < day; i++) {
     const rules = rulesFor(setup, records, i)
-    const ctx = dawnForRun(setup, records, i, at)
+    const ctx = dawnForRun(setup, records, i, at, traitAdjustments)
     advanceReplay(ctx, rules, Infinity)
     at = ctx.settled.checkpoint
     await pause()
   }
-  const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at)
+  const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at, traitAdjustments)
   const startFrame = snapshot(state)
   const opening = structuredClone(startFrame.blobs)
   const plants = state.plants.map(p => ({ id: p.id, x: p.x, y: p.y }))
@@ -130,6 +131,19 @@ async function replay(message) {
     opening, plants, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
 }
 
+function adjustTraits({ day, tick, changes }) {
+  if (busy || !canAdvance() || day !== committed + 1 || tick !== current().tick) {
+    emit('trait-adjustment', { error: 'The live day has moved on. Check the preview and try again.' })
+    return
+  }
+  const state = current()
+  if (!validTraitAdjustment(changes) || !applyTraitAdjustment(state, rulesFor(config, records, day), changes)) {
+    emit('trait-adjustment', { error: 'Enter an adjustment that changes at least one living blob.' })
+    return
+  }
+  emit('trait-adjustment', { adjustment: { day, tick, changes }, partial: state, frame: snapshot(state) })
+}
+
 self.onmessage = async ({ data }) => {
   try {
     switch (data.type) {
@@ -169,6 +183,7 @@ self.onmessage = async ({ data }) => {
           show()
         }
         break
+      case 'adjust-traits': adjustTraits(data); break
       case 'batch': if (!busy) await batch(data.target); break
       case 'stop': stopped = true; break
       case 'extend': config.days = data.days; break

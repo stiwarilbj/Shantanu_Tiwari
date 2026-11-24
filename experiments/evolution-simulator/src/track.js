@@ -34,8 +34,10 @@ export function trackFrame(track, time) {
     let credits = 0, preyCredits = 0, state = frames[p + 5]
     let from = { time:aTime, x:frames[p], y:frames[p+1], energy:frames[p+3] }
     let to = { time:bTime, x:frames[q], y:frames[q+1], energy:frames[q+3] }
+    const traits = events?.findLast(event => event.type === 'traits' && event.time <= time + 1e-9)?.traits
     let terminal
     if (events) for (const event of events) {
+      if (event.type === 'traits') continue
       if (event.time > time) {
         if (event.time <= bTime && event.type!=='birth') to = { ...event, energy:event.beforeEnergy ?? event.energy }
         break
@@ -50,7 +52,7 @@ export function trackFrame(track, time) {
     if (terminal) state = terminal.type === 'death' ? 6 : 5
     const delta = frames[q + 2] - frames[p + 2]
     const angle = frames[p + 2] + Math.atan2(Math.sin(delta), Math.cos(delta)) * (time-aTime)/(bTime-aTime || 1)
-    return { ...blob, x:blend('x'), y:blend('y'), angle, energy:Math.max(0,blend('energy')),
+    return { ...blob, ...traits, x:blend('x'), y:blend('y'), angle, energy:Math.max(0,blend('energy')),
       ...(fields > TRACK_FIELDS && {
         foragingDecision: frames[p + TRACK_FIELDS],
         foragingSavings: frames[p + TRACK_FIELDS + 1],

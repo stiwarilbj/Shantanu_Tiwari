@@ -95,6 +95,7 @@ function requestForecast(entry, request) {
       heartbeat()
       worker.postMessage({
         type: 'forecast', setup: toRaw(run.setup), revisions: toRaw(run.revisions),
+        traitAdjustments: toRaw(run.traitAdjustments),
         start: entry.through, end, target, checkpoint: toRaw(entry.checkpoint),
       })
     } catch {
@@ -110,7 +111,8 @@ export function useForecast(getRun, getVisibleRows, isActive = () => true) {
     if (!run) return null
     const end = forecastEndpoint(getVisibleRows())
     if (end == null || !run.summaries[end - 1]?.rows.all.population) return null
-    const model = JSON.stringify([run.id, rulesKey(run.setup), run.revisions.map(({ day, setup }) => [day, rulesKey(setup)])])
+    const model = JSON.stringify([run.id, rulesKey(run.setup), run.revisions.map(({ day, setup }) => [day, rulesKey(setup)]),
+      run.traitAdjustments ?? []])
     return { key: `${model}:${end}`, model, run, end, target: end + forecastPreferences.cycles }
   })
   const entry = shallowRef(null)
