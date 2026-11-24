@@ -74,6 +74,7 @@ export const TERRITORY_FIELDS = [
   { key: 'width', label: 'Band width (%)', min: 5, max: 100 },
 ]
 export const ADVANCED_DEFAULTS = Object.freeze({ mealRefills: true, breeding: true, customForaging: true })
+export const MUTATION_DEFAULTS = Object.freeze({ speed: true, size: true, sense: true })
 export const INHERITANCE_DEFAULTS = Object.freeze({
   mutationPattern: 'normal',
   mutationChance: Object.freeze({ speed: 100, size: 100, sense: 100 }),
@@ -141,7 +142,7 @@ export function speciesTemplate(id, name, color, count = 10, enabled = true, ver
     ...(usesReproductionRules({ version }) && {
       inheritance: { ...INHERITANCE_DEFAULTS, mutationChance: { ...INHERITANCE_DEFAULTS.mutationChance } },
     }),
-    mutation: { speed: true, size: true, sense: true } }
+    mutation: { ...MUTATION_DEFAULTS } }
 }
 
 export function starter(version = VERSION) {

@@ -1,7 +1,7 @@
 import { runSpecies } from './engine/species-actions.js'
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
 import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
-  REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
+  MUTATION_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
   usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
@@ -91,7 +91,9 @@ export function setupLink(setup) {
           ? { foragingDecisions: undefined, fd: packForaging(item.foragingDecisions) }
           : {}
         const placement = territories && item.territory ? { territory: undefined, tt: packTerritory(item.territory) } : {}
-        return { ...item, ...aging, ...decisions, ...placement, inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
+        return { ...item, ...aging, ...decisions, ...placement,
+          mutation: omitDefaults(item.mutation, MUTATION_DEFAULTS),
+          inheritance: omitDefaults({ mutationPattern, mutationChance }, INHERITANCE_DEFAULTS) }
       }),
     }
   }
@@ -106,10 +108,11 @@ export function setupFromLink(hash) {
   if(!hash.startsWith('#/setup/')) return null
   const token=hash.slice(8)
   const bytes=Uint8Array.from(atob(token.replaceAll('-','+').replaceAll('_','/')),c=>c.charCodeAt(0))
-  const setup = JSON.parse(new TextDecoder().decode(bytes))
+  let setup = JSON.parse(new TextDecoder().decode(bytes))
   // Share links omit defaults to keep common configurations within the URL limit.
   if (!setup || !usesReproductionRules(setup) || !Array.isArray(setup.species) ||
       !setup.species.every(item => item && typeof item === 'object')) return setup
+  setup = { ...setup, species: setup.species.map(item => ({ ...item, mutation: { ...MUTATION_DEFAULTS, ...item.mutation } })) }
   if (!usesForagingDecisionRules(setup)) return setupWithRuleDefaults(setup)
   const decoded = { ...unpackForaging(setup), species: setup.species.map(unpackForaging) }
   if (!usesTerritoryRules(setup)) return setupWithRuleDefaults(decoded)

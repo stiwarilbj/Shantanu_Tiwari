@@ -3,7 +3,7 @@ import test from 'node:test'
 import { starter } from '../src/engine/config.js'
 import { applySpeciesAction, applyTraitAdjustment, dawnForRun, founders, snapshot, step } from '../src/engine/simulation.js'
 import { newSpecies, runSpecies, speciesActionIssue, splitSample, validSpeciesHistory } from '../src/engine/species-actions.js'
-import { csv } from '../src/export.js'
+import { csv, setupFromLink, setupLink } from '../src/export.js'
 import { simulateForecast } from '../src/forecast.js'
 
 function experiment() {
@@ -24,6 +24,21 @@ test('creating and duplicating species uses unique identities and independent in
   assert.equal(source.mutation.speed, true)
   assert.equal(source.inheritance.mutationChance.speed, 100)
   assert.equal(newSpecies([...setup.species, copy], setup.version, null, 'Wide sight').sense, 40)
+})
+
+test('a compact setup link keeps four species and their custom mutation rules on GitHub Pages', t => {
+  Object.defineProperty(globalThis, 'location', {
+    value: new URL('https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/'), configurable: true,
+  })
+  t.after(() => { delete globalThis.location })
+  const setup = experiment()
+  const copy = newSpecies(setup.species, setup.version, setup.species[0])
+  copy.mutation.speed = false
+  copy.inheritance.mutationChance.size = 40
+  setup.species.push(copy)
+  const link = setupLink(setup)
+  assert.ok(link)
+  assert.deepEqual(setupFromLink(new URL(link).hash), setup)
 })
 
 test('live species edits preserve identity and catch up identically in scheduled runs and forecasts', () => {
