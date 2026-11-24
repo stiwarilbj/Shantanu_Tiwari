@@ -57,14 +57,20 @@ watchEffect(() => {
   for (const plant of habitat.plants) circle(plant.x, plant.y, 3.5)
 }, { flush: 'post' })
 
-function addAnchor() {
-  const used = new Set(draft.schedule.map(point => point.day))
+const validRunLength = computed(() => Number.isInteger(draft.days) && draft.days >= 10 && draft.days <= 1000)
+const nextScheduleDay = computed(() => {
+  if (!validRunLength.value) return null
+  const used = new Set(draft.schedule.map(point => point.day)
+    .filter(day => Number.isInteger(day) && day >= 2 && day <= draft.days))
   let day = Math.max(1, ...used) + 1
   if (day > draft.days) {
     day = 2
     while (day <= draft.days && used.has(day)) day++
   }
-  if (day <= draft.days) draft.schedule.push({ day, food: draft.food })
+  return day <= draft.days ? day : null
+})
+function addAnchor() {
+  if (nextScheduleDay.value !== null) draft.schedule.push({ day: nextScheduleDay.value, food: draft.food })
 }
 </script>
 
@@ -72,7 +78,7 @@ function addAnchor() {
   <div v-if="topic === 'food'" class="advanced-block">
     <h3>Plant supply</h3>
     <label class="advanced-select">Food schedule
-      <select id="schedule" v-model="draft.scheduleMode" @change="delete issue.schedule">
+      <select id="schedule" v-model="draft.scheduleMode">
         <option value="constant">Constant (schedule off)</option><option value="ramp">Ramp</option><option value="step">Step</option>
       </select>
     </label>
@@ -85,9 +91,13 @@ function addAnchor() {
       </div>
       <p v-if="issue.schedule" class="issue">{{ issue.schedule }}</p>
       <div class="advanced-actions">
-        <button type="button" class="secondary" @click="addAnchor">Add point</button>
+        <button type="button" class="secondary" :disabled="nextScheduleDay === null"
+          :aria-describedby="nextScheduleDay === null ? 'schedule-capacity' : undefined" @click="addAnchor">Add point</button>
         <button v-if="draft.schedule.length" type="button" class="link" @click="draft.schedule = []">Clear</button>
       </div>
+      <p v-if="nextScheduleDay === null" id="schedule-capacity" class="quiet">
+        {{ validRunLength ? 'Every available day already has a schedule point.' : 'Set a valid run length before adding a point.' }}
+      </p>
     </template>
     <p v-else-if="draft.schedule.length" class="quiet">Constant runs use the daily food count. Starting the run clears any invalid schedule points.</p>
   </div>

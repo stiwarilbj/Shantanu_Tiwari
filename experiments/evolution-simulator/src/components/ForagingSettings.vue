@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { FORAGING_DEFAULTS, FORAGING_FIELDS, usesForagingDecisionRules, usesOptionalRules,
   usesRefugeBorder, usesStandardDeviation } from '../engine/config.js'
 import { canPursuePrey, keepsMeal, mealFitsBudget, remembersPlant, returnReserve, shouldReturn,
@@ -21,17 +21,7 @@ const reserveLabel = computed(() => {
   if (!Number.isInteger(margin) || margin < 0 || margin > 20) return ''
   return returnReserve(settings.value, stepSeconds.value).toFixed(2) + ' s in reserve with this energy model.'
 })
-const scenario = ref('memory')
-
-function useCustomDecisions(event) {
-  draft.advanced.customForaging = event.target.checked
-  delete issue['advanced.customForaging']
-  if (!event.target.checked) {
-    for (const key of Object.keys(issue)) {
-      if (key.includes('foragingDecisions.')) delete issue[key]
-    }
-  }
-}
+const scenario = defineModel('scenario')
 
 function customize(event) {
   if (event.target.checked) selected.value.foragingDecisions = { ...draft.foragingDecisions }
@@ -58,7 +48,7 @@ const preview = computed(() => {
   }
   if (scenario.value === 'switch') {
     const current = 4, closer = 3.4
-    const keeps = keepsMeal(current, closer, rules.switchSavings)
+    const keeps = keepsMeal(current, closer, rules.switchSavings, draft.version)
     return {
       numbers:`Current meal 4 s · Other meal 3.4 s · ${timeSavedPercent(current, closer).toFixed(0)}% less travel time`,
       result:keeps ? 'Keep the current meal' : 'Switch to the quicker meal',
@@ -104,7 +94,7 @@ const preview = computed(() => {
     </p>
     <template v-if="usesForagingDecisionRules(draft)">
       <label v-if="usesOptionalRules(draft)" class="advanced-toggle">
-        <input id="advanced.customForaging" type="checkbox" :checked="customDecisions" @change="useCustomDecisions">
+        <input id="advanced.customForaging" type="checkbox" v-model="draft.advanced.customForaging">
         Use custom foraging decisions
       </label>
       <p v-if="!customDecisions" class="quiet">Standard runs use the built-in decision rules. Your field and species settings are saved.</p>

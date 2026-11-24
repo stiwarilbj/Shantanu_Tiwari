@@ -178,7 +178,7 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
     const y = clamp(prey.y + vy * arrival, prey.r, FIELD - prey.r)
     score('prey', prey.id, x, y, travelTime, reach, turning)
   }
-  const meal = current && keepsMeal(current.time, best.time, settings.switchSavings) ? current : best
+  const meal = current && keepsMeal(current.time, best.time, settings.switchSavings, config.version) ? current : best
   if (meal?.kind === 'plant' && !meal.remembered) {
     memory.plant = { id: meal.id, x: meal.x, y: meal.y, time: now }
   }

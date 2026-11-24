@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, shallowRef, watch, watchEffect } from 'vue'
-import { rulesFor, TERRITORY_EDGES, TERRITORY_FIELDS, usesOptionalRules, validate } from '../engine/config.js'
+import { rulesFor, TERRITORY_EDGES, TERRITORY_FIELDS, validate } from '../engine/config.js'
 import { FIELD } from '../engine/geometry.js'
 import { dawn, founders } from '../engine/simulation.js'
 import { startingEdge, territoryFor } from '../engine/starting-territories.js'
@@ -23,20 +23,10 @@ const territoryIssue = key => key.startsWith('territories.') || key.includes('.t
 const showFields = computed(() => draft.territories.enabled || Object.keys(issue).some(territoryIssue))
 const edgeLabel = edge => edge[0].toUpperCase() + edge.slice(1)
 
-function clearTerritoryErrors(event) {
-  if (event.target.checked || !usesOptionalRules(draft)) return
-  for (const key of Object.keys(issue)) {
-    if (territoryIssue(key)) delete issue[key]
-  }
-}
-
 function customize(event) {
   const { edges, center, width } = draft.territories
   if (event.target.checked) selected.value.territory = { edges: [...edges], center, width }
   else delete selected.value.territory
-  for (const key of Object.keys(issue)) {
-    if (key.startsWith(prefix.value)) delete issue[key]
-  }
 }
 
 watch([() => draft.territories.enabled, () => lab.run, retry], async ([enabled, run], _, onCleanup) => {
@@ -118,13 +108,13 @@ watchEffect(() => {
   <div class="advanced-block">
     <h3>Starting territories</h3>
     <label class="advanced-toggle">
-      <input id="territories.enabled" v-model="draft.territories.enabled" type="checkbox" @change="clearTerritoryErrors">
+      <input id="territories.enabled" v-model="draft.territories.enabled" type="checkbox">
       Use starting territories
     </label>
     <p class="quiet">Choose where each species enters the field. Blobs still return to the usual refuge.</p>
     <template v-if="showFields">
       <label class="advanced-select">Apply territories
-        <select id="territories.timing" v-model="draft.territories.timing" @change="delete issue['territories.timing']">
+        <select id="territories.timing" v-model="draft.territories.timing">
           <option value="opening">Opening generation only</option>
           <option value="daily">Every dawn</option>
         </select>
@@ -148,7 +138,7 @@ watchEffect(() => {
         <div class="territory-options">
           <label v-for="(edge, index) in TERRITORY_EDGES" :key="edge" class="advanced-toggle">
             <input :id="index === 0 ? prefix + 'edges' : undefined" v-model="placement.edges" :value="edge" type="checkbox"
-              :aria-invalid="!inherited && !!issue[prefix + 'edges'] || undefined" @change="delete issue[prefix + 'edges']">
+              :aria-invalid="!inherited && !!issue[prefix + 'edges'] || undefined">
             {{ edgeLabel(edge) }}
           </label>
         </div>
@@ -156,8 +146,7 @@ watchEffect(() => {
       </fieldset>
       <NumberField v-for="field in TERRITORY_FIELDS" :key="prefix + field.key" :id="prefix + field.key"
         v-model="placement[field.key]" :label="field.label" :min="field.min" :max="field.max"
-        :disabled="inherited" :error="inherited ? undefined : issue[prefix + field.key]"
-        @update:model-value="delete issue[prefix + field.key]"/>
+        :disabled="inherited" :error="inherited ? undefined : issue[prefix + field.key]"/>
       <p class="quiet">Bands read left to right along horizontal edges and top to bottom along vertical edges. Near a corner, the band slides inward to keep its width.</p>
     </template>
   </div>

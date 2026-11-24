@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { AGING_FIELDS, usesOptionalRules } from '../engine/config.js'
+import { computed } from 'vue'
+import { AGING_FIELDS, usesOptionalRules, validate } from '../engine/config.js'
 import { agingRules, lifespanReached, oldAgeRisk, travelSpeedPercent } from '../engine/aging.js'
 import NumberField from './NumberField.vue'
 
@@ -12,24 +12,16 @@ const rules = computed(() => agingRules(props.draft, selected.value))
 const lifespanLimit = computed(() => rules.value.maxAge !== null && rules.value.maxAgeEnabled !== false)
 const prefix = computed(() => selected.value ? selected.value.id + '.aging.' : 'aging.')
 
-const previewAge = ref(8)
+const previewAge = defineModel('previewAge')
 const validPreview = computed(() => {
   const age = previewAge.value
   if (!Number.isInteger(age) || age < 0 || age > 1000) return false
-  if (!rules.value.enabled) return true
-  return AGING_FIELDS.every(({ key, min, max }) => {
-    const value = rules.value[key]
-    return Number.isFinite(value) && value >= min && value <= max
-  }) && (!lifespanLimit.value || (
-    Number.isInteger(rules.value.maxAge) && rules.value.maxAge >= 1 && rules.value.maxAge <= 1000))
+  const effectivePrefix = inherited.value ? 'aging.' : prefix.value
+  const errors = validate(props.draft)
+  return !AGING_FIELDS.some(({ key }) => errors[effectivePrefix + key]) &&
+    !['enabled', 'maxAge', 'maxAgeEnabled'].some(key => errors[effectivePrefix + key])
 })
 const percent = value => value.toLocaleString('en-US', { maximumFractionDigits:1 }) + '%'
-
-function clearAgingErrors() {
-  for (const key of Object.keys(props.issue)) {
-    if (key.startsWith(prefix.value)) delete props.issue[key]
-  }
-}
 
 function toggleLifespan(event) {
   if (event.target.checked) {
@@ -40,14 +32,11 @@ function toggleLifespan(event) {
   } else {
     rules.value.maxAge = null
   }
-  delete props.issue[prefix.value + 'maxAge']
-  delete props.issue[prefix.value + 'maxAgeEnabled']
 }
 
 function customize(event) {
   if (event.target.checked) selected.value.aging = { ...props.draft.aging }
   else delete selected.value.aging
-  clearAgingErrors()
 }
 </script>
 
@@ -67,8 +56,7 @@ function customize(event) {
     </label>
     <p v-if="inherited" class="quiet">Uses the current field default. Turn on custom settings to edit this species separately.</p>
     <label class="advanced-toggle">
-      <input :id="prefix+'enabled'" v-model="rules.enabled" type="checkbox" :disabled="inherited"
-        @change="!$event.target.checked && clearAgingErrors()"> Enable aging
+      <input :id="prefix+'enabled'" v-model="rules.enabled" type="checkbox" :disabled="inherited"> Enable aging
     </label>
     <NumberField v-for="field in AGING_FIELDS" :key="prefix+field.key" :id="prefix+field.key" v-model="rules[field.key]"
       :label="field.label" :min="field.min" :max="field.max" :step="field.step"
@@ -85,7 +73,8 @@ function customize(event) {
 
   <div class="advanced-block">
     <h3>Age preview</h3>
-    <NumberField id="aging-preview-age" v-model="previewAge" label="Preview age" :min="0" :max="1000"/>
+    <NumberField id="aging-preview-age" v-model="previewAge" label="Preview age" :min="0" :max="1000" @keydown.enter.prevent/>
+    <p class="quiet">This example uses the same age for speed and risk. During a run, blobs gain a year at dusk, before their risk is checked.</p>
     <div class="quiet" role="status">
       <p v-if="validPreview">
         Age {{ previewAge }} · {{ percent(travelSpeedPercent(rules, previewAge)) }} travel speed

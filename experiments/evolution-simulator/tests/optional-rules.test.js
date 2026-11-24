@@ -82,3 +82,40 @@ test('inactive settings stay stored and become subject to validation when enable
   assert.equal(validate(rules)['blue.standardDeviation.speed'], undefined)
   assert.equal(rules.species[0].standardDeviation.speed, 11)
 })
+
+test('a zero mutation chance keeps its unused pattern and spread without blocking a run', () => {
+  const config = starter()
+  const blue = config.species[0]
+  Object.assign(blue.mutation, { size: false, sense: false })
+  blue.inheritance.mutationChance.speed = 0
+  blue.inheritance.mutationPattern = 'future-pattern'
+  blue.standardDeviation.speed = 11
+  assert.deepEqual(validate(config), {})
+  const checkpoint = founders(config)
+  checkpoint.roster = checkpoint.roster.slice(0, 1)
+  const board = dawn(config, 1, checkpoint)
+  Object.assign(board.blobs[0], { home: true, credits: 2 })
+  const result = dusk(board, config)
+  assert.equal(result.summary.rows.all.births, 1)
+  assert.equal(result.checkpoint.roster[1].speed, blue.speed)
+
+  blue.inheritance.mutationChance.speed = 1
+  assert.deepEqual(Object.keys(validate(config)), ['blue.mutationPattern', 'blue.standardDeviation.speed'])
+  blue.inheritance.mutationChance.speed = -1
+  assert.ok(validate(config)['blue.mutationChance.speed'])
+})
+
+test('a zero birth chance ignores unused reproduction and mutation values', () => {
+  const config = starter()
+  Object.assign(config.reproduction, { birthChance: 0, twinChance: 101, birthWait: 32 })
+  config.species[0].inheritance.mutationChance.speed = 101
+  assert.deepEqual(validate(config), {})
+  const checkpoint = founders(config)
+  checkpoint.roster = checkpoint.roster.slice(0, 1)
+  const board = dawn(config, 1, checkpoint)
+  Object.assign(board.blobs[0], { home: true, credits: 2 })
+  assert.equal(dusk(board, config).summary.rows.all.births, 0)
+
+  config.reproduction.birthChance = 1
+  assert.deepEqual(Object.keys(validate(config)), ['birthWait', 'twinChance', 'blue.mutationChance.speed'])
+})

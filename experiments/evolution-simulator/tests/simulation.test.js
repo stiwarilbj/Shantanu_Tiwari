@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { HABITAT_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, REFUGE_RULE_VERSION, REPRODUCTION_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
+import { HABITAT_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, OPTIONAL_RULES_VERSION, REFUGE_RULE_VERSION, REPRODUCTION_RULE_VERSION, SETTLED_RULE_VERSION, STEERING_RULE_VERSION, VERSION, WALKTHROUGH_RULE_VERSION, starter, plantsForDay, randomSeed,
   rulesFor, setupForNewRun, speciesTemplate, validate, validateRevisions } from '../src/engine/config.js'
 import { canHunt, cost, FIELD, radius, REFUGE_WIDTH, refugeDistance, walkthroughStepCost } from '../src/engine/geometry.js'
 import { normal } from '../src/engine/random.js'
@@ -427,6 +427,15 @@ test('the hunt threshold is inclusive, same-species configurable, and hunting co
     assert.equal(field.events.filter(e => e.cause === 'Predation').length, Number(eligible))
   }
 })
+
+test('the exact custom hunting size boundary excludes only larger prey and preserves older rules', () => {
+  const config = { ...starter(), predation: true, huntingAdvantage: 94 }
+  const hunter = { id: 1, species: 'blue', size: 97 }
+  const prey = { id: 2, species: 'orange' }
+  assert.deepEqual([49.999, 50, 50.001].map(size => canHunt(hunter, { ...prey, size }, config)), [true, true, false])
+  assert.equal(canHunt(hunter, { ...prey, size: 50 }, { ...config, version: OPTIONAL_RULES_VERSION }), false)
+})
+
 
 test('plants give one credit and only refill energy when configured', () => {
   const defaults = starter()

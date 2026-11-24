@@ -196,7 +196,8 @@ function jump(event) {
   if(chart) {
     if(hidden.value.includes(chart.id)) toggleHidden(chart.id)
     const targetId = chart.id === 'overview' ? 'trends-overview' : 'chart-'+chart.title.toLowerCase().replaceAll(' ','-')
-    requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    // Prediction status can change the chart's position while a smooth scroll is in flight.
+    nextTick(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'instant', block: 'start' }))
   }
   event.target.value=''
 }

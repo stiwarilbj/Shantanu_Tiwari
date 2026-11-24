@@ -1,4 +1,4 @@
-import { LEGACY_RULE_VERSION, usesHabitatRules } from './config.js'
+import { PRECISE_THRESHOLDS_RULE_VERSION, LEGACY_RULE_VERSION, usesHabitatRules } from './config.js'
 
 export const FIELD = 500
 export const REFUGE_WIDTH = 50
@@ -18,6 +18,9 @@ export function cost(blob, config) {
 export function canHunt(hunter, prey, config) {
   if (!config.predation || hunter.id === prey.id || (!config.sameSpecies && hunter.species === prey.species)) return false
   if (config.version === LEGACY_RULE_VERSION) return hunter.size >= 1.2 * prey.size
+  if (config.version >= PRECISE_THRESHOLDS_RULE_VERSION) {
+    return prey.size * (100 + config.huntingAdvantage) <= hunter.size * 100
+  }
   const largestPreyRatio = usesHabitatRules(config) ? 100 / (100 + config.huntingAdvantage) : 0.8
   return prey.size <= largestPreyRatio * hunter.size
 }

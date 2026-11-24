@@ -1,4 +1,4 @@
-import { advancedRuleEnabled, FORAGING_DEFAULTS, usesForagingDecisionRules, usesWalkthroughForaging } from './config.js'
+import { advancedRuleEnabled, FORAGING_DEFAULTS, PRECISE_THRESHOLDS_RULE_VERSION, usesForagingDecisionRules, usesWalkthroughForaging, VERSION } from './config.js'
 
 export const DECISION = Object.freeze({
   searching: 0,
@@ -28,7 +28,13 @@ export function foragingDecisionsFor(config, species) {
 }
 
 export const remembersPlant = (elapsed, seconds) => seconds > 0 && elapsed <= seconds + 1e-9
-export const keepsMeal = (currentTime, bestTime, savings) => bestTime >= currentTime * ((100 - savings) / 100)
+export function keepsMeal(currentTime, bestTime, savings, version = VERSION) {
+  const threshold = currentTime * ((100 - savings) / 100)
+  if (bestTime >= threshold) return true
+  // A computed tie can be one rounding step below the threshold.
+  return version >= PRECISE_THRESHOLDS_RULE_VERSION && savings > 0 &&
+    bestTime >= threshold - Number.EPSILON * threshold
+}
 export const returnReserve = (settings, stepSeconds) => settings.returnMargin * stepSeconds
 export const shouldReturn = (left, toRefuge, reserve) => left <= toRefuge + reserve
 export const shouldReturnWithoutMeal = (left, toRefuge, reserve) => left <= toRefuge + reserve + .75

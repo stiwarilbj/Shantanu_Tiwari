@@ -11,7 +11,8 @@ export const AGING_RULE_VERSION = 9
 export const FORAGING_DECISION_RULE_VERSION = 10
 export const TERRITORY_RULE_VERSION = 11
 export const OPTIONAL_RULES_VERSION = 12
-export const VERSION = OPTIONAL_RULES_VERSION
+export const PRECISE_THRESHOLDS_RULE_VERSION = 13
+export const VERSION = PRECISE_THRESHOLDS_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -79,6 +80,12 @@ export const usesForagingDecisionRules = config => config.version >= FORAGING_DE
 export const usesTerritoryRules = config => config.version >= TERRITORY_RULE_VERSION
 export const usesOptionalRules = config => config.version >= OPTIONAL_RULES_VERSION
 export const advancedRuleEnabled = (config, key) => !usesOptionalRules(config) || config.advanced?.[key] !== false
+export const breedingCanProduceOffspring = config => advancedRuleEnabled(config, 'breeding') &&
+  (!usesOptionalRules(config) || config.reproduction?.birthChance !== 0)
+export const mutationEnabled = (config, species, trait) =>
+  breedingCanProduceOffspring(config) && species.mutation?.[trait] === true
+export const mutationProducesSpread = (config, species, trait) =>
+  mutationEnabled(config, species, trait) && species.inheritance?.mutationChance?.[trait] !== 0
 export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
@@ -185,11 +192,14 @@ export function validate(config) {
   }
   if (usesReproductionRules(config) && config.reproduction !== undefined && advancedRuleEnabled(config, 'breeding')) {
     const rules = config.reproduction
-    if (!['single', 'pair'].includes(rules?.parentMode)) errors.parentMode = 'Choose a parent mode.'
-    number('minimumBreedingAge', 'Minimum breeding age', rules?.minimumBreedingAge, 0, 30)
-    number('birthWait', 'Wait after a birth', rules?.birthWait, 0, 30)
+    const canBreed = breedingCanProduceOffspring(config)
+    if (canBreed) {
+      if (!['single', 'pair'].includes(rules?.parentMode)) errors.parentMode = 'Choose a parent mode.'
+      number('minimumBreedingAge', 'Minimum breeding age', rules?.minimumBreedingAge, 0, 30)
+      number('birthWait', 'Wait after a birth', rules?.birthWait, 0, 30)
+    }
     number('birthChance', 'Chance of a birth', rules?.birthChance, 0, 100)
-    number('twinChance', 'Chance of twins', rules?.twinChance, 0, 100)
+    if (canBreed) number('twinChance', 'Chance of twins', rules?.twinChance, 0, 100)
   }
   function validateAging(rules, prefix) {
     if (typeof rules?.enabled !== 'boolean') errors[prefix + 'enabled'] = 'Choose whether aging is enabled.'
@@ -277,21 +287,22 @@ export function validate(config) {
       validateTerritory(item.territory, item.id + '.territory.')
     }
     const inheritance = usesReproductionRules(config) ? item.inheritance : undefined
-    const breeding = advancedRuleEnabled(config, 'breeding')
-    const mutationActive = trait => !usesOptionalRules(config) || (breeding && item.mutation?.[trait] === true)
-    if (inheritance !== undefined && TRAITS.some(mutationActive) && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
+    const legacy = !usesOptionalRules(config)
+    const validateSpread = trait => legacy || mutationProducesSpread(config, item, trait)
+    if (inheritance !== undefined && TRAITS.some(validateSpread) && !['normal', 'bounded'].includes(inheritance?.mutationPattern)) {
       errors[item.id + '.mutationPattern'] = 'Choose a mutation pattern.'
     }
     for (const trait of TRAITS) {
       number(item.id + '.' + trait, trait, item[trait], 1, 100)
       if (typeof item.mutation?.[trait] !== 'boolean') errors[item.id + '.mutation.' + trait] = 'Specify which traits mutate.'
-      if (!mutationActive(trait)) continue
-      if (usesStandardDeviation(config)) {
-        number(item.id + '.standardDeviation.' + trait, 'Standard deviation', item.standardDeviation?.[trait], 0, 10, false)
-      } else {
-        number(item.id + '.variance.' + trait, 'Variance', item.variance?.[trait], 0.01, 10, false)
+      if (validateSpread(trait)) {
+        if (usesStandardDeviation(config)) {
+          number(item.id + '.standardDeviation.' + trait, 'Standard deviation', item.standardDeviation?.[trait], 0, 10, false)
+        } else {
+          number(item.id + '.variance.' + trait, 'Variance', item.variance?.[trait], 0.01, 10, false)
+        }
       }
-      if (inheritance !== undefined) {
+      if (inheritance !== undefined && (legacy || mutationEnabled(config, item, trait))) {
         number(item.id + '.mutationChance.' + trait, 'Mutation chance', inheritance?.mutationChance?.[trait], 0, 100)
       }
     }

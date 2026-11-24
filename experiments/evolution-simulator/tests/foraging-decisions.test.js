@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { AGING_RULE_VERSION, FORAGING_DEFAULTS, setupForNewRun, starter, validate } from '../src/engine/config.js'
+import { AGING_RULE_VERSION, FORAGING_DEFAULTS, OPTIONAL_RULES_VERSION, setupForNewRun, starter, validate } from '../src/engine/config.js'
 import { canPursuePrey, DECISION, keepsMeal, mealFitsBudget, remembersPlant, returnReserve,
   shouldReturn } from '../src/engine/foraging-decisions.js'
 import { Grid } from '../src/engine/geometry.js'
@@ -12,7 +12,10 @@ test('foraging thresholds include exact memory, pursuit and budget ties and reta
   assert.deepEqual([.59, .6, .61].map(elapsed => remembersPlant(elapsed, .6)), [true, true, false])
   assert.equal(remembersPlant(0, 0), false)
   assert.deepEqual([7.99, 8, 8.01].map(time => keepsMeal(10, time, 20)), [false, true, true])
+  assert.deepEqual([.092999, .093, .093001].map(time => keepsMeal(.1, time, 7)), [false, true, true])
+  assert.equal(keepsMeal(.1, .093, 7, OPTIONAL_RULES_VERSION), false)
   assert.equal(keepsMeal(10, 9.99, 0), false)
+  assert.equal(keepsMeal(.1, .09999999999999999, 0), false)
   assert.equal(keepsMeal(10, 10, 0), true)
   assert.equal(keepsMeal(10, 0, 100), true)
   assert.deepEqual([.99, 1, 1.01].map(time => canPursuePrey(time, 1)), [true, true, false])
