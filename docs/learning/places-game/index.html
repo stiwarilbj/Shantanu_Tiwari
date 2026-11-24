@@ -261,6 +261,10 @@
         #rulesBtn, #showSearchBtn, #searchBtn, #startBtn, #pauseBtn, #resetBtn, #displayBtn, #enterBtn {
             cursor: grab;
         }
+        #startBtn[aria-disabled="true"] {
+            cursor: wait;
+            opacity: 0.65;
+        }
         .panel-toggle {
             white-space: nowrap;
         }
@@ -424,7 +428,7 @@
             <div id="rulesContainer" class="game-panel rules-container" hidden>
                 <h2>Game Rules</h2>
                 <ul>
-                    <li>Pick a 1–5 minute time limit and any starting letter, ending letter, or country filters. Then select <strong>Start Game</strong>.</li>
+                    <li>Pick a 1–5 minute time limit and any letter or country filters. Select <strong>Load places</strong> if prompted, then select <strong>Start Game</strong>.</li>
                     <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
                     <li>Each correct answer gets one point. A name can be one letter off or have two neighboring letters swapped.</li>
@@ -536,9 +540,10 @@
                 </div>
 
                 <div class="game-actions">
-                    <button id="startBtn" class="btn btn-success">
-                        <i class="fas fa-play"></i> Start Game
+                    <button id="startBtn" class="btn btn-success" type="button">
+                        <i class="fas fa-play" aria-hidden="true"></i> <span id="startLabel">Load places</span>
                     </button>
+                    <span id="roundLoadStatus" class="visually-hidden" role="status"></span>
                     <button id="pauseBtn" class="btn btn-warning" disabled>
                         <i class="fas fa-pause"></i> Pause
                     </button>
@@ -569,17 +574,26 @@
         </div>
     </main>
 
-    <script src="places.compact.js"></script>
+    <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
     <script>
         let timer;
         let timeLeft = 0;
         let score = 0;
         let gameActive = false;
         let guessedPlaces = [];
-        let allPlaces = [];
         let filteredPlaces = [];
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
+        let restoringRound = false;
+        let readingSavedState = false;
+        let roundRequest = 0;
+        let roundLoadState = 'idle';
+
+        const catalog = JSON.parse(document.getElementById('countryCatalog').textContent);
+        const countryIndexes = new Map(catalog.countries.map((country, index) => [country, index]));
+        const loadedPlaces = new Map();
+        const pendingLoads = new Map();
+        const resultRequests = new WeakMap();
 
         const rulesBtn = document.getElementById('rulesBtn');
         const rulesContainer = document.getElementById('rulesContainer');
@@ -594,6 +608,8 @@
         const placeInput = document.getElementById('placeInput');
         const enterBtn = document.getElementById('enterBtn');
         const startBtn = document.getElementById('startBtn');
+        const startLabel = document.getElementById('startLabel');
+        const roundLoadStatus = document.getElementById('roundLoadStatus');
         const pauseBtn = document.getElementById('pauseBtn');
         const resetBtn = document.getElementById('resetBtn');
         const displayBtn = document.getElementById('displayBtn');
@@ -644,25 +660,54 @@
             });
         }
 
-        function expandPlaceDictionary({ countries, runs }) {
+        function expandPlaceDictionary(placesByCountry, runs) {
             const places = [];
-            const nextCityIndexes = countries.map(() => 0);
+            const nextCityIndexes = placesByCountry.map(() => 0);
             for (const [countryIndex, count] of runs) {
-                const [country, cities] = countries[countryIndex];
+                const countryPlaces = placesByCountry[countryIndex];
                 const first = nextCityIndexes[countryIndex];
                 const end = first + count;
                 for (let cityIndex = first; cityIndex < end; cityIndex++) {
-                    places.push({ city: cities[cityIndex], country_name: country });
+                    places.push(countryPlaces[cityIndex]);
                 }
                 nextCityIndexes[countryIndex] = end;
             }
             return places;
         }
 
+        function loadPlaces(country) {
+            if (loadedPlaces.has(country)) return Promise.resolve(loadedPlaces.get(country));
+            if (pendingLoads.has(country)) return pendingLoads.get(country);
+
+            const worldwide = country === 'any';
+            const file = worldwide ? 'world.json' : `countries/${countryIndexes.get(country)}.json`;
+            const request = fetch(`places/${file}?v=${catalog.revision}`).then(async response => {
+                if (!response.ok) throw new Error(`Place download failed with HTTP ${response.status}`);
+
+                const data = await response.json();
+                if (worldwide) {
+                    const placesByCountry = data.countries.map(([name, cities]) =>
+                        loadedPlaces.get(name) ?? cities.map(city => ({ city, country_name: name }))
+                    );
+                    const places = expandPlaceDictionary(placesByCountry, data.runs);
+                    data.countries.forEach(([name], index) => loadedPlaces.set(name, placesByCountry[index]));
+                    loadedPlaces.set(country, places);
+                } else {
+                    const [name, cities] = data;
+                    if (name !== country || !Array.isArray(cities)) throw new Error('Unexpected country dictionary');
+                    if (!loadedPlaces.has(country)) {
+                        loadedPlaces.set(country, cities.map(city => ({ city, country_name: country })));
+                    }
+                }
+                return loadedPlaces.get(country);
+            }).finally(() => pendingLoads.delete(country));
+
+            pendingLoads.set(country, request);
+            return request;
+        }
+
         function initGame() {
-            const dictionary = typeof placeDictionary === 'undefined' ? { countries: [], runs: [] } : placeDictionary;
-            allPlaces = expandPlaceDictionary(dictionary);
-            const sortedCountries = dictionary.countries.map(([country]) => country).sort();
+            const sortedCountries = [...catalog.countries].sort();
             const hasUnitedStates = sortedCountries.includes('United States');
 
             const letterOptionsFragment = document.createDocumentFragment();
@@ -772,6 +817,13 @@
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
             updatePlaceInputPlaceholder();
             saveSettings();
+            resultRequests.delete(examplePlacesContainer);
+            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+            roundRequest++;
+            roundLoadState = 'idle';
+            const country = roundCountry();
+            if (country !== 'any' && !loadedPlaces.has(country)) prepareRound();
+            else updateStartButton();
         }
 
         function setPanelVisibility(button, panel, isVisible) {
@@ -790,24 +842,91 @@
         });
 
 
-        startBtn.addEventListener('click', function() {
-            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+        function roundCountry() {
+            const selection = countrySelect.value;
+            return selection === 'placeAndCountry' ? 'any' : selection || 'any';
+        }
 
+        function filterRoundPlaces(places) {
             const selectedStartLetter = letterSelect.value;
-            const selectedEndLetter = endLetterSelect.value;
-            const selectedCountryFilter = (currentGameMode === 'placeAndCountry' || countrySelect.value === 'any') ? 'any' : countrySelect.value;
-
-
-            filteredPlaces = allPlaces.filter(place => {
+            const selectedEndLetter = endLetterSelect.value.toLowerCase();
+            return places.filter(place => {
                 const cityLower = place.city.toLowerCase();
                 const matchesStartLetter = selectedStartLetter === 'any' ||
                                     (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
                 const matchesEndLetter = selectedEndLetter === 'any' ||
-                                    (place.city && cityLower.charAt(cityLower.length - 1) === selectedEndLetter.toLowerCase());
-                const matchesCountry = selectedCountryFilter === 'any' ||
-                                       (place.country_name && place.country_name === selectedCountryFilter);
-                return matchesStartLetter && matchesEndLetter && matchesCountry;
+                                    (place.city && cityLower.charAt(cityLower.length - 1) === selectedEndLetter);
+                return matchesStartLetter && matchesEndLetter;
             });
+        }
+
+        function updateStartButton() {
+            const loading = readingSavedState || roundLoadState === 'loading';
+            const roundInProgress = timeLeft > 0 && !restoringRound;
+            const ready = loadedPlaces.has(roundCountry()) && !restoringRound;
+            startBtn.disabled = roundInProgress;
+            startBtn.setAttribute('aria-disabled', String(loading));
+
+            let label = 'Load places';
+            let status = '';
+            if (roundInProgress) label = 'Start Game';
+            else if (loading) {
+                label = 'Loading places…';
+                status = label;
+            } else if (ready) label = 'Start Game';
+            else if (roundLoadState === 'failed') {
+                label = 'Retry loading';
+                status = 'Could not load places. Retry loading to try again.';
+            }
+            startLabel.textContent = label;
+            if (roundLoadStatus.textContent !== status) roundLoadStatus.textContent = status;
+        }
+
+        async function prepareRound() {
+            const request = ++roundRequest;
+            const needsResume = restoringRound;
+            roundLoadState = 'loading';
+            updateStartButton();
+            try {
+                const places = await loadPlaces(roundCountry());
+                if (request !== roundRequest) return;
+                roundLoadState = 'idle';
+                if (restoringRound) {
+                    filteredPlaces = filterRoundPlaces(places);
+                    restoringRound = false;
+                    pauseBtn.disabled = false;
+                }
+            } catch {
+                if (request !== roundRequest) return;
+                roundLoadState = 'failed';
+            }
+            updateStartButton();
+            if (needsResume && !restoringRound) {
+                roundLoadStatus.textContent = 'Places loaded. Resume your round when ready.';
+            }
+        }
+
+        function setRoundSettingsDisabled(disabled) {
+            letterSelect.disabled = disabled;
+            endLetterSelect.disabled = disabled;
+            countrySelect.disabled = disabled;
+            timeSelect.disabled = disabled;
+        }
+
+        function setGuessingEnabled(enabled) {
+            placeInput.disabled = !enabled;
+            enterBtn.disabled = !enabled;
+        }
+
+        startBtn.addEventListener('click', function() {
+            if (readingSavedState || roundLoadState === 'loading' || (timeLeft > 0 && !restoringRound)) return;
+            if (restoringRound || startLabel.textContent !== 'Start Game') {
+                prepareRound();
+                return;
+            }
+
+            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+            filteredPlaces = filterRoundPlaces(loadedPlaces.get(roundCountry()));
 
             timeLeft = parseInt(timeSelect.value) * 60;
             score = 0;
@@ -818,38 +937,37 @@
             updateGuessedPlacesDisplay();
             updatePlaceInputPlaceholder();
 
-            startBtn.disabled = true;
             pauseBtn.disabled = false;
-            placeInput.disabled = false;
-            enterBtn.disabled = false;
-            letterSelect.disabled = true;
-            endLetterSelect.disabled = true;
-            countrySelect.disabled = true;
-            timeSelect.disabled = true;
+            setGuessingEnabled(true);
+            setRoundSettingsDisabled(true);
             gameActive = true;
+            updateStartButton();
 
             placeInput.focus();
             startTimer();
             saveGameState();
         });
 
+        function pauseRound() {
+            clearInterval(timer);
+            gameActive = false;
+            pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
+            setGuessingEnabled(false);
+        }
+
+        function resumeRound() {
+            wasGameActiveBeforeHidden = false;
+            gameActive = true;
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+            setGuessingEnabled(true);
+            placeInput.focus();
+            startTimer();
+        }
+
         pauseBtn.addEventListener('click', function() {
-            if (gameActive) {
-                clearInterval(timer);
-                gameActive = false;
-                pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
-                placeInput.disabled = true;
-                enterBtn.disabled = true;
-            } else {
-                if(timeLeft > 0) {
-                    gameActive = true;
-                    pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
-                    placeInput.disabled = false;
-                    enterBtn.disabled = false;
-                    placeInput.focus();
-                    startTimer();
-                }
-            }
+            if (restoringRound || timeLeft <= 0) return;
+            if (gameActive) pauseRound();
+            else resumeRound();
             saveGameState();
         });
 
@@ -859,66 +977,47 @@
             timeLeft = 0;
             score = 0;
             guessedPlaces = [];
+            filteredPlaces = [];
             wasGameActiveBeforeHidden = false;
-
+            restoringRound = false;
+            readingSavedState = false;
+            roundRequest++;
+            roundLoadState = 'idle';
+            resultRequests.delete(searchResultsContainer);
+            resultRequests.delete(examplePlacesContainer);
 
             updateTimerDisplay();
             updateScoreDisplay();
             updateGuessedPlacesDisplay();
 
-
-            startBtn.disabled = false;
             pauseBtn.disabled = true;
-            placeInput.disabled = true;
-            enterBtn.disabled = true;
-            letterSelect.disabled = false;
-            endLetterSelect.disabled = false;
-            countrySelect.disabled = false;
-            timeSelect.disabled = false;
+            setGuessingEnabled(false);
+            setRoundSettingsDisabled(false);
             pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
             placeInput.value = '';
 
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                chrome.storage.local.remove(['gameState', 'gameSettings', 'searchFilters'], () => {
-                    letterSelect.value = 'any';
-                    endLetterSelect.value = 'any';
-                    countrySelect.value = 'placeAndCountry';
-                    timeSelect.value = '1';
-                    currentGameMode = 'placeAndCountry';
-                    updatePlaceInputPlaceholder();
-
-                    searchStartLetterSelect.value = 'any';
-                    searchEndLetterSelect.value = 'any';
-                    searchCountrySelect.value = 'any';
-                    searchIncludeInput.value = '';
-                    searchExcludeInput.value = '';
-                    searchMinLengthInput.value = '';
-                    searchMaxLengthInput.value = '';
-                    searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
-                    examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
-                    setPanelVisibility(rulesBtn, rulesContainer, false);
-                    setPanelVisibility(showSearchBtn, searchContainer, false);
-                });
-            } else {
-                letterSelect.value = 'any';
-                endLetterSelect.value = 'any';
-                countrySelect.value = 'placeAndCountry';
-                timeSelect.value = '1';
-                currentGameMode = 'placeAndCountry';
-                updatePlaceInputPlaceholder();
-
-                searchStartLetterSelect.value = 'any';
-                searchEndLetterSelect.value = 'any';
-                searchCountrySelect.value = 'any';
-                searchIncludeInput.value = '';
-                searchExcludeInput.value = '';
-                searchMinLengthInput.value = '';
-                searchMaxLengthInput.value = '';
-                searchResultsContainer.innerHTML = '<p class="text-muted">Search results will appear here</p>';
-                examplePlacesContainer.innerHTML = '<p class="text-muted">Click "Display Places" to see examples</p>';
-                setPanelVisibility(rulesBtn, rulesContainer, false);
-                setPanelVisibility(showSearchBtn, searchContainer, false);
+                chrome.storage.local.remove(['gameState', 'gameSettings', 'searchFilters']);
             }
+            letterSelect.value = 'any';
+            endLetterSelect.value = 'any';
+            countrySelect.value = 'placeAndCountry';
+            timeSelect.value = '1';
+            currentGameMode = 'placeAndCountry';
+            updatePlaceInputPlaceholder();
+
+            searchStartLetterSelect.value = 'any';
+            searchEndLetterSelect.value = 'any';
+            searchCountrySelect.value = 'any';
+            searchIncludeInput.value = '';
+            searchExcludeInput.value = '';
+            searchMinLengthInput.value = '';
+            searchMaxLengthInput.value = '';
+            showResultMessage(searchResultsContainer, 'Search results will appear here');
+            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+            setPanelVisibility(rulesBtn, rulesContainer, false);
+            setPanelVisibility(showSearchBtn, searchContainer, false);
+            updateStartButton();
         });
 
         function updatePlaceInputPlaceholder() {
@@ -1027,7 +1126,40 @@
             return matrix[b.length][a.length];
         }
 
-        function performSearch() {
+        function showResultMessage(container, message, retry) {
+            const status = document.createElement('p');
+            status.className = 'text-muted';
+            status.setAttribute('role', 'status');
+            status.textContent = message;
+            container.replaceChildren(status);
+            if (retry) {
+                const button = document.createElement('button');
+                button.className = 'btn btn-outline-secondary btn-sm';
+                button.type = 'button';
+                button.textContent = 'Retry loading';
+                button.addEventListener('click', retry);
+                container.append(button);
+            }
+        }
+
+        async function loadResultPlaces(country, container, retry) {
+            const request = Symbol();
+            resultRequests.set(container, request);
+            if (!loadedPlaces.has(country)) showResultMessage(container, 'Loading places…');
+            try {
+                const places = await loadPlaces(country);
+                if (resultRequests.get(container) !== request) return null;
+                updateStartButton();
+                return places;
+            } catch {
+                if (resultRequests.get(container) === request) {
+                    showResultMessage(container, 'Could not load places.', retry);
+                }
+                return null;
+            }
+        }
+
+        async function performSearch() {
             const includeTerms = searchIncludeInput.value.trim().toLowerCase()
                 .split(',')
                 .map(term => term.trim())
@@ -1046,7 +1178,8 @@
             const minLength = minLengthText ? parseInt(minLengthText) : 0;
             const maxLength = maxLengthText ? parseInt(maxLengthText) : Infinity;
 
-            searchResultsContainer.innerHTML = '';
+            const places = await loadResultPlaces(selectedSearchCountry, searchResultsContainer, performSearch);
+            if (!places) return;
 
             const isSearchEffectivelyEmpty = includeTerms.length === 0 &&
                                           excludeTerms.length === 0 &&
@@ -1057,8 +1190,8 @@
                                           !maxLengthText;
 
             if (isSearchEffectivelyEmpty) {
-                if (allPlaces.length > 0) {
-                    const randomPlacesArray = getRandomPlaces(allPlaces, 100);
+                if (places.length > 0) {
+                    const randomPlacesArray = getRandomPlaces(places, 100);
                     if (randomPlacesArray.length > 0) {
                         let html = '';
                         randomPlacesArray.forEach(place => {
@@ -1075,7 +1208,7 @@
                 return;
             }
 
-            const matchingPlaces = allPlaces.filter(place => {
+            const matchingPlaces = places.filter(place => {
                 const cityLower = place.city.toLowerCase();
                 const countryLower = place.country_name.toLowerCase();
                 const cityLength = place.city.length;
@@ -1094,11 +1227,10 @@
 
                 const matchesStartLetter = selectedSearchStartLetter === 'any' || cityLower.startsWith(selectedSearchStartLetter.toLowerCase());
                 const matchesEndLetter = selectedSearchEndLetter === 'any' || cityLower.endsWith(selectedSearchEndLetter.toLowerCase());
-                const matchesCountry = selectedSearchCountry === 'any' || place.country_name === selectedSearchCountry;
                 const matchesMinLength = cityLength >= minLength;
                 const matchesMaxLength = cityLength <= maxLength;
 
-                return matchesStartLetter && matchesEndLetter && matchesCountry && matchesMinLength && matchesMaxLength;
+                return matchesStartLetter && matchesEndLetter && matchesMinLength && matchesMaxLength;
             });
 
             if (matchingPlaces.length === 0) {
@@ -1116,25 +1248,14 @@
         }
 
 
-        displayBtn.addEventListener('click', function() {
-            const selectedStartLetter = letterSelect.value;
-            const selectedEndLetter = endLetterSelect.value;
-            const selectedCountryFilter = (countrySelect.value === 'placeAndCountry' || countrySelect.value === 'any') ? 'any' : countrySelect.value;
-
-            const filteredForDisplay = allPlaces.filter(place => {
-                const cityLower = place.city.toLowerCase();
-                const matchesStartLetter = selectedStartLetter === 'any' ||
-                                    (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
-                const matchesEndLetter = selectedEndLetter === 'any' ||
-                                    (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
-                const matchesCountry = selectedCountryFilter === 'any' ||
-                                       (place.country_name && place.country_name === selectedCountryFilter);
-                return matchesStartLetter && matchesEndLetter && matchesCountry;
-            });
-            const examples = getRandomPlaces(filteredForDisplay, 8);
-            displayExamplePlaces(examples);
+        async function showExamples() {
+            const places = await loadResultPlaces(roundCountry(), examplePlacesContainer, showExamples);
+            if (!places) return;
+            displayExamplePlaces(getRandomPlaces(filterRoundPlaces(places), 8));
             examplePlacesContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
+        }
+
+        displayBtn.addEventListener('click', showExamples);
 
         function getRandomPlaces(placesArray, count) {
             if (!Array.isArray(placesArray) || placesArray.length === 0) return [];
@@ -1163,14 +1284,10 @@
                 if (timeLeft === 0) {
                     clearInterval(timer);
                     gameActive = false;
-                    placeInput.disabled = true;
-                    enterBtn.disabled = true;
+                    setGuessingEnabled(false);
                     pauseBtn.disabled = true;
-                    startBtn.disabled = false;
-                    letterSelect.disabled = false;
-                    endLetterSelect.disabled = false;
-                    countrySelect.disabled = false;
-                    timeSelect.disabled = false;
+                    setRoundSettingsDisabled(false);
+                    updateStartButton();
                     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                         chrome.storage.local.remove(['gameState']);
                     }
@@ -1250,110 +1367,65 @@
 
 
         function loadGameState() {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                chrome.storage.local.get(['gameState', 'gameSettings', 'searchFilters'], function(result) {
-                    if (result.gameSettings) {
-                        const savedSettings = result.gameSettings;
-                        countrySelect.value = savedSettings.selectedCountryValue || 'placeAndCountry';
-                        letterSelect.value = savedSettings.letter || 'any';
-                        endLetterSelect.value = savedSettings.endLetter || 'any';
-                        timeSelect.value = savedSettings.timeLimit || '1';
-                    } else {
-                        countrySelect.value = 'placeAndCountry';
-                        letterSelect.value = 'any';
-                        endLetterSelect.value = 'any';
-                        timeSelect.value = '1';
-                    }
-                    currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-                    updatePlaceInputPlaceholder();
-
-                    if (result.searchFilters) {
-                        const savedSearchFilters = result.searchFilters;
-                        searchStartLetterSelect.value = savedSearchFilters.startLetter || 'any';
-                        searchEndLetterSelect.value = savedSearchFilters.endLetter || 'any';
-                        searchCountrySelect.value = savedSearchFilters.country || 'any';
-                        searchIncludeInput.value = savedSearchFilters.includeTerm || '';
-                        searchExcludeInput.value = savedSearchFilters.excludeTerm || '';
-                        searchMinLengthInput.value = savedSearchFilters.minLength || '';
-                        searchMaxLengthInput.value = savedSearchFilters.maxLength || '';
-                        if (searchIncludeInput.value || searchExcludeInput.value ||
-                            searchStartLetterSelect.value !== 'any' || searchEndLetterSelect.value !== 'any' || searchCountrySelect.value !== 'any' ||
-                            searchMinLengthInput.value || searchMaxLengthInput.value) {
-                            performSearch();
-                        }
-                    }
-
-
-                    if (result.gameState) {
-                        const savedState = result.gameState;
-                        timeLeft = savedState.timeLeft || 0;
-                        score = savedState.score || 0;
-                        guessedPlaces = savedState.guessedPlaces || [];
-                        gameActive = savedState.gameActive || false;
-                        wasGameActiveBeforeHidden = savedState.wasGameActiveBeforeHidden || false;
-
-                        setPanelVisibility(rulesBtn, rulesContainer, savedState.isRulesVisible);
-                        setPanelVisibility(showSearchBtn, searchContainer, savedState.isSearchVisible);
-
-                        updateTimerDisplay();
-                        updateScoreDisplay();
-                        updateGuessedPlacesDisplay();
-
-                        if (gameActive) {
-                            const selectedStartLetter = letterSelect.value;
-                            const selectedEndLetter = endLetterSelect.value;
-                            const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
-
-                            filteredPlaces = allPlaces.filter(place => {
-                                 const cityLower = place.city.toLowerCase();
-                                 const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
-                                 const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
-                                 const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
-                                 return matchesStartLetter && matchesEndLetter && matchesCountry;
-                            });
-
-                            startBtn.disabled = true;
-                            pauseBtn.disabled = false;
-                            placeInput.disabled = false;
-                            enterBtn.disabled = false;
-                            pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
-                        } else if (timeLeft > 0 && wasGameActiveBeforeHidden) {
-                             const selectedStartLetter = letterSelect.value;
-                             const selectedEndLetter = endLetterSelect.value;
-                             const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
-                             filteredPlaces = allPlaces.filter(place => {
-                                 const cityLower = place.city.toLowerCase();
-                                 const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
-                                 const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
-                                 const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
-                                 return matchesStartLetter && matchesEndLetter && matchesCountry;
-                             });
-                             startBtn.disabled = true;
-                             pauseBtn.disabled = false;
-                             placeInput.disabled = true;
-                             enterBtn.disabled = true;
-                             pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
-                        }
-                        else {
-                            startBtn.disabled = false;
-                            pauseBtn.disabled = true;
-                            placeInput.disabled = true;
-                            enterBtn.disabled = true;
-                            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
-                        }
-                    }
-                });
-            } else {
-                countrySelect.value = 'placeAndCountry';
-                letterSelect.value = 'any';
-                endLetterSelect.value = 'any';
-                timeSelect.value = '1';
-                currentGameMode = 'placeAndCountry';
+            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
                 updatePlaceInputPlaceholder();
-                updateTimerDisplay();
-                updateScoreDisplay();
-                updateGuessedPlacesDisplay();
+                updateStartButton();
+                return;
             }
+
+            const request = roundRequest;
+            readingSavedState = true;
+            updateStartButton();
+            chrome.storage.local.get(['gameState', 'gameSettings', 'searchFilters'], function(result) {
+                if (!readingSavedState) return;
+                readingSavedState = false;
+                if (request !== roundRequest) {
+                    updateStartButton();
+                    return;
+                }
+
+                const settings = result.gameSettings || {};
+                const selection = settings.selectedCountryValue;
+                countrySelect.value = selection === 'any' || countryIndexes.has(selection) ? selection : 'placeAndCountry';
+                letterSelect.value = settings.letter || 'any';
+                endLetterSelect.value = settings.endLetter || 'any';
+                timeSelect.value = settings.timeLimit || '1';
+                currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
+                updatePlaceInputPlaceholder();
+
+                const search = result.searchFilters || {};
+                searchStartLetterSelect.value = search.startLetter || 'any';
+                searchEndLetterSelect.value = search.endLetter || 'any';
+                searchCountrySelect.value = countryIndexes.has(search.country) ? search.country : 'any';
+                searchIncludeInput.value = search.includeTerm || '';
+                searchExcludeInput.value = search.excludeTerm || '';
+                searchMinLengthInput.value = search.minLength || '';
+                searchMaxLengthInput.value = search.maxLength || '';
+
+                if (result.gameState) {
+                    const saved = result.gameState;
+                    timeLeft = saved.timeLeft || 0;
+                    score = saved.score || 0;
+                    guessedPlaces = saved.guessedPlaces || [];
+                    setPanelVisibility(rulesBtn, rulesContainer, saved.isRulesVisible);
+                    setPanelVisibility(showSearchBtn, searchContainer, saved.isSearchVisible);
+                    updateTimerDisplay();
+                    updateScoreDisplay();
+                    updateGuessedPlacesDisplay();
+                }
+
+                if (timeLeft > 0) {
+                    restoringRound = true;
+                    pauseRound();
+                    pauseBtn.disabled = true;
+                    setRoundSettingsDisabled(true);
+                    prepareRound();
+                } else if (roundCountry() !== 'any') {
+                    prepareRound();
+                } else {
+                    updateStartButton();
+                }
+            });
         }
 
         enterBtn.addEventListener('click', enterPlace);
@@ -1364,80 +1436,19 @@
         });
 
         document.addEventListener('visibilitychange', function() {
-            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                 return;
-            }
-            if (document.hidden) {
-                if (gameActive) {
-                    clearInterval(timer);
-                    wasGameActiveBeforeHidden = true;
-                    gameActive = false;
-                    pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
-                    placeInput.disabled = true;
-                    enterBtn.disabled = true;
-                    saveGameState();
-                } else {
-                     wasGameActiveBeforeHidden = false;
-                     saveGameState();
-                }
-            } else {
-                chrome.storage.local.get(['gameState', 'gameSettings'], function(result) {
-                    if (result.gameState && result.gameState.wasGameActiveBeforeHidden && result.gameState.timeLeft > 0) {
-                         const savedState = result.gameState;
-                         const savedSettings = result.gameSettings || {};
+            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
 
-                         timeLeft = savedState.timeLeft;
-                         score = savedState.score;
-                         guessedPlaces = savedState.guessedPlaces || [];
-                         wasGameActiveBeforeHidden = false;
-
-                         countrySelect.value = savedSettings.selectedCountryValue || 'placeAndCountry';
-                         letterSelect.value = savedSettings.letter || 'any';
-                         endLetterSelect.value = savedSettings.endLetter || 'any';
-                         timeSelect.value = savedSettings.timeLimit || '1';
-
-                         currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-                         updatePlaceInputPlaceholder();
-                         updateTimerDisplay();
-                         updateScoreDisplay();
-                         updateGuessedPlacesDisplay();
-
-                         const selectedStartLetter = letterSelect.value;
-                         const selectedEndLetter = endLetterSelect.value;
-                         const selectedCountryFilter = countrySelect.value === 'placeAndCountry' ? 'any' : countrySelect.value;
-
-                         filteredPlaces = allPlaces.filter(place => {
-                            const cityLower = place.city.toLowerCase();
-                            const matchesStartLetter = selectedStartLetter === 'any' || (place.city && place.city.charAt(0).toUpperCase() === selectedStartLetter);
-                            const matchesEndLetter = selectedEndLetter === 'any' || (place.city && cityLower.charAt(cityLower.length-1) === selectedEndLetter.toLowerCase());
-                            const matchesCountry = selectedCountryFilter === 'any' || (place.country_name && place.country_name === selectedCountryFilter);
-                            return matchesStartLetter && matchesEndLetter && matchesCountry;
-                         });
-
-                         gameActive = true;
-                         startBtn.disabled = true;
-                         pauseBtn.disabled = false;
-                         placeInput.disabled = false;
-                         enterBtn.disabled = false;
-                         pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
-                         placeInput.focus();
-                         startTimer();
-                         saveGameState();
-                     } else if (result.gameState && result.gameState.timeLeft <=0){
-                        gameActive = false;
-                        startBtn.disabled = false;
-                        pauseBtn.disabled = true;
-                        placeInput.disabled = true;
-                        enterBtn.disabled = true;
-                        letterSelect.disabled = false;
-                        endLetterSelect.disabled = false;
-                        countrySelect.disabled = false;
-                        timeSelect.disabled = false;
-                     }
-                });
+            if (document.hidden && gameActive) {
+                wasGameActiveBeforeHidden = true;
+                pauseRound();
+                saveGameState();
+            } else if (!document.hidden && wasGameActiveBeforeHidden && timeLeft > 0) {
+                resumeRound();
+                saveGameState();
             }
         });
-        window.addEventListener('load', initGame);
+
+        initGame();
     </script>
 </body>
 </html>
