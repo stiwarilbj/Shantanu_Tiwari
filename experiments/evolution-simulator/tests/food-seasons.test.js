@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { foodSupplyForDay, plantsForDay, PRECISE_THRESHOLDS_RULE_VERSION, rulesFor, starter, validate } from '../src/engine/config.js'
+import { FOOD_SEASONS_RULE_VERSION, foodSupplyForDay, plantsForDay, PRECISE_THRESHOLDS_RULE_VERSION, rulesFor, starter, validate } from '../src/engine/config.js'
 import { openingHabitat } from '../src/engine/habitat.js'
 import { dawnForRun, founders, step } from '../src/engine/simulation.js'
 import { setupFromLink, setupLink } from '../src/export.js'
@@ -85,7 +85,7 @@ function settlements(setup, revisions, limit) {
 }
 
 test('off and neutral seasons preserve older behavior, and forks and forecasts use the correct days', () => {
-  const fields = { seed: 118, food: 500, predation: false, endMode: 'timed', duration: 100, foodPlacement: 'patches' }
+  const fields = { version: FOOD_SEASONS_RULE_VERSION, seed: 118, food: 500, predation: false, endMode: 'timed', duration: 100, foodPlacement: 'patches' }
   const original = { ...starter(PRECISE_THRESHOLDS_RULE_VERSION), ...fields }
   const off = seasonalSetup({ enabled: false, peakDay: 5 }, fields)
   const neutral = seasonalSetup({ peak: 100, lean: 100 }, fields)

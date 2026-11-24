@@ -134,7 +134,7 @@ async function replay(message) {
   const used = frames.slice(0, index)
   postMessage({ type: 'track', id, track: { day, duration: final.duration,
     stepSeconds: state.stepSeconds, ticks: state.tick, stride, fields,
-    opening, plants, width, speciesEdits: startFrame.speciesEdits, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
+    opening, plants, width, foodWeb: startFrame.foodWeb, speciesEdits: startFrame.speciesEdits, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
 }
 
 function adjustTraits({ day, tick, changes, group = {} }) {

@@ -20,7 +20,7 @@ const movements = [
   { key:'transferredIn', label:'Transferred in' },
   { key:'transferredOut', label:'Transferred out' },
 ]
-const hasMovements = computed(() => !!lab.run.speciesActions?.length)
+const hasMovements = computed(() => lab.run.speciesActions?.some(action => action.kind !== 'food-web'))
 const columns = computed(() => [
   { key:'opening', label:'Opening population' },
   { key:'population', label:'Closing population' },

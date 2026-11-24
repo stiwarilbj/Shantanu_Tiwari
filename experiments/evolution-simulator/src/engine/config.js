@@ -13,7 +13,8 @@ export const TERRITORY_RULE_VERSION = 11
 export const OPTIONAL_RULES_VERSION = 12
 export const PRECISE_THRESHOLDS_RULE_VERSION = 13
 export const FOOD_SEASONS_RULE_VERSION = 14
-export const VERSION = FOOD_SEASONS_RULE_VERSION
+export const FOOD_WEB_RULE_VERSION = 15
+export const VERSION = FOOD_WEB_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -156,8 +157,23 @@ export function starter(version = VERSION) {
   })
 }
 
+export function validDiet(diet, ids) {
+  return !!diet && typeof diet.plants === 'boolean' && ['any', 'selected', 'none'].includes(diet.hunt) &&
+    Array.isArray(diet.prey) && new Set(diet.prey).size === diet.prey.length &&
+    diet.prey.every(id => typeof id === 'string' && !!id && (!ids || ids.has(id)))
+}
+
+export function validFoodWeb(web, ids) {
+  return !!web && typeof web.enabled === 'boolean' && !!web.diets &&
+    typeof web.diets === 'object' && !Array.isArray(web.diets) &&
+    Object.entries(web.diets).every(([id, diet]) => id && (!ids || ids.has(id)) && validDiet(diet, ids))
+}
+
 export function validate(config) {
   const errors = {}
+  if (config?.version >= FOOD_WEB_RULE_VERSION && config.foodWeb !== undefined && !validFoodWeb(config.foodWeb)) {
+    errors.foodWeb = 'Check the species diets and food-web switch.'
+  }
   const number = (key, name, value, min, max, integer = true) => {
     if (!Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value))) {
       errors[key] = `${name} must be ${integer ? 'a whole number ' : ''}from ${min} to ${max}.`

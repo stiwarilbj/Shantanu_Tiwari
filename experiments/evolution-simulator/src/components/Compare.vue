@@ -106,7 +106,7 @@ const comparisonMetrics=computed(()=>[
   ...METRICS,
   { key:'births', label:'Births', color:'#A1BD67', count:true },
   { key:'deaths', label:'Deaths', color:'#BD5558', count:true },
-  ...(runs.value.some(run => run?.speciesActions?.length) ? [
+  ...(runs.value.some(run => run?.speciesActions?.some(action => action.kind !== 'food-web')) ? [
     { key:'introduced', label:'Introduced', count:true },
     { key:'transferredIn', label:'Transferred in', count:true },
     { key:'transferredOut', label:'Transferred out', count:true },

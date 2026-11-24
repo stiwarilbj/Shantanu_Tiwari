@@ -1,4 +1,5 @@
 import { PRECISE_THRESHOLDS_RULE_VERSION, LEGACY_RULE_VERSION, usesHabitatRules } from './config.js'
+import { permitsPrey } from './food-web.js'
 
 export const FIELD = 500
 export const REFUGE_WIDTH = 50
@@ -15,14 +16,19 @@ export function cost(blob, config) {
   if (config.metabolism === 'product') return blob.size ** 3 * blob.speed ** 2 * blob.sense / 20000
   return 0.001 * (blob.size ** 3 * (travel(blob, config) / 10) ** 2 + blob.sense)
 }
+export function huntBlock(hunter, prey, config) {
+  if (!config.predation) return 'Hunting is off.'
+  if (hunter.id === prey.id) return 'A creature cannot hunt itself.'
+  if (!config.sameSpecies && hunter.species === prey.species) return 'Hunting within the same species is off.'
+  if (!permitsPrey(hunter, prey, config)) return 'This diet excludes that prey species.'
+  const largeEnough = config.version === LEGACY_RULE_VERSION ? hunter.size >= 1.2 * prey.size :
+    config.version >= PRECISE_THRESHOLDS_RULE_VERSION ? prey.size * (100 + config.huntingAdvantage) <= hunter.size * 100 :
+      prey.size <= (usesHabitatRules(config) ? 100 / (100 + config.huntingAdvantage) : 0.8) * hunter.size
+  return largeEnough ? null : 'The hunter is below the required size advantage.'
+}
+
 export function canHunt(hunter, prey, config) {
-  if (!config.predation || hunter.id === prey.id || (!config.sameSpecies && hunter.species === prey.species)) return false
-  if (config.version === LEGACY_RULE_VERSION) return hunter.size >= 1.2 * prey.size
-  if (config.version >= PRECISE_THRESHOLDS_RULE_VERSION) {
-    return prey.size * (100 + config.huntingAdvantage) <= hunter.size * 100
-  }
-  const largestPreyRatio = usesHabitatRules(config) ? 100 / (100 + config.huntingAdvantage) : 0.8
-  return prey.size <= largestPreyRatio * hunter.size
+  return huntBlock(hunter, prey, config) === null
 }
 
 export function turn(from, to) {

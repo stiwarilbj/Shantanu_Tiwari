@@ -1,6 +1,7 @@
+import { DEFAULT_DIET, EMPTY_FOOD_WEB } from './engine/food-web.js'
 import { runSpecies } from './engine/species-actions.js'
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
-import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
+import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FOOD_WEB_RULE_VERSION, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
   MUTATION_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
   usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
@@ -66,6 +67,30 @@ function unpackSeasons({ fs, ...setup }) {
   return setup
 }
 
+function packFoodWeb(web, species) {
+  const indexOf = id => {
+    const index = species.findIndex(item => item.id === id)
+    return index < 0 ? id : index
+  }
+  const diets = Object.entries(web?.diets ?? {}).map(([id, diet]) => [
+    indexOf(id), Number(diet.plants), ['any', 'selected', 'none'].indexOf(diet.hunt), ...diet.prey.map(indexOf),
+  ])
+  return web?.enabled || diets.length ? [Number(web.enabled), ...diets] : undefined
+}
+
+function unpackFoodWeb(setup) {
+  if (!Array.isArray(setup.fw)) return setup
+  const { fw: [enabled, ...rows], ...rest } = setup
+  const idOf = value => typeof value === 'number' ? setup.species[value]?.id : value
+  if (![0, 1].includes(enabled) || rows.some(row => !Array.isArray(row) || row.length < 3 ||
+      ![0, 1].includes(row[1]) || ![0, 1, 2].includes(row[2]) ||
+      ![row[0], ...row.slice(3)].every(value => idOf(value)))) throw new Error('Invalid food web in setup link.')
+  const diets = Object.fromEntries(rows.map(([id, plants, mode, ...prey]) => [
+    idOf(id), { ...DEFAULT_DIET, plants: plants === 1, hunt: ['any', 'selected', 'none'][mode], prey: prey.map(idOf) },
+  ]))
+  return { ...rest, foodWeb: { ...EMPTY_FOOD_WEB, enabled: enabled === 1, diets } }
+}
+
 export function setupLink(setup) {
   let compact = setup
   if (usesReproductionRules(setup)) {
@@ -80,6 +105,7 @@ export function setupLink(setup) {
       ...(foraging && { foragingDecisions: undefined, fd: fieldDecisions.length ? fieldDecisions : undefined }),
       ...(territories && { territories: undefined, tt: fieldTerritory.length ? fieldTerritory : undefined }),
       ...(usesFoodSeasonsRules(setup) && { foodSeasons: undefined, fs: packSeasons(setup.foodSeasons) }),
+      ...(setup.version >= FOOD_WEB_RULE_VERSION && { foodWeb: undefined, fw: packFoodWeb(setup.foodWeb, setup.species) }),
       reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
       species: setup.species.map(item => {
         const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
@@ -117,7 +143,8 @@ export function setupFromLink(hash) {
   const decoded = { ...unpackForaging(setup), species: setup.species.map(unpackForaging) }
   if (!usesTerritoryRules(setup)) return setupWithRuleDefaults(decoded)
   const withTerritories = { ...unpackTerritory(decoded, true), species: decoded.species.map(item => unpackTerritory(item)) }
-  return setupWithRuleDefaults(usesFoodSeasonsRules(setup) ? unpackSeasons(withTerritories) : withTerritories)
+  const withSeasons = usesFoodSeasonsRules(setup) ? unpackSeasons(withTerritories) : withTerritories
+  return setupWithRuleDefaults(setup.version >= FOOD_WEB_RULE_VERSION ? unpackFoodWeb(withSeasons) : withSeasons)
 }
 
 export function download(name, mime, content) {
@@ -133,7 +160,7 @@ export function csv(run, scope='all', start=1, end=1000) {
   const traits=METRICS.filter(m=>m.key!=='population')
   const fields=['n','mean','p25','p75','min','max','sd']
   const base=['opening','population','births','deaths','net','food','plants','plantsLeft','hunts']
-  const hasSpeciesHistory = !!run.speciesActions?.length
+  const hasSpeciesHistory = run.speciesActions?.some(action => action.kind !== 'food-web')
   const movement = ['introduced', 'transferredIn', 'transferredOut']
   const headers=['run','seed','rule_version','day','scope','rule_start_day','fork_day',...base,...DEATH_CAUSES,...traits.flatMap(m=>fields.map(f=>m.key+'_'+f)),
     ...(hasSpeciesHistory ? ['species_name', 'species_color', ...movement] : [])]

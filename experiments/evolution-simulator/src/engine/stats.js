@@ -1,4 +1,4 @@
-import { usesAgingRules } from './config.js'
+import { FOOD_WEB_RULE_VERSION, usesAgingRules } from './config.js'
 
 export const METRICS = [
   { key: 'population', label: 'Population', short: 'Population', unit: 'blobs', color: '#EEEDD6', petal: '#EEEDD6' },
@@ -23,6 +23,17 @@ export function distribution(values) {
   }
   const sd = n < 2 ? 0 : Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (n - 1))
   return { n, mean, min: values[0], p25: quantile(0.25), p75: quantile(0.75), max: values[n - 1], sd }
+}
+
+export function preyMeals(events) {
+  const pairs = new Map()
+  for (const { type, species, targetSpecies } of events) {
+    if (type !== 'prey' || targetSpecies == null) continue
+    if (!pairs.has(species)) pairs.set(species, new Map())
+    const counts = pairs.get(species)
+    counts.set(targetSpecies, (counts.get(targetSpecies) ?? 0) + 1)
+  }
+  return Object.fromEntries([...pairs].map(([id, counts]) => [id, Object.fromEntries(counts)]))
 }
 
 export function summaries(day, config, opening, closing, events, supply, plantsLeft, hasEdits) {
@@ -50,7 +61,7 @@ export function summaries(day, config, opening, closing, events, supply, plantsL
       sense: distribution(lives.map(b => b.sense)),
     }
   }
-  return { day, rows }
+  return { day, rows, ...(config.version >= FOOD_WEB_RULE_VERSION && { preyMeals: preyMeals(events) }) }
 }
 
 export function metricValue(row, key) {

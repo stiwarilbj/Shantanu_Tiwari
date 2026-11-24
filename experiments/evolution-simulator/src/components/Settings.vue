@@ -2,13 +2,15 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
 import { useLab } from '../store.js'
-import { breedingCanProduceOffspring, endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, mutationEnabled,
+import { breedingCanProduceOffspring, endsWhenSettled, FOOD_WEB_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, mutationEnabled,
   mutationProducesSpread, SETTLED_RULE_VERSION, TRAITS,
   randomSeed, usesAgingRules, usesHabitatRules, usesReproductionRules,
   usesOptionalRules, usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
-import { newSpecies } from '../engine/species-actions.js'
+import { copyDiet, dietFor, EMPTY_FOOD_WEB, setDiet } from '../engine/food-web.js'
+import { newSpecies, runSpecies } from '../engine/species-actions.js'
 import { cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
+import FoodWebSettings from './FoodWebSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
@@ -27,7 +29,18 @@ const breeding = computed(() => draft.advanced?.breeding !== false)
 const canBreed = computed(() => breedingCanProduceOffspring(draft))
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), savedSpecies = ref(null)
-const newDraft = ref(null)
+const newDraft = ref(null), newDiet = ref(null)
+const web = computed({
+  get: () => draft.foodWeb ?? EMPTY_FOOD_WEB,
+  set: value => { draft.foodWeb = value },
+})
+const webSpecies = computed(() => {
+  if (fork == null) return draft.species
+  const founders = new Set(draft.species.map(item => item.id))
+  const atFork = runSpecies(lab.run, fork)
+  return [...draft.species.map(item => atFork.find(species => species.id === item.id) ?? item),
+    ...atFork.filter(item => !founders.has(item.id))]
+})
 const creationIssue = computed(() => {
   if (!newDraft.value) return {}
   const id = newDraft.value.id
@@ -41,7 +54,7 @@ const foragingSpecies = ref(null), territorySpecies = ref(null)
 const body = ref(null), fields = ref(null), currentPage = ref('basic'), group = ref(null)
 const categories = [
   { label: 'Field & food', topics: { food: 'Plant supply', seasons: 'Food seasons', habitat: 'Field layout', territory: 'Starting territories' } },
-  { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting' } },
+  { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting', foodWeb: 'Species food web' } },
   { label: 'Life cycle', topics: { reproduction: 'Reproduction', inheritance: 'Inheritance & mutation', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
 ]
@@ -56,7 +69,7 @@ const advancedFields = {
   schedule: 'food', foodSeasons: 'seasons', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
   patchRelocation: 'habitat', patchInterval: 'habitat', refugePercent: 'habitat',
   territories: 'territory', territory: 'territory',
-  huntingAdvantage: 'hunting', firstHuntingDay: 'hunting',
+  foodWeb: 'foodWeb', huntingAdvantage: 'hunting', firstHuntingDay: 'hunting',
   plantReward: 'movement', preyReward: 'movement', rules: 'movement', endMode: 'duration', duration: 'duration',
   parentMode: 'reproduction', minimumBreedingAge: 'reproduction', birthWait: 'reproduction',
   birthChance: 'reproduction', twinChance: 'reproduction',
@@ -123,6 +136,7 @@ const foraging = computed({
 })
 function add(source) {
   newDraft.value = newSpecies(draft.species, draft.version, source)
+  newDiet.value = source ? copyDiet(dietFor(web.value, source.id), source.id, newDraft.value.id) : null
   nextTick(() => document.getElementById(newDraft.value?.id + '.name')?.focus())
 }
 function confirmSpecies() {
@@ -130,6 +144,9 @@ function confirmSpecies() {
   const candidate = newDraft.value
   candidate.name = candidate.name.trim()
   draft.species.push(candidate)
+  if (newDiet.value && draft.version >= FOOD_WEB_RULE_VERSION && draft.foodWeb) {
+    web.value = setDiet(web.value, candidate.id, newDiet.value)
+  }
   tab.value = candidate.id
   newDraft.value = null
   nextTick(() => document.getElementById(candidate.id + '.name')?.focus())
@@ -141,12 +158,26 @@ function remove() {
   if (agingSpecies.value === value.id) agingSpecies.value = null
   if (foragingSpecies.value === value.id) foragingSpecies.value = null
   if (territorySpecies.value === value.id) territorySpecies.value = null
-  savedSpecies.value={value,index}
+  const { diets } = web.value
+  const diet = Object.hasOwn(diets, value.id) ? diets[value.id] : null
+  const preyOf = Object.entries(diets).filter(([id, row]) => id !== value.id && row.prey.includes(value.id))
+  if (diet || preyOf.length) {
+    const kept = { ...diets }
+    delete kept[value.id]
+    for (const [id, row] of preyOf) kept[id] = { ...row, prey: row.prey.filter(prey => prey !== value.id) }
+    web.value = { ...web.value, diets: kept }
+  }
+  savedSpecies.value = { value, index, diet, preyOf }
   tab.value=draft.species[Math.max(0,index-1)].id
 }
 function undo() {
-  const { value,index } = savedSpecies.value
-  draft.species.splice(index,0,value)
+  const { value, index, diet, preyOf } = savedSpecies.value
+  draft.species.splice(index, 0, value)
+  if (diet) web.value = setDiet(web.value, value.id, diet)
+  for (const [id] of preyOf) {
+    const row = dietFor(web.value, id)
+    if (!row.prey.includes(value.id)) web.value = setDiet(web.value, id, { ...row, prey: [...row.prey, value.id] })
+  }
   tab.value=value.id
   savedSpecies.value=null
 }
@@ -449,6 +480,12 @@ onMounted(()=>dialog.value.showModal())
             <template v-else-if="group === 'foraging'">
               <ForagingSettings v-model:mode="foraging" v-model:species="foragingSpecies" v-model:scenario="foragingScenario" :draft="draft" :issue="issue"/>
             </template>
+            <div v-else-if="group === 'foodWeb'" class="advanced-block">
+              <h3>Species food web</h3>
+              <FoodWebSettings v-if="draft.version >= FOOD_WEB_RULE_VERSION" v-model="web"
+                :rules="draft" :species="webSpecies" :starting-day="(fork ?? 0) + 1"/>
+              <p v-else class="quiet">Start a run with current rules to configure a food web.</p>
+            </div>
             <div v-else-if="group === 'predictions'" class="advanced-block">
               <h3>Graph predictions</h3>
               <label class="advanced-toggle">

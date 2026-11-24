@@ -6,6 +6,7 @@ export const TRACK_FIELDS = 7
 export function prepareTrack(track) {
   track.eaten = new Map(track.events.filter(e => e.type === 'plant').map(e => [e.target, e.time]))
   track.changes = new Map()
+  track.foodWebChanges = track.events.filter(event => event.type === 'food-web')
   track.speciesChanges = track.events.filter(event => event.type === 'species-edit')
   for (const event of track.events) {
     if (event.id == null) continue
@@ -75,6 +76,7 @@ export function trackFrame(track, time) {
     if (event.time > time + 1e-9) break
     speciesEdits = speciesEditsAfter(speciesEdits, { id: event.species, definition: event.edit })
   }
+  const foodWeb = track.foodWebChanges?.findLast(event => event.time <= time + 1e-9)?.foodWeb ?? track.foodWeb
   return { day: track.day, time, duration: track.duration, stepSeconds, refugeWidth: track.final.refugeWidth, blobs,
-    ...(speciesEdits && { speciesEdits }), plants: track.plants.filter(p => (eaten.get(p.id) ?? Infinity) > time), events: track.events }
+    ...(foodWeb && { foodWeb }), ...(speciesEdits && { speciesEdits }), plants: track.plants.filter(p => (eaten.get(p.id) ?? Infinity) > time), events: track.events }
 }

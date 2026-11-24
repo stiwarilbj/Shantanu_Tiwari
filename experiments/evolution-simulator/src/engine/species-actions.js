@@ -1,4 +1,4 @@
-import { PALETTE, TRAITS, rulesFor, speciesTemplate, validate } from './config.js'
+import { FOOD_WEB_RULE_VERSION, PALETTE, TRAITS, rulesFor, speciesTemplate, validDiet, validFoodWeb, validate } from './config.js'
 import { random } from './random.js'
 import { adjustedTrait, validTraitChange } from './trait-adjustments.js'
 
@@ -34,6 +34,7 @@ export function speciesWithEdits(species, edits) {
 }
 
 export function speciesEditsAfter(edits, action) {
+  if (action.kind === 'food-web') return edits
   return { ...edits, [action.id]: action.definition ?? { ...edits?.[action.id], ...action.identity } }
 }
 
@@ -66,7 +67,14 @@ function validTraitEdit(edit) {
 }
 
 export function speciesActionIssue(action, rules, blobs) {
-  const { kind, id, definition, identity, sourceId, creatureIds, count, traits } = action
+  const { kind, id, definition, identity, sourceId, creatureIds, count, traits, diet } = action
+  if (kind === 'food-web' || diet !== undefined) {
+    if (rules.version < FOOD_WEB_RULE_VERSION) return 'Start or branch a run with current rules to change diets.'
+    const ids = new Set(rules.species.map(item => item.id))
+    if (kind === 'food-web') return validFoodWeb(action.foodWeb, ids) ? '' : 'Check the species diets.'
+    ids.add(id)
+    if (kind === 'edit' || !validDiet(diet, ids)) return 'Choose a valid diet for the new species.'
+  }
   const existing = rules.species.find(item => item.id === id)
   const editing = kind === 'edit'
   if (!id || typeof id !== 'string' || ['all', '__proto__', 'constructor', 'prototype'].includes(id) ||

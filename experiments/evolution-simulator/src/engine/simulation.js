@@ -1,6 +1,7 @@
 import { advancedRuleEnabled, endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
   rulesFor, usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
+import { canEatPlants, foodWebAfter } from './food-web.js'
 import { summaries } from './stats.js'
 import { forage } from './foraging.js'
 import { improvedIntent, steer } from './steering.js'
@@ -36,7 +37,9 @@ function standardSpawn(blob, i, count, edges, seed, day, refugeWidth) {
 
 export function dawnForRun(setup, revisions, day, checkpoint, adjustments, speciesActions) {
   const rules = rulesFor(setup, revisions, day)
-  const state = dawn(rules, day, checkpoint, rulesFor(setup, revisions, day - 1))
+  const revised = revisions.some(revision => revision.day === day)
+  const state = dawn(rules, day, revised ? { ...checkpoint, foodWeb: rules.foodWeb } : checkpoint,
+    rulesFor(setup, revisions, day - 1))
   const scheduled = [...(adjustments ?? []), ...(speciesActions ?? [])].filter(edit => edit.day === day)
     .sort((a, b) => a.tick - b.tick || (a.order ?? 0) - (b.order ?? 0))
   if (scheduled.length) {
@@ -71,12 +74,14 @@ export function dawn(config, day, checkpoint, previous = config) {
   const limit = endsWhenSettled(config) ? null : Math.round(config.duration / 10 / stepSeconds)
   return { day, tick: 0, stepSeconds, limit, refugeWidth,
     nextId, opening: roster, blobs, plants, events: [], settled: false,
+    ...(config.foodWeb && { foodWeb: config.foodWeb }),
     ...(checkpoint.speciesEdits && { speciesEdits: checkpoint.speciesEdits }) }
 }
 
 function effectiveSpecies(config, state) {
   const species = speciesWithEdits(config.species, state.speciesEdits)
-  return species === config.species ? config : { ...config, species }
+  const foodWeb = state.foodWeb ?? config.foodWeb
+  return species === config.species && foodWeb === config.foodWeb ? config : { ...config, species, foodWeb }
 }
 
 function initializeBlob(original, position, r, config, settings, stepSeconds) {
@@ -132,6 +137,15 @@ export function applySpeciesAction(ctx, config, action) {
   if (kind === 'introduce' && (creatureIds?.length !== count ||
       creatureIds.some((creature, index) => creature !== ctx.nextId + index))) return 'The next creature IDs have changed.'
   const time = ctx.tick * ctx.stepSeconds
+  const web = foodWebAfter(rules.foodWeb, action)
+  if (web !== rules.foodWeb) {
+    ctx.foodWeb = web
+    ctx.events.push({ day: ctx.day, time, type: 'food-web', foodWeb: web })
+  }
+  if (kind === 'food-web') {
+    clearForbiddenMeals(ctx, { ...rules, foodWeb: web })
+    return ''
+  }
   ctx.speciesEdits = speciesEditsAfter(ctx.speciesEdits, action)
   ctx.events.push({ day: ctx.day, time, type: 'species-edit', edit: ctx.speciesEdits[id], species: id })
   if (kind === 'introduce') {
@@ -165,7 +179,26 @@ export function applySpeciesAction(ctx, config, action) {
     Object.assign(blob, properties)
     record(ctx, blob, time, 'traits', { traits: properties })
   }
+  if (kind === 'split') clearForbiddenMeals(ctx, { ...rules, foodWeb: web })
   return ''
+}
+
+function clearForbiddenMeals(ctx, config) {
+  if (!config.foodWeb?.enabled) return
+  const blobs = new Map(ctx.blobs.map(blob => [blob.id, blob]))
+  for (const blob of ctx.blobs) {
+    const memory = blob.steering
+    if (!memory) continue
+    const permitsPlants = canEatPlants(blob, config)
+    if (!permitsPlants) memory.plant = null
+    const target = memory.kind === 'prey' ? blobs.get(memory.id) : null
+    if ((memory.kind === 'plant' && !permitsPlants) || (target && !canHunt(blob, target, config))) {
+      memory.kind = null
+      memory.id = null
+      blob.foragingDecision = DECISION.searching
+      blob.foragingSavings = 0
+    }
+  }
 }
 
 function applyScheduledAdjustments(ctx, config) {
@@ -349,8 +382,10 @@ function tick(ctx, config) {
     if (b.returning) push(homeFraction(path), 0, path)
     if (b.credits >= 2) continue
     const endX = path.x + path.dx, endY = path.y + path.dy
-    for (const plant of plantGrid.near(path.x, path.y, b.r + 2, endX, endY)) {
-      push(contact(path, plant, b.r + 2), 1, path, plant)
+    if (canEatPlants(b, config)) {
+      for (const plant of plantGrid.near(path.x, path.y, b.r + 2, endX, endY)) {
+        push(contact(path, plant, b.r + 2), 1, path, plant)
+      }
     }
     if (!config.predation) continue
     for (const other of new Set(pathGrid.near(path.x, path.y, b.r + 50, endX, endY))) {
@@ -536,6 +571,7 @@ export function dusk(ctx, config) {
   ctx.events.sort((a, b) => a.time - b.time)
   ctx.settled = { summary: summaries(ctx.day, config, ctx.opening, closing, ctx.events, ctx.plants.length,
     ctx.plants.filter(p => !p.eaten).length, !!ctx.speciesEdits), checkpoint: { roster: closing, nextId: ctx.nextId,
+      ...(ctx.foodWeb && { foodWeb: ctx.foodWeb }),
       ...(ctx.speciesEdits && { speciesEdits: ctx.speciesEdits }) } }
   return ctx.settled
 }
@@ -546,5 +582,6 @@ export function snapshot(ctx) {
   const duration = ctx.settled ? time : ctx.limit == null ? null : ctx.limit * stepSeconds
   return { day: ctx.day, time, duration, stepSeconds, nextId: ctx.nextId, refugeWidth: ctx.refugeWidth ?? 0,
     blobs: [...ctx.blobs, ...(ctx.newborns ?? [])], plants: ctx.plants.filter(p => !p.eaten), events: ctx.events,
+    ...(ctx.foodWeb && { foodWeb: ctx.foodWeb }),
     ...(ctx.speciesEdits && { speciesEdits: ctx.speciesEdits }) }
 }

@@ -5107,7 +5107,7 @@ test('species editor introduces, splits, and renames blobs at the paused tick @p
   await count.fill('1')
   await editor.getByRole('button', { name: 'Fast', exact: true }).click()
   await expect(editor.getByText('1 blob · Day 1 at 0.20 s')).toBeVisible()
-  await expect(editor.locator('summary')).toHaveText('#61')
+  await expect(editor.locator('.trait-preview summary')).toHaveText('#61')
   await apply.click()
   await expect(editor.getByRole('status')).toHaveText(/Introduced 1 blob in Mint/)
   await editor.getByRole('button', { name: 'Make another change' }).click()
@@ -5250,4 +5250,163 @@ test('species editor fits a phone and can return to live after a replay @pages',
   } finally {
     await context.close()
   }
+})
+
+for (const [screen, viewport] of [
+  ['desktop', { width: 1280, height: 900 }],
+  ['phone', { width: 390, height: 844 }],
+]) {
+  test(`species food web preview, paused edits and meal counts work on ${screen} @pages`, async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.setViewportSize(viewport)
+    await openSimulator(page)
+    await expect(page).toHaveTitle(/Evolution Simulator/)
+
+    await startRun(page, '10', async () => {
+      await fixedDay(page)
+      await page.getByRole('button', { name: 'Orange Off', exact: true }).click()
+      await page.getByRole('checkbox', { name: 'Enabled', exact: true }).check()
+      await advancedSettings(page, 'Species food web')
+      const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+      const enable = settings.getByRole('switch', { name: 'Enable species food web' })
+      await enable.focus()
+      await enable.press('Space')
+      await expect(enable).toBeChecked()
+      await settings.getByLabel('Eating species').selectOption('orange')
+      await settings.getByLabel('Eats plants').uncheck()
+      await settings.getByLabel('Can hunt').selectOption('none')
+      await expect(settings.getByText('Orange has no food sources', { exact: false })).toBeVisible()
+      await settings.getByLabel('Can hunt').selectOption('selected')
+      await settings.getByRole('checkbox', { name: 'Blue', exact: true }).check()
+      await settings.getByLabel('Food source').selectOption('blue')
+      await settings.getByLabel('Hunter size').fill('15')
+      await settings.getByLabel('Prey size').fill('12')
+      await expect(settings.getByText('This hunt is allowed if the hunter catches the prey.')).toBeVisible()
+      await settings.getByLabel('Hunter size').fill('14.99')
+      await expect(settings.getByText('The hunter is below the required size advantage.')).toBeVisible()
+      await settings.getByLabel('Generation', { exact: true }).fill('0')
+      await expect(settings.getByText('Enter a generation within the run limit.')).toBeVisible()
+      await settings.getByLabel('Generation', { exact: true }).fill('1')
+      const screenshots = process.env.FOOD_WEB_SCREENSHOTS
+      if (screenshots) {
+        await settings.getByText('The hunter is below the required size advantage.').scrollIntoViewIfNeeded()
+        await page.screenshot({ path: screenshots + '/food-web-' + screen + '.png' })
+      }
+    })
+
+    await stepTo(page, 0.1)
+    const species = page.getByRole('button', { name: 'Species', exact: true })
+    const editor = page.getByRole('dialog', { name: 'Species', exact: true })
+    const edit = editor.getByRole('button', { name: 'Edit food web' })
+    await species.click()
+    await edit.click()
+    await expect(editor.getByText('Generation 1 · Step 1')).toBeVisible()
+    const enable = editor.getByRole('switch', { name: 'Enable species food web' })
+    await enable.uncheck()
+    await editor.getByRole('button', { name: 'Discard', exact: true }).click()
+    await expect(species).toBeFocused()
+    await species.click()
+    await edit.click()
+    await expect(enable).toBeChecked()
+    await enable.uncheck()
+    await editor.getByRole('button', { name: 'Apply changes' }).click()
+    await expect(editor.getByRole('status').filter({ hasText: 'Updated the species food web' })).toBeVisible()
+    await editor.getByRole('button', { name: 'Done' }).click()
+    await page.reload()
+    await species.click()
+    await edit.click()
+    await expect(enable).not.toBeChecked()
+    await editor.getByRole('button', { name: 'Discard', exact: true }).click()
+
+    await quickThrough(page, 2)
+    await expect(batchStatus(page, 'Saved through')).toHaveText('Day 2')
+    await page.getByRole('button', { name: 'Watch last day' }).click()
+    await dayTile(page, 1).click()
+    const replay = page.getByRole('slider', { name: 'Replay time' })
+    await replay.fill('0')
+    await species.click()
+    await expect(enable).toBeChecked()
+    await expect(enable).toBeDisabled()
+    await editor.getByRole('button', { name: 'Close' }).click()
+    await replay.fill('0.1')
+    await species.click()
+    await expect(enable).not.toBeChecked()
+    await editor.getByRole('button', { name: 'Close' }).click()
+
+    await page.getByRole('link', { name: 'Trends', exact: true }).click()
+    await page.getByRole('button', { name: 'Advanced stats', exact: true }).click()
+    const stats = page.getByRole('dialog', { name: 'Advanced stats' })
+    await stats.getByRole('button', { name: 'Food & Hunting' }).click()
+    const table = stats.getByRole('table', { name: 'Generation 2' })
+    await expect(table).toBeVisible()
+    await stats.getByRole('combobox', { name: 'Generation', exact: true }).selectOption('1')
+    const first = stats.getByRole('table', { name: 'Generation 1' })
+    await expect(first.getByRole('rowheader', { name: 'Blue' })).toBeVisible()
+    await stats.getByRole('combobox', { name: 'Species', exact: true }).selectOption('orange')
+    await expect(first.getByRole('rowheader')).toHaveText('Orange')
+
+    if (screen === 'desktop') {
+      await page.keyboard.press('Escape')
+      const options = page.getByRole('button', { name: 'Run options' })
+      await options.click()
+      await page.getByRole('button', { name: 'Branch here', exact: true }).click()
+      await page.getByLabel('Branch after day').fill('1')
+      await page.getByRole('button', { name: 'Edit branch rules' }).click()
+      await advancedSettings(page, 'Species food web')
+      const settings = page.getByRole('dialog', { name: 'Branch Settings' })
+      const branchEnable = settings.getByRole('switch', { name: 'Enable species food web' })
+      await expect(branchEnable).not.toBeChecked()
+      await branchEnable.check()
+      await settings.getByRole('combobox', { name: 'Eating species' }).selectOption('orange')
+      await expect(settings.getByRole('checkbox', { name: 'Blue', exact: true })).toBeChecked()
+      await settings.getByRole('button', { name: 'Create branch' }).click()
+      await expect(options).toHaveText('Day 2 / 10 · Ready')
+      await page.getByRole('link', { name: 'World', exact: true }).click()
+      await species.click()
+      await edit.click()
+      await expect(enable).toBeChecked()
+    }
+    expect(errors).toEqual([])
+  })
+}
+
+test('historical meal tables keep known totals and can recover prey counts from replay @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const WorkerConstructor = window.Worker
+    window.failHistoricalMealReplay = false
+    window.Worker = class extends WorkerConstructor {
+      postMessage(data, ...args) {
+        if (window.failHistoricalMealReplay && data.type === 'replay') {
+          window.failHistoricalMealReplay = false
+          queueMicrotask(() => this.dispatchEvent(new MessageEvent('message', {
+            data: { id: data.id, type: 'error', message: 'Replay unavailable for test' },
+          })))
+          return
+        }
+        super.postMessage(data, ...args)
+      }
+    }
+  })
+  await openSimulator(page)
+  await startRefugeFixture(page, setup => {
+    Object.assign(setup, { food: 150, endMode: 'timed', duration: 100 })
+    Object.assign(setup.species[0], { size: 12, sense: 100, energy: 1000 })
+    Object.assign(setup.species[1], { enabled: true, size: 7, sense: 50, energy: 1000 })
+  })
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.getByRole('link', { name: 'Trends', exact: true }).click()
+  await page.getByRole('button', { name: 'Advanced stats', exact: true }).click()
+  const stats = page.getByRole('dialog', { name: 'Advanced stats' })
+  await page.evaluate(() => { window.failHistoricalMealReplay = true })
+  await stats.getByRole('button', { name: 'Food & Hunting' }).click()
+  const blue = stats.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Blue', exact: true }) })
+  const unavailable = stats.getByText('Prey breakdown unavailable for this generation.')
+  await expect(unavailable).toBeVisible()
+  await expect(blue.getByRole('cell')).toHaveText([/^\d+$/, '—', '—', '10', /^\d+$/])
+  await stats.getByRole('button', { name: 'Try again' }).click()
+  await expect(blue.getByRole('cell')).toHaveText([/^\d+$/, '0', '10', '10', /^\d+$/])
+  await expect(unavailable).toBeHidden()
 })

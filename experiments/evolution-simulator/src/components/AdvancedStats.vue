@@ -5,6 +5,7 @@ import { runSpecies } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
 import { useForecast } from '../use-forecast.js'
 import ForecastStatus from './ForecastStatus.vue'
+import MealTable from './MealTable.vue'
 
 const TrendPlot = defineAsyncComponent(() => import('./TrendPlot.vue'))
 const lab = useLab()
@@ -139,6 +140,12 @@ function statValue(row) {
     <label>Stat <select v-model="chosen[view]">
       <option v-for="item in section.metrics" :key="item.key" :value="item.key">{{ item.option ?? item.label }}</option>
     </select></label>
+    <label v-if="view === 'food' && latest">Generation
+      <select :value="pinnedDay ?? ''" @change="pinnedDay = $event.target.value ? Number($event.target.value) : null">
+        <option value="">Latest completed</option>
+        <option v-for="row in rows" :key="row.day" :value="row.day">{{ row.day }}</option>
+      </select>
+    </label>
     <span v-if="latest" class="advanced-stats-latest quiet">Latest completed · Generation {{ latest.day }}</span>
   </div>
   <ForecastStatus :forecasts="[forecast]"/>
@@ -160,4 +167,5 @@ function statValue(row) {
       <button type="button" class="secondary" @click="emit('watch', reading.day)">Replay generation {{ reading.day }}</button>
     </section>
   </div>
+  <MealTable v-if="view === 'food' && reading" :day="reading.day"/>
 </template>

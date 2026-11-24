@@ -1,17 +1,20 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useLab } from '../store.js'
-import { rulesFor, TRAITS } from '../engine/config.js'
+import { FOOD_WEB_RULE_VERSION, rulesFor, TRAITS } from '../engine/config.js'
+import { copyDiet, DEFAULT_DIET, dietFor, EMPTY_FOOD_WEB } from '../engine/food-web.js'
 import { format } from '../engine/stats.js'
 import { MAX_TRAIT_CHANGE } from '../engine/trait-adjustments.js'
 import { newSpecies, SPECIES_TRAIT_LABELS, speciesActionIssue, speciesTraitValue, speciesWithEdits, splitSample } from '../engine/species-actions.js'
+import DietFields from './DietFields.vue'
+import FoodWebSettings from './FoodWebSettings.vue'
 import SpeciesFields from './SpeciesFields.vue'
 
 const lab = useLab()
 const dialog = ref()
 const kind = ref('introduce')
 const target = ref('')
-const definition = ref(null)
+const definition = ref(null), newDiet = ref(null), webDraft = ref(EMPTY_FOOD_WEB)
 const selection = ref('sample')
 const count = ref(1)
 const ids = ref([])
@@ -24,6 +27,9 @@ const rules = computed(() => {
   const base = rulesFor(lab.run.setup, lab.run.revisions, frame.value?.day ?? lab.viewing)
   return { ...base, species: speciesWithEdits(base.species, frame.value?.speciesEdits) }
 })
+const currentWeb = computed(() => frame.value?.foodWeb ?? EMPTY_FOOD_WEB)
+const webAvailable = computed(() => rules.value.version >= FOOD_WEB_RULE_VERSION)
+const step = computed(() => frame.value ? Math.round(frame.value.time / frame.value.stepSeconds) : 0)
 const living = computed(() => frame.value?.blobs.filter(blob => blob.alive) ?? [])
 const livingCounts = computed(() => {
   const counts = new Map()
@@ -52,15 +58,18 @@ const traits = computed(() => checked.value.length ? {
   values: Object.fromEntries(checked.value.map(key => [key, values.value[key] === '' ? null : values.value[key]])),
 } : undefined)
 const action = computed(() => {
+  if (kind.value === 'food-web') return JSON.stringify(webDraft.value) === JSON.stringify(currentWeb.value)
+    ? null : { kind: 'food-web', foodWeb: webDraft.value }
   if (!definition.value) return null
   const { id, name, color } = definition.value
   const creatureIds = chosen.value.map(blob => blob.id)
   if (kind.value === 'edit') return { kind: 'edit', id, identity: { name: name.trim(), color }, creatureIds, traits: traits.value }
   const full = { ...definition.value, name: name.trim(), count: Math.max(10, definition.value.count), enabled: true }
+  const diet = webAvailable.value ? newDiet.value : undefined
   if (kind.value === 'split') {
-    return { kind: 'split', id, definition: full, sourceId: source.value?.id, creatureIds, traits: traits.value }
+    return { kind: 'split', id, definition: full, sourceId: source.value?.id, creatureIds, traits: traits.value, diet }
   }
-  return { kind: 'introduce', id, definition: full, count: definition.value.count }
+  return { kind: 'introduce', id, definition: full, count: definition.value.count, diet }
 })
 const issue = computed(() => action.value ? speciesActionIssue(action.value, rules.value, frame.value?.blobs) : '')
 const preview = computed(() => {
@@ -85,6 +94,7 @@ const nextIds = computed(() => {
 const resultText = computed(() => {
   const result = lab.speciesResult
   if (!result) return ''
+  if (result.kind === 'food-web') return 'Updated the species food web'
   if (result.kind === 'edit') return 'Updated ' + result.identity.name
   const amount = result.creatureIds.length
   return (result.kind === 'split' ? 'Moved ' : 'Introduced ') + amount + (amount === 1 ? ' blob' : ' blobs') + ' in ' + result.definition.name
@@ -100,10 +110,18 @@ function resetTarget() {
   definition.value = kind.value === 'edit'
     ? source.value && { ...source.value }
     : newSpecies(rules.value.species, rules.value.version, kind.value === 'split' ? source.value : undefined)
+  if (kind.value === 'split' && source.value) {
+    newDiet.value = copyDiet(dietFor(currentWeb.value, source.value.id), source.value.id, definition.value.id)
+  } else newDiet.value = { ...DEFAULT_DIET, prey: [] }
 }
 
 function choose(nextKind) {
   kind.value = nextKind
+  if (nextKind === 'food-web') {
+    definition.value = null
+    webDraft.value = JSON.parse(JSON.stringify(currentWeb.value))
+    return
+  }
   target.value = choices.value[0]?.id ?? ''
   selection.value = 'sample'
   resetTarget()
@@ -138,7 +156,9 @@ onMounted(() => {
     <header><h2 id="world-species-title">Species</h2></header>
     <p v-if="frame" class="quiet">Day {{ frame.day }} · {{ format(frame.time) }} s{{ lab.replay ? ' · Replay' : ' · Paused' }}</p>
     <template v-if="lab.replay">
-      <p>Open the live day to change its species.</p>
+      <p>Open the live day to change species, or branch from a completed generation to try a different food web.</p>
+      <FoodWebSettings v-if="webAvailable" :model-value="currentWeb" :rules="rules"
+        :species="rules.species" :starting-day="frame.day" readonly/>
       <footer><button type="button" class="secondary" @click="close">Close</button>
         <button v-if="lab.canEnterLive" type="button" class="primary" @click="lab.goLive()">Back to Live</button></footer>
     </template>
@@ -159,8 +179,14 @@ onMounted(() => {
         <div class="species-presets" role="group" aria-label="Species action">
           <button v-for="[key, label] in [['introduce', 'Introduce species'], ['split', 'Split living blobs'], ['edit', 'Edit species']]" :key="key"
             type="button" class="secondary" :aria-pressed="kind === key" @click="choose(key)">{{ label }}</button>
+          <button v-if="webAvailable" type="button" class="secondary" :aria-pressed="kind === 'food-web'"
+            @click="choose('food-web')">Edit food web</button>
         </div>
-        <label v-if="kind !== 'introduce' && choices.length" class="dialog-field">
+        <template v-if="kind === 'food-web'">
+          <p class="quiet">Generation {{ frame.day }} · Step {{ step }}</p>
+          <FoodWebSettings v-model="webDraft" :rules="rules" :species="rules.species" :starting-day="frame.day"/>
+        </template>
+        <label v-else-if="kind !== 'introduce' && choices.length" class="dialog-field">
           {{ kind === 'split' ? 'Source species' : 'Species to edit' }}
           <select v-model="target" @change="resetTarget">
             <option v-for="item in choices" :key="item.id" :value="item.id">{{ item.name }} · {{ livingCounts.get(item.id) ?? 0 }} living</option>
@@ -170,6 +196,11 @@ onMounted(() => {
         <template v-else-if="definition">
           <p v-if="kind === 'split'" class="quiet">Selected blobs keep their IDs, positions, food, energy, age, and lineage.</p>
           <SpeciesFields :species="definition" :rules="rules" :starting="kind === 'introduce'" presets live/>
+          <details v-if="webAvailable && kind !== 'edit'" class="new-species-diet">
+            <summary>Food web diet</summary>
+            <p v-if="!currentWeb.enabled" class="quiet">This diet applies when the food web is enabled.</p>
+            <DietFields v-model="newDiet" :eater="definition" :species="rules.species"/>
+          </details>
           <template v-if="kind === 'split'">
             <label class="dialog-field">Pick blobs
               <select v-model="selection"><option value="sample">Seeded sample</option><option value="ids">Choose by ID</option></select>
@@ -207,7 +238,7 @@ onMounted(() => {
       <p v-if="lab.traitAdjustmentError" role="alert" class="issue">{{ lab.traitAdjustmentError }}</p>
       <p v-else-if="lab.adjustingTraits || !lab.canAdjustSpecies" role="status">{{ lab.adjustingTraits ? 'Applying changes…' : 'Confirming the paused tick…' }}</p>
       <p v-else-if="issue" role="status" class="quiet">{{ issue }}</p>
-      <div v-else-if="action" class="trait-preview">
+      <div v-else-if="action && kind !== 'food-web'" class="trait-preview">
         <strong>{{ total }} {{ total === 1 ? 'blob' : 'blobs' }} · Day {{ frame.day }} at {{ format(frame.time) }} s</strong>
         <details v-if="nextIds.length">
           <summary>{{ nextIds.length === 1 ? '#' + nextIds[0] : 'View ' + nextIds.length + ' creature IDs' }}</summary>
@@ -218,7 +249,7 @@ onMounted(() => {
         </p>
       </div>
       <footer>
-        <button type="button" class="secondary" :disabled="lab.adjustingTraits" @click="close">Cancel</button>
+        <button type="button" class="secondary" :disabled="lab.adjustingTraits" @click="close">{{ kind === 'food-web' ? 'Discard' : 'Cancel' }}</button>
         <button type="submit" class="primary" :disabled="!lab.canAdjustSpecies || !action || !!issue">Apply changes</button>
       </footer>
     </form>

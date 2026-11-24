@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { CircleX, Download, FastForward, Upload } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
+import { foodWebAt } from '../engine/food-web.js'
 import { runSpecies } from '../engine/species-actions.js'
 import { csv, download, setupLink } from '../export.js'
 import AdvancedStats from './AdvancedStats.vue'
@@ -131,6 +132,7 @@ async function createBranch(edit=false) {
   const { setup: current, revisions } = lab.run
   const setup = {
     ...JSON.parse(JSON.stringify(rulesFor(current, revisions, branchDay.value))),
+    foodWeb: foodWebAt(lab.run, branchDay.value),
     name: (current.name + ' · branch').slice(0,60),
     days: current.days,
     mode: current.mode,

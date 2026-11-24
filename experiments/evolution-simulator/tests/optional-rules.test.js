@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { oldAgeRisk } from '../src/engine/aging.js'
-import { FORAGING_DEFAULTS, starter, TERRITORY_RULE_VERSION, validate } from '../src/engine/config.js'
+import { FOOD_SEASONS_RULE_VERSION, FORAGING_DEFAULTS, starter, TERRITORY_RULE_VERSION, validate } from '../src/engine/config.js'
 import { dawn, dusk, founders, step } from '../src/engine/simulation.js'
 
 test('default optional rules preserve version 11 outcomes in both foraging modes', () => {
@@ -17,7 +17,7 @@ test('default optional rules preserve version 11 outcomes in both foraging modes
     return days
   }
   for (const foraging of [undefined, 'walkthrough']) {
-    const config = { ...starter(), seed: 118, food: 250, plantReward: 25, foraging }
+    const config = { ...starter(FOOD_SEASONS_RULE_VERSION), seed: 118, food: 250, plantReward: 25, foraging }
     const legacy = { ...config, version: TERRITORY_RULE_VERSION }
     const expected = run(legacy)
     assert.equal(expected.length, 5)

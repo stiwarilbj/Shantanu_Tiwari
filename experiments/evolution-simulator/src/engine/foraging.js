@@ -1,4 +1,5 @@
 import { canHunt, clamp, contact, edgePoint, FIELD, Grid, refugeContact, refugeDistance } from './geometry.js'
+import { canEatPlants, usesFoodWeb } from './food-web.js'
 import { random } from './random.js'
 
 const active = blob => blob.alive && !blob.home
@@ -34,7 +35,7 @@ function orient(blob, nearby, plants, ctx, config) {
     if (canHunt(blob, other, config) && (!prey || other.speedWorld < prey.speedWorld)) prey = other
   }
   const jitter = (stream, id = 0) => (random(config.seed, stream, ctx.day, ctx.tick, blob.id, id) - 0.5) * Math.PI / 2
-  const food = blob.credits < 2 ? nearestPlant(blob, plants, blob.sense) : null
+  const food = blob.credits < 2 && canEatPlants(blob, config) ? nearestPlant(blob, plants, blob.sense) : null
   const stepsLeft = Math.min(blob.energy / (blob.rate * ctx.stepSeconds), (ctx.limit ?? Infinity) - ctx.tick)
   const reserve = stepsLeft - Math.sqrt(distance(blob, blob.target)) / (blob.speedWorld * ctx.stepSeconds)
   const wantsHome = blob.credits >= 2 || (blob.credits === 1 && reserve <= 10)
@@ -49,6 +50,21 @@ function orient(blob, nearby, plants, ctx, config) {
   const edge = ctx.refugeWidth ? blob.r : 0
   return { state: 0, angle: x >= edge && x <= FIELD - edge && y >= edge && y <= FIELD - edge
     ? angle : towards(blob, { x: FIELD / 2, y: FIELD / 2 }) }
+}
+
+function hasEligiblePrey(blobs, config) {
+  if (!usesFoodWeb(config) || !config.predation) return false
+  const largest = new Map(), smallest = new Map()
+  for (const blob of blobs) {
+    if (!active(blob)) continue
+    if (!largest.has(blob.species) || largest.get(blob.species).size < blob.size) largest.set(blob.species, blob)
+    if (!smallest.has(blob.species) || smallest.get(blob.species).size > blob.size) smallest.set(blob.species, blob)
+  }
+  // Eligibility is monotonic in size. Only the largest hunter and smallest prey of each species matter.
+  for (const hunter of largest.values()) {
+    for (const prey of smallest.values()) if (canHunt(hunter, prey, config)) return true
+  }
+  return false
 }
 
 export function forage(ctx, config, settleHome, kill, eat) {
@@ -117,14 +133,14 @@ export function forage(ctx, config, settleHome, kill, eat) {
     }
   }
   for (const blob of blobs) {
-    if (!active(blob) || blob.credits >= 2 || !remaining) continue
+    if (!active(blob) || blob.credits >= 2 || !remaining || !canEatPlants(blob, config)) continue
     const plant = nearestPlant(blob, plants, reach(blob) + blob.speedWorld * seconds)
     if (plant && canReach(blob, plant)) {
       remaining--
       eat(ctx, config, blob, plant, end, 'plant')
     }
   }
-  if (!remaining) {
+  if (!remaining && !hasEligiblePrey(blobs, config)) {
     for (const blob of blobs) if (active(blob) && !blob.credits) kill(ctx, blob, end, 'Starvation')
   }
   ctx.tick++

@@ -1,3 +1,4 @@
+import { canEatPlants } from './food-web.js'
 import { FIELD, canHunt, clamp, contact, pathOf, refugeContact, turn } from './geometry.js'
 import { FORAGING_DEFAULTS } from './config.js'
 import { canPursuePrey, DECISION, keepsMeal, mealFitsBudget, remembersPlant, returnReserve,
@@ -246,7 +247,9 @@ export function improvedIntent(blob, ctx, config, plantGrid, blobGrid, timeLeft)
     return escapeHeading(blob, urgent, threats, home, seconds, ctx.refugeWidth)
   }
   if (!blob.returning) {
-    const plants = [...plantGrid.near(blob.x, blob.y, blob.sense)].filter(visible)
+    const plantsAllowed = canEatPlants(blob, config)
+    if (!plantsAllowed) memory.plant = null
+    const plants = plantsAllowed ? [...plantGrid.near(blob.x, blob.y, blob.sense)].filter(visible) : []
     const meal = findMeal(blob, memory, plants, nearby, config, now, ctx.refugeWidth, left - reserve, settings)
     if (meal) {
       memory.kind = meal.kind
