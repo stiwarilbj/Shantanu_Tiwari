@@ -1,9 +1,9 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, PALETTE, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesRefugeBorder, usesReproductionRules,
+  randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesReproductionRules,
   usesOptionalRules, usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
@@ -26,17 +26,14 @@ const dialog = ref(), tab = ref(draft.species[0].id), issue = ref({}), savedSpec
 const copied = ref(false), discarding = ref(false), applying = ref(false)
 const agingSpecies = ref(null)
 const foragingSpecies = ref(null), territorySpecies = ref(null)
-const body = ref(null), fields = ref(null), currentPage = ref('basic'), group = ref('habitat')
+const body = ref(null), fields = ref(null), currentPage = ref('basic'), group = ref(null)
 const categories = [
   { label: 'Environment', topics: { habitat: 'Habitat and food', territory: 'Starting territories' } },
-  { label: 'Survival', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting' } },
+  { label: 'Behavior & energy', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting' } },
   { label: 'Life cycle', topics: { inheritance: 'Inheritance and reproduction', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
 ]
 const category = computed(() => categories.find(item => Object.hasOwn(item.topics, group.value)))
-function showCategory(item) {
-  if (item !== category.value) showPage('advanced', Object.keys(item.topics)[0])
-}
 const forecastCycles = ref(String(forecastPreferences.cycles))
 const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
 function editForecastCycles(event) {
@@ -173,6 +170,11 @@ function showPage(page, nextGroup = group.value, focusHeading = false) {
   fields.value.scrollTop = 0
   if (focusHeading) nextTick(() => document.getElementById('advanced-settings-title')?.focus())
 }
+function showCategories() {
+  const previousTopic = group.value
+  showPage('advanced', null)
+  nextTick(() => document.getElementById('advanced-topic-' + previousTopic)?.focus())
+}
 async function copySeed() {
   try { await navigator.clipboard.writeText(String(draft.seed)); copied.value=true; setTimeout(()=>{ copied.value=false },1200) }
   catch { issue.value={ ...issue.value, clipboard:'Clipboard unavailable. Select the seed to copy it.' } }
@@ -239,12 +241,13 @@ onMounted(()=>dialog.value.showModal())
       </nav>
       <div id="settings-panel" ref="body" class="settings-body" :class="{ 'is-advanced': currentPage === 'advanced' }">
         <div v-if="currentPage === 'advanced'" class="advanced-settings">
-          <h2 id="advanced-settings-title" tabindex="-1">Advanced Settings</h2>
-          <nav class="advanced-categories" aria-label="Advanced settings categories">
-            <button v-for="item in categories" :key="item.label" type="button" :aria-pressed="item === category"
-              aria-controls="advanced-topics advanced-group" @click="showCategory(item)">{{ item.label }}</button>
-          </nav>
-          <nav id="advanced-topics" class="advanced-topics" :aria-label="category.label + ' topics'">
+          <div class="advanced-heading">
+            <button v-if="category" type="button" class="advanced-back" @click="showCategories">
+              <ChevronLeft :size="16" aria-hidden="true"/> All categories
+            </button>
+            <h2 id="advanced-settings-title" tabindex="-1">{{ category ? category.label : 'Advanced Settings' }}</h2>
+          </div>
+          <nav v-if="category" class="advanced-topics" :aria-label="category.label + ' topics'">
             <button v-for="(label, key) in category.topics" :key="key" type="button" :aria-pressed="group === key"
               aria-controls="advanced-group" @click="showPage('advanced', key)">{{ label }}</button>
           </nav>
@@ -316,12 +319,26 @@ onMounted(()=>dialog.value.showModal())
               </div>
             </section>
             <section class="setting-section">
-              <button type="button" class="advanced-summary" @click="showPage('advanced', 'habitat', true)">
+              <button type="button" class="advanced-summary" @click="showPage('advanced', null, true)">
                 <span><strong>Advanced Settings</strong><small>{{ rulesSummary }}</small></span>
                 <ChevronRight :size="17" aria-hidden="true"/>
               </button>
             </section>
           </template>
+
+          <nav v-else-if="!category" class="advanced-index" aria-label="Advanced settings categories">
+            <section v-for="(item, index) in categories" :key="item.label" class="advanced-category"
+              :aria-labelledby="'advanced-category-' + index">
+              <h3 :id="'advanced-category-' + index">{{ item.label }}</h3>
+              <ul>
+                <li v-for="(label, key) in item.topics" :key="key">
+                  <button :id="'advanced-topic-' + key" type="button" @click="showPage('advanced', key, true)">
+                    {{ label }} <ChevronRight :size="15" aria-hidden="true"/>
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </nav>
 
           <section v-else id="advanced-group" class="advanced-group" :aria-label="category.topics[group]">
             <template v-if="group === 'habitat'">
@@ -354,13 +371,6 @@ onMounted(()=>dialog.value.showModal())
             <template v-else-if="group === 'movement'">
               <div class="advanced-block">
                 <h3>How blobs move</h3>
-                <label v-if="standardDeviation" class="advanced-select">Foraging rules
-                  <select v-model="foraging"><option value="standard">Standard</option><option value="walkthrough">Video experiment</option></select>
-                </label>
-                <p v-if="foraging === 'walkthrough'" class="quiet">
-                  {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start in the gray refuge.' :
-                    'Blobs turn in steps and start the next day where their parents reached the edge.' }}
-                </p>
                 <label class="advanced-select">Stride
                   <select v-model="draft.stride"><option value="linked">Size-linked</option><option value="speed">Speed only</option></select>
                 </label>

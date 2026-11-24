@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { FORAGING_DEFAULTS, FORAGING_FIELDS, usesForagingDecisionRules, usesOptionalRules, usesStandardDeviation } from '../engine/config.js'
+import { FORAGING_DEFAULTS, FORAGING_FIELDS, usesForagingDecisionRules, usesOptionalRules,
+  usesRefugeBorder, usesStandardDeviation } from '../engine/config.js'
 import { canPursuePrey, keepsMeal, mealFitsBudget, remembersPlant, returnReserve, shouldReturn,
   shouldReturnWithoutMeal, timeSavedPercent } from '../engine/foraging-decisions.js'
 import { DT, WALKTHROUGH_STEP } from '../engine/geometry.js'
@@ -95,7 +96,12 @@ const preview = computed(() => {
     <label v-if="usesStandardDeviation(draft)" class="advanced-select">Foraging rules
       <select v-model="mode"><option value="standard">Standard</option><option value="walkthrough">Video experiment</option></select>
     </label>
-    <p v-if="mode === 'walkthrough'" class="quiet">Video experiment uses its own movement rules. These settings and the preview apply when you use Standard.</p>
+    <p v-if="mode === 'walkthrough'" class="quiet">
+      Video experiment uses its own movement rules.
+      {{ usesRefugeBorder(draft) ? 'Blobs turn in steps and start in the gray refuge.' :
+        'Blobs turn in steps and start the next day where their parents reached the edge.' }}
+      These settings and the preview apply when you use Standard.
+    </p>
     <template v-if="usesForagingDecisionRules(draft)">
       <label v-if="usesOptionalRules(draft)" class="advanced-toggle">
         <input id="advanced.customForaging" type="checkbox" :checked="customDecisions" @change="useCustomDecisions">

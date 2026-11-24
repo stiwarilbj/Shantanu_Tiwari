@@ -7,7 +7,7 @@ Watch blobs look for food, hunt, and have babies. Small changes in speed, size, 
 ## Try it
 
 - **World** plays one day at a time. Pick a blob to follow it, or use **Quick Sim** to jump ahead. If the last blob dies, select the extinction tile to watch the ending.
-- **Settings** lets you make species, change their traits, and decide how much food to put out. **Advanced** groups its controls under **Environment**, **Survival**, **Life cycle**, and **Run & charts**. Use **Preview day** under **Environment** to see where the plants will appear.
+- **Settings** lets you make species, change their traits, and decide how much food to put out. Open **Advanced** to see every topic under **Environment**, **Behavior & energy**, **Life cycle**, and **Run & charts**. For a peek at where plants will appear, choose **Habitat and food** and use **Preview day**.
 - **Starting territories** lets you choose which edges each species starts on and how close together the blobs begin. Preview their spots at dawn, then try it for one generation or every day.
 - **Optional rules** let you turn off reproduction, meal energy refills, or custom foraging and keep the values you set. A blob can still survive and collect food when reproduction and refills are off.
 - **Inheritance and reproduction** lets you try two-parent families, set the odds of twins, and decide how often each species’ traits change. Open Creature Details during a replay to see who the parents were.

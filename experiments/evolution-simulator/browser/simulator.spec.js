@@ -21,17 +21,11 @@ async function startRun(page, days = '10', configure) {
 }
 
 async function advancedSettings(page, group = 'Habitat and food') {
-  const categories = {
-    'Habitat and food': 'Environment', 'Starting territories': 'Environment',
-    'Movement and energy': 'Survival', 'Foraging decisions': 'Survival', 'Hunting': 'Survival',
-    'Inheritance and reproduction': 'Life cycle', 'Aging and lifespan': 'Life cycle',
-    'Day length': 'Run & charts', 'Graph predictions': 'Run & charts',
-  }
   const advanced = page.getByRole('button', { name: 'Advanced', exact: true })
   if (await advanced.getAttribute('aria-pressed') !== 'true') await advanced.click()
-  const category = categories[group]
-  await page.getByRole('navigation', { name: 'Advanced settings categories' }).getByRole('button', { name: category }).click()
-  await page.getByRole('navigation', { name: category + ' topics', exact: true }).getByRole('button', { name: group, exact: true }).click()
+  const categories = page.getByRole('navigation', { name: 'Advanced settings categories' })
+  if (await categories.count() === 0) await page.getByRole('button', { name: 'All categories' }).click()
+  await categories.getByRole('button', { name: group, exact: true }).click()
 }
 
 async function fixedDay(page, seconds = '10') {
@@ -1790,6 +1784,7 @@ test('Advanced Settings preview seeded patches and preserve the draft on a phone
     await page.getByRole('button', { name:/^Advanced Settings/ }).press('Enter')
     await expect(page.getByRole('heading', { name:'Advanced Settings' })).toBeFocused()
     const dialog = page.getByRole('dialog', { name:'Simulation Settings' })
+    await dialog.getByRole('button', { name:'Habitat and food', exact:true }).press('Enter')
     const habitat = dialog.getByRole('region', { name:'Habitat and food' })
     await habitat.getByLabel('Food placement').selectOption('patches')
     await habitat.getByRole('spinbutton', { name:'Number of patches' }).fill('8')
@@ -1876,8 +1871,8 @@ test('foraging decisions preview responds to species and settings on a phone @pa
   await page.getByRole('button', { name:'Simulation Settings' }).click()
   const dialog = page.getByRole('dialog', { name:'Simulation Settings' })
   await dialog.getByRole('button', { name:'Advanced', exact:true }).press('Enter')
-  await dialog.getByRole('button', { name:'Survival', exact:true }).press('Enter')
   await dialog.getByRole('button', { name:'Foraging decisions', exact:true }).press('Enter')
+  await expect(dialog.getByRole('heading', { name:'Behavior & energy' })).toBeFocused()
   const group = dialog.getByRole('region', { name:'Foraging decisions' })
   const species = group.getByRole('combobox', { name:'Foraging decisions for' })
   const mode = group.getByRole('combobox', { name:'Foraging rules' })
@@ -2053,7 +2048,8 @@ test('Settings rejects invalid day lengths instead of rounding them', async ({ p
     await seconds.fill(value)
     await advancedSettings(page, 'Hunting')
     await evolve.click()
-    await expect(page.getByRole('button', { name: 'Run & charts' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(settings.getByRole('navigation', { name: 'Run & charts topics' })
+      .getByRole('button', { name: 'Day length' })).toHaveAttribute('aria-pressed', 'true')
     await expect(seconds).toBeFocused()
     await expect(seconds).toHaveAccessibleDescription(error)
     await expect(seconds).toHaveValue(value)
@@ -2121,6 +2117,9 @@ test('discarding edits to a duplicated run restores the duplicated setup', async
   await expect(food).toHaveValue('444')
   await advancedSettings(page, 'Movement and energy')
   const foraging = settings.getByRole('combobox', { name: 'Foraging rules' })
+  await expect(foraging).toHaveCount(0)
+  await settings.getByRole('navigation', { name: 'Behavior & energy topics' })
+    .getByRole('button', { name: 'Foraging decisions' }).click()
   await foraging.selectOption('walkthrough')
   await discard.click()
   await settings.getByRole('button', { name: 'Discard draft', exact: true }).click()
@@ -2170,7 +2169,7 @@ test('paired breeding settings show both parents in the saved replay @pages', as
   await startRun(page, '10', async () => {
     await page.getByRole('spinbutton', { name: 'Food', exact: true }).fill('400')
     await page.getByRole('button', { name: /^Inheritance and reproduction/ }).press('Enter')
-    await expect(page.getByRole('heading', { name: 'Advanced Settings' })).toBeFocused()
+    await expect(page.getByRole('heading', { name: 'Life cycle' })).toBeFocused()
     await page.getByLabel('Parent mode').selectOption('pair')
     const chance = page.getByRole('spinbutton', { name: 'Chance of a birth (%)' })
     await chance.fill('101')
