@@ -437,25 +437,19 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .setting-section{margin:4px auto 0;max-width:600px}
 .setting-section h2{display:flex;align-items:center;justify-content:center;gap:9px;text-align:center;font-size:13px;margin:0 auto 3px}
 .setting-section h2::before,.setting-section h2::after{content:'';flex:1;max-width:44px;height:1px;background:#a5a19555}
-.species-tabs,.species-editor,.quick-picks,.seed-actions{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:7px}
+.species-tabs,.quick-picks,.seed-actions{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:7px}
 .species-tabs{margin-bottom:3px;gap:4px}
 .species-tab{min-height:24px;padding:2px 7px;font-size:11px}
 .species-tab i{width:10px;height:10px;border-radius:50%;background:var(--species)}.species-tab small{color:var(--quiet)}
-.species-editor{gap:3px 9px;color:var(--muted);font-size:11px;margin-bottom:3px}
-.species-editor label{display:inline-flex;align-items:center;gap:5px}.species-editor input:not([type=color],[type=checkbox]){width:112px;min-height:27px;padding:2px 6px;font-size:12px}
-.species-editor input[type=color]{height:26px;width:35px;padding:2px}
-.species-editor details summary{font-size:11px;padding:3px 4px}
+.species-actions summary{font-size:11px;padding:3px 4px}
 .species-actions{position:relative}.species-actions button{color:var(--muted);padding:6px}.species-actions button:hover{color:var(--focus)}
-.species-traits{max-width:600px;margin:auto}
-.species-trait-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
-.species-trait-fields .number-shell{grid-template-columns:minmax(0,1fr) 50px;grid-template-rows:20px 22px;min-height:42px}
-.species-trait-fields .number-shell>label{grid-column:1;grid-row:1;min-width:0;padding:2px 4px;font-size:10px;white-space:nowrap}
-.species-trait-fields .number-shell>.spring{grid-column:2;grid-row:1;min-width:0;gap:0;padding:0}
-.species-trait-fields .spring button{width:14px;min-height:18px}
-.species-trait-fields .spring-track{height:18px}
-.species-trait-fields .spring-track i{top:8px}
-.species-trait-fields .number-shell>input{grid-column:1/-1;grid-row:2;min-height:22px;padding:1px 4px;font-size:12px}
-.traits-readout{display:block;margin-top:2px;text-align:right;font-size:10px;line-height:1.1}
+.species-starting-fields .number-shell{grid-template-columns:minmax(0,1fr) 50px;grid-template-rows:20px 22px;min-height:42px}
+.species-starting-fields .number-shell>label{grid-column:1;grid-row:1;min-width:0;padding:2px 4px;font-size:10px;white-space:nowrap}
+.species-starting-fields .number-shell>.spring{grid-column:2;grid-row:1;min-width:0;gap:0;padding:0}
+.species-starting-fields .spring button{width:14px;min-height:18px}
+.species-starting-fields .spring-track{height:18px}
+.species-starting-fields .spring-track i{top:8px}
+.species-starting-fields .number-shell input[type=number]{grid-column:1/-1;grid-row:2;min-width:0;min-height:22px;padding:1px 4px;font-size:12px}
 .form-stack{display:grid;gap:4px}
 .number-shell{display:grid;grid-template-columns:minmax(92px,1fr) minmax(99px,1.02fr) 72px;align-items:stretch;min-height:37px;border:1px solid #45423a;border-radius:5px;background:#131313;overflow:hidden}
 .number-shell>label{display:flex;align-items:center;padding:5px 8px;background:#1e1e1d;color:var(--cream);font:13px var(--mono);line-height:1.2}
@@ -472,7 +466,6 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .daily-cards,.start-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-width:600px;margin:3px auto}
 .daily-card{min-width:0;background:transparent;border:0;border-top:1px solid var(--daily-rule);border-radius:0;padding:3px 4px}
 .setting-inset{background:#1c1c1b;border:1px solid var(--subtle);border-radius:5px;padding:5px}
-.energy-card{--daily-ink:#e6cf79;--daily-rule:#8f8048}
 .food-card{--daily-ink:#c4cd97;--daily-rule:#6c7c3a}
 .daily-card .number-shell{grid-template-columns:minmax(43px,.7fr) minmax(0,1fr) 48px;min-height:31px}
 .daily-card .number-shell>label{padding:3px 5px;color:var(--daily-ink);font-size:11px}
@@ -800,22 +793,20 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .advanced-block{padding:9px}
   .daily-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
   .final-fields{grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
-  .species-editor{gap:2px 6px;font-size:10px}
-  .species-editor input:not([type=color],[type=checkbox]){width:100px}
-  .species-trait-fields{gap:3px}
-  .species-trait-fields .number-shell,.final-fields .number-shell{
+  .species-starting-fields{gap:3px}
+  .species-starting-fields .number-shell,.final-fields .number-shell{
     grid-template-columns:minmax(0,1fr);grid-template-rows:16px 18px 20px;min-height:54px
   }
-  .species-trait-fields .number-shell>label,.final-fields .number-shell>label{
+  .species-starting-fields .number-shell>label,.final-fields .number-shell>label{
     grid-column:1;grid-row:1;min-width:0;padding:1px 3px;font-size:9px
   }
-  .species-trait-fields .number-shell>.spring,.final-fields .number-shell>.spring{
+  .species-starting-fields .number-shell>.spring,.final-fields .number-shell>.spring{
     grid-column:1;grid-row:2;min-width:0;gap:1px;padding:0 2px
   }
-  .species-trait-fields .spring button,.final-fields .spring button{width:15px;min-height:17px}
-  .species-trait-fields .spring-track,.final-fields .spring-track{height:17px}
-  .species-trait-fields .spring-track i,.final-fields .spring-track i{top:7px}
-  .species-trait-fields .number-shell>input,.final-fields .number-shell>input{
+  .species-starting-fields .spring button,.final-fields .spring button{width:15px;min-height:17px}
+  .species-starting-fields .spring-track,.final-fields .spring-track{height:17px}
+  .species-starting-fields .spring-track i,.final-fields .spring-track i{top:7px}
+  .species-starting-fields .number-shell input[type=number],.final-fields .number-shell>input{
     grid-column:1;grid-row:3;min-width:0;min-height:20px;padding:1px 3px;font-size:11px
   }
   .daily-card{padding:2px 1px}
@@ -929,3 +920,23 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .spotlight-layout .spotlight-plot{grid-column:1 / -1;grid-row:auto;min-height:0}
   .spotlight-layout .spotlight-plot .chart-canvas{height:min(45vh,360px);min-height:240px;flex:none}
 }
+
+.species-fields { max-width: 620px; margin: 8px auto; }
+.species-identity, .species-presets { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.species-identity { margin-block: 8px; }
+.species-identity label { display: flex; align-items: center; gap: 6px; }
+.species-identity input:not([type=color],[type=checkbox]) { width: min(190px, 41vw); }
+.species-identity input[type=color] { width: 38px; padding: 2px; }
+.species-presets { margin-block: 8px; }
+.species-presets > button[aria-pressed=true] { border-color: var(--rail); color: var(--cream); }
+.species-management { justify-content: center; }
+.species-starting-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-block: 10px; }
+.species-creation { padding: 12px; margin-block: 10px; border: 1px solid var(--line); border-radius: 7px; }
+.species-creation > h3 { margin: 0; }
+.world-species-button { margin-right: 4px; min-width: 66px; }
+.task-dialog.species-dialog { width: min(575px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.species-workflow { min-width: 0; border: 0; padding: 0; margin: 0; }
+.species-trait-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+.species-trait-row > input { width: 92px; }
+.species-id-list { max-height: 88px; overflow: auto; overflow-wrap: anywhere; }
+.daily-cards.food-only { max-width: 300px; grid-template-columns: minmax(0, 1fr); }

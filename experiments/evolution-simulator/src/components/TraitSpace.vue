@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useLab } from '../store.js'
+import { runSpecies } from '../engine/species-actions.js'
 import { format } from '../engine/stats.js'
 
 const props=defineProps({scope:String})
@@ -27,13 +28,13 @@ const chosen=computed(()=>{
   const id=queryText.value ? searchedId.value : chosenId.value
   return cohort.value.find(blob=>blob.id===id)
 })
-const species=computed(()=>Object.fromEntries(lab.run.setup.species.map(s=>[s.id,s])))
+const species=computed(()=>Object.fromEntries(runSpecies(lab.run, day.value).map(s=>[s.id,s])))
 const idResult=computed(()=>{
   if (!queryText.value || queryText.value==='#') return ''
   const id=searchedId.value
   if (id===null) return 'Enter a creature ID like #142'
   if (!track.value) return ''
-  if (chosen.value) return `Selected ${species.value[chosen.value.species].name} #${id} on Day ${day.value}`
+  if (chosen.value) return `Selected ${species.value[chosen.value.species]?.name ?? chosen.value.species} #${id} on Day ${day.value}`
   if (dayBlobs.value.some(blob=>blob.id===id)) return `Creature #${id} is hidden by the species filter on Day ${day.value}`
   return `Creature #${id} wasn’t found among the living creatures on Day ${day.value}`
 })

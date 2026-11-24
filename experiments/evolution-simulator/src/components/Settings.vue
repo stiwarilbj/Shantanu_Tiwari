@@ -3,14 +3,16 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { breedingCanProduceOffspring, endsWhenSettled, LEGACY_RULE_VERSION, MAX_SEED, mutationEnabled,
-  mutationProducesSpread, PALETTE, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, speciesTemplate, usesAgingRules, usesHabitatRules, usesReproductionRules,
+  mutationProducesSpread, SETTLED_RULE_VERSION, TRAITS,
+  randomSeed, usesAgingRules, usesHabitatRules, usesReproductionRules,
   usesOptionalRules, usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
-import { travel, cost, walkthroughStepCost } from '../engine/geometry.js'
+import { newSpecies } from '../engine/species-actions.js'
+import { cost, walkthroughStepCost } from '../engine/geometry.js'
 import AgingSettings from './AgingSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
 import HabitatSettings from './HabitatSettings.vue'
 import NumberField from './NumberField.vue'
+import SpeciesFields from './SpeciesFields.vue'
 import StartingTerritories from './StartingTerritories.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
 
@@ -25,6 +27,13 @@ const breeding = computed(() => draft.advanced?.breeding !== false)
 const canBreed = computed(() => breedingCanProduceOffspring(draft))
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), savedSpecies = ref(null)
+const newDraft = ref(null)
+const creationIssue = computed(() => {
+  if (!newDraft.value) return {}
+  const id = newDraft.value.id
+  return Object.fromEntries(Object.entries(validate({ ...draft, species: [...draft.species, newDraft.value] }))
+    .filter(([key]) => key.startsWith(id + '.')))
+})
 const showValidation = ref(false), actionIssue = ref({})
 const copied = ref(false), discarding = ref(false), applying = ref(false)
 const agingSpecies = ref(null), previewAge = ref(8), foragingScenario = ref('memory')
@@ -102,7 +111,6 @@ const seconds = computed({
   set: value => { draft.duration = value === '' ? '' : value * 10 },
 })
 const total = computed(() => draft.species.filter(s=>s.enabled).reduce((sum,s)=>sum+(Number(s.count)||0),0))
-const endurance = computed(() => selected.value.energy/cost(selected.value,draft))
 const swatches = { speed:'#9A5A57',size:'#44877C',sense:'#468298' }
 const labels = { speed:'Speed',size:'Size',sense:'Sense Range' }
 const titleErrors = computed(() => Object.entries(issue.value).map(([key,message])=>({key,message})))
@@ -113,17 +121,18 @@ const foraging = computed({
     else delete draft.foraging
   },
 })
-function add(copy=false) {
-  const id = crypto.randomUUID()
-  const original = selected.value
-  const color = PALETTE.find(c=>!draft.species.some(s=>s.color.toLowerCase()===c.toLowerCase())) ??
-    '#'+((draft.species.length*2654435761)>>>8).toString(16).padStart(6,'0')
-  const stem = copy ? original.name.slice(0,23)+' copy' : 'Species'
-  let name = copy ? stem : 'Species '+(draft.species.length+1)
-  let i = 2
-  while (draft.species.some(s=>s.name.toLowerCase()===name.toLowerCase())) name=stem+' '+i++
-  draft.species.push(copy ? { ...JSON.parse(JSON.stringify(original)),id,name,color } : speciesTemplate(id,name,color,10,true,draft.version))
-  tab.value=id
+function add(source) {
+  newDraft.value = newSpecies(draft.species, draft.version, source)
+  nextTick(() => document.getElementById(newDraft.value?.id + '.name')?.focus())
+}
+function confirmSpecies() {
+  if (!newDraft.value || Object.keys(creationIssue.value).length) return
+  const candidate = newDraft.value
+  candidate.name = candidate.name.trim()
+  draft.species.push(candidate)
+  tab.value = candidate.id
+  newDraft.value = null
+  nextTick(() => document.getElementById(candidate.id + '.name')?.focus())
 }
 function remove() {
   if (draft.species.length<2) return
@@ -165,6 +174,7 @@ async function copySeed() {
   catch { actionIssue.value={ ...actionIssue.value, clipboard:'Clipboard unavailable. Select the seed to copy it.' } }
 }
 function discard() {
+  newDraft.value=null
   lab.resetDraft()
   tab.value=draft.species[0].id
   savedSpecies.value=null
@@ -206,6 +216,7 @@ function speciesForError(key) {
 }
 
 async function apply() {
+  if (newDraft.value) return
   if (applying.value) return
   actionIssue.value = {}
   const { errors, setup } = checkedDraft.value
@@ -269,29 +280,28 @@ onMounted(()=>dialog.value.showModal())
               <h2>Blob Creatures</h2>
               <div class="species-tabs" aria-label="Edit species">
                 <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
-                  :aria-pressed="selected.id===s.id" :style="{'--species':s.color}" @click="tab=s.id">
-                  <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
+                  :aria-pressed="selected.id===s.id" :aria-description="s.count + ' founders'" :style="{'--species':s.color}" @click="tab=s.id">
+                  <i></i>{{ s.name }}<small v-if="s.enabled" aria-hidden="true">{{ s.count }} founders</small><small v-else>Off</small>
                 </button>
-                <button v-if="fork==null" class="secondary" type="button" @click="add()"><Plus :size="15"/> Add species</button>
               </div>
-              <div v-if="fork==null" class="species-editor">
-                <label>Name <input :id="selected.id+'.name'" v-model="selected.name" maxlength="30"></label>
-                <label>Color <input :id="selected.id+'.color'" v-model="selected.color" type="color"></label>
-                <label><input v-model="selected.enabled" type="checkbox"> Enabled</label>
+              <div v-if="fork==null" class="species-presets species-management">
+                <button class="secondary" type="button" :disabled="!!newDraft" @click="add()"><Plus :size="15"/> New species</button>
+                <button class="secondary" type="button" :disabled="!!newDraft" @click="add(selected)"><Copy :size="15"/> Duplicate</button>
                 <details class="species-actions"><summary>Species actions</summary>
-                  <button type="button" @click="add(true)">Duplicate</button><button type="button" @click="reorder(-1)">Move left</button>
-                  <button type="button" @click="reorder(1)">Move right</button><button type="button" :disabled="draft.species.length<2" @click="remove">Remove</button>
+                  <button type="button" @click="reorder(-1)">Move left</button><button type="button" @click="reorder(1)">Move right</button>
+                  <button type="button" :disabled="draft.species.length<2 || !!newDraft" @click="remove">Remove</button>
                 </details>
               </div>
               <div v-if="savedSpecies" class="center quiet">Species removed from draft. <button type="button" class="link" @click="undo">Undo</button></div>
-              <div v-if="fork==null" class="species-traits">
-                <div class="species-trait-fields">
-                  <NumberField :id="selected.id+'.count'" v-model="selected.count" label="Founders" :min="10" :max="1000" compact :error="issue[selected.id+'.count']"/>
-                  <NumberField v-for="key in TRAITS" :id="selected.id+'.'+key" :key="key" v-model="selected[key]" :label="labels[key]"
-                    :min="1" :max="100" :tint="swatches[key]" compact :error="issue[selected.id+'.'+key]"/>
+              <div v-if="newDraft" class="species-creation">
+                <h3>New species</h3>
+                <SpeciesFields :species="newDraft" :rules="draft" :issue="creationIssue" starting presets/>
+                <div class="species-presets">
+                  <button type="button" class="secondary" @click="newDraft=null">Cancel</button>
+                  <button type="button" class="primary" :disabled="!!Object.keys(creationIssue).length" @click="confirmSpecies">Add to setup</button>
                 </div>
-                <small class="quiet traits-readout">{{ travel(selected,draft).toFixed(0) }} units/s · {{ Number.isFinite(endurance) ? endurance.toFixed(1) : '—' }} s of movement on starting energy</small>
               </div>
+              <SpeciesFields v-else-if="fork==null" :species="selected" :rules="draft" :issue="issue" starting/>
             </section>
             <div class="setting-section advanced-shortcuts">
               <button type="button" class="advanced-summary" @click="showPage('advanced', 'reproduction', true)">
@@ -305,10 +315,7 @@ onMounted(()=>dialog.value.showModal())
             </div>
             <section class="setting-section">
               <h2>Each generation</h2>
-              <div class="daily-cards">
-                <div class="daily-card energy-card">
-                  <NumberField :id="selected.id+'.energy'" v-model="selected.energy" label="Energy" :min="10" :max="1000" :pace="100" tint="#8F8048" compact :disabled="fork!=null" :error="issue[selected.id+'.energy']"/>
-                </div>
+              <div class="daily-cards food-only">
                 <div class="daily-card food-card">
                   <NumberField id="food" v-model="draft.food" label="Food" :min="10" :max="1000" tint="#6C7C3A" compact :error="issue.food"/>
                 </div>
@@ -547,10 +554,10 @@ onMounted(()=>dialog.value.showModal())
       <footer class="settings-footer">
         <div v-if="titleErrors.length" class="settings-errors issue" tabindex="-1" role="alert"><p>Review the setup</p><ul><li v-for="error in titleErrors" :key="error.key">{{ error.message }}</li></ul></div>
         <p>{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} {{ draft.foodSeasons?.enabled ? 'base plants' : 'plants' }} per founder</p>
-        <p v-if="lab.draftChanged && fork==null" class="quiet">Draft has changes <button type="button" class="link" @click="discarding=true">Discard changes</button></p>
+        <p v-if="(lab.draftChanged || !!newDraft) && fork==null" class="quiet">Draft has changes <button type="button" class="link" @click="discarding=true">Discard changes</button></p>
         <p v-if="discarding">Restore the setup you opened? <button type="button" class="secondary" @click="discard">Discard draft</button> <button type="button" class="link" @click="discarding=false">Keep editing</button></p>
         <p v-if="lab.branchPreparing!=null" class="quiet" role="status">Preparing branch from Day {{ lab.branchPreparing }}…</p>
-        <button type="submit" class="primary evolve" :disabled="applying">{{ fork==null ? 'Evolve!' : 'Create branch' }}</button>
+        <button type="submit" class="primary evolve" :disabled="!!newDraft || applying">{{ fork==null ? 'Evolve!' : 'Create branch' }}</button>
         <small class="quiet">by natural selection</small>
       </footer>
     </form>

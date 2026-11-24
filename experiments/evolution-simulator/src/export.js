@@ -1,3 +1,4 @@
+import { runSpecies } from './engine/species-actions.js'
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
 import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
   REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
@@ -129,15 +130,21 @@ export function csv(run, scope='all', start=1, end=1000) {
   const traits=METRICS.filter(m=>m.key!=='population')
   const fields=['n','mean','p25','p75','min','max','sd']
   const base=['opening','population','births','deaths','net','food','plants','plantsLeft','hunts']
-  const headers=['run','seed','rule_version','day','scope','rule_start_day','fork_day',...base,...DEATH_CAUSES,...traits.flatMap(m=>fields.map(f=>m.key+'_'+f))]
+  const hasSpeciesHistory = !!run.speciesActions?.length
+  const movement = ['introduced', 'transferredIn', 'transferredOut']
+  const headers=['run','seed','rule_version','day','scope','rule_start_day','fork_day',...base,...DEATH_CAUSES,...traits.flatMap(m=>fields.map(f=>m.key+'_'+f)),
+    ...(hasSpeciesHistory ? ['species_name', 'species_color', ...movement] : [])]
   const out=[headers]
   for(const day of run.summaries.filter(s=>s.day>=start&&s.day<=end)) {
     const revision=run.revisions?.findLast(r=>r.day<=day.day)
     const rules=revision?.setup ?? run.setup
+    const species = hasSpeciesHistory ? new Map(runSpecies(run, day.day).map(item => [item.id, item])) : null
     for(const [id,row] of Object.entries(day.rows)) {
       if(scope!=='*'&&scope!==id) continue
       out.push([run.id,rules.seed,rules.version,day.day,id,revision?.day ?? 1,run.forkDay,...base.map(k=>row[k]),...DEATH_CAUSES.map(c=>row.causes?.[c] ?? 0),
-        ...traits.flatMap(m=>fields.map(f=>row[m.key]?.[f]))])
+        ...traits.flatMap(m=>fields.map(f=>row[m.key]?.[f])),
+        ...(species ? [id === 'all' ? 'All species' : species.get(id)?.name, species.get(id)?.color,
+          ...movement.map(key => row[key] ?? 0)] : [])])
     }
   }
   return out.map(row=>row.map(v=>v==null?'':'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n')

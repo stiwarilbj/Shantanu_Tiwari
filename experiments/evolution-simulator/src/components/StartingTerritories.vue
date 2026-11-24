@@ -4,6 +4,7 @@ import { rulesFor, TERRITORY_EDGES, TERRITORY_FIELDS, validate } from '../engine
 import { FIELD } from '../engine/geometry.js'
 import { dawn, founders } from '../engine/simulation.js'
 import { startingEdge, territoryFor } from '../engine/starting-territories.js'
+import { speciesWithEdits } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
 import NumberField from './NumberField.vue'
 
@@ -60,7 +61,7 @@ const preview = computed(() => {
 
   const previous = fork == null ? draft : rulesFor(lab.run.setup, lab.run.revisions, fork)
   const board = dawn(draft, day, checkpoint.value ?? founders(draft), previous)
-  const counts = new Map(draft.species.filter(species => species.enabled).map(species => [
+  const counts = new Map(speciesWithEdits(draft.species, board.speciesEdits).filter(species => species.enabled).map(species => [
     species.id, { name: species.name, color: species.color, total: 0, edges: [0, 0, 0, 0] },
   ]))
   for (const blob of board.blobs) {

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { LEGACY_RULE_VERSION, REFUGE_RULE_VERSION, starter, WALKTHROUGH_RULE_VERSION } from '../src/engine/config.js'
+import { setupFromLink } from '../src/export.js'
 import { guideSource } from '../src/guide-replay.js'
 
 async function openSimulator(page) {
@@ -216,7 +217,7 @@ test('the production build runs a new experiment and shows its charts @pages', a
     if (isAppRequest(failed.url())) problems.push(failed.url())
   })
   if (process.env.PAGES_URL) {
-    const built = await readFile('dist/index.html', 'utf8')
+    const built = await readFile(new URL('../../../docs/experiments/evolution-simulator/index.html', import.meta.url), 'utf8')
     const entry = built.match(/<script type="module"[^>]* src="([^"]+)"/)?.[1]
     expect(entry).toBeTruthy()
     await expect.poll(async () => (await request.get('./')).text(), { timeout: 45000 }).toContain(entry)
@@ -5068,4 +5069,185 @@ test('advanced zero birth chance keeps unused reproduction and mutation settings
   await expect(twins).toHaveValue('101')
   await evolve.click()
   await expect(errors).toContainText('Chance of twins')
+})
+
+test('species editor introduces, splits, and renames blobs at the paused tick @pages', async ({ page, context }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page, '10')
+    const newSpecies = page.getByRole('button', { name: 'New species', exact: true })
+    await newSpecies.click()
+    await page.getByRole('button', { name: 'Wide sight' }).click()
+    await expect(page.getByRole('spinbutton', { name: 'Sense Range' })).toHaveValue('40')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Species 4', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Duplicate', exact: true }).click()
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Blue copy')
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Spruce')
+    const founders = page.getByRole('spinbutton', { name: 'Founders' })
+    await expect(founders).toHaveValue('50')
+    await founders.fill('10')
+    await page.getByRole('button', { name: 'Add to setup' }).click()
+    await expect(page.getByRole('button', { name: 'Spruce', exact: true })).toBeVisible()
+  })
+  await stepTo(page, 0.1)
+  await stepTo(page, 0.2)
+  const speciesButton = page.getByRole('button', { name: 'Species', exact: true })
+  const editor = page.getByRole('dialog', { name: 'Species', exact: true })
+  const apply = editor.getByRole('button', { name: 'Apply changes' })
+  const name = editor.getByRole('textbox', { name: 'Name', exact: true })
+  await speciesButton.click()
+  await name.fill('Mint')
+  const count = editor.getByRole('spinbutton', { name: 'Blobs to introduce' })
+  await count.fill('0')
+  await expect(apply).toBeDisabled()
+  await count.fill('1')
+  await editor.getByRole('button', { name: 'Fast', exact: true }).click()
+  await expect(editor.getByText('1 blob · Day 1 at 0.20 s')).toBeVisible()
+  await expect(editor.locator('summary')).toHaveText('#61')
+  await apply.click()
+  await expect(editor.getByRole('status')).toHaveText(/Introduced 1 blob in Mint/)
+  await editor.getByRole('button', { name: 'Make another change' }).click()
+  await editor.getByRole('button', { name: 'Split living blobs' }).click()
+  await name.fill('Teal')
+  await editor.getByLabel('Pick blobs').selectOption('ids')
+  await editor.getByLabel('Find by ID').fill('#1')
+  await editor.getByRole('checkbox', { name: /^#1 Active$/ }).check()
+  await apply.click()
+  await expect(editor.getByRole('status')).toHaveText(/Moved 1 blob in Teal/)
+  await stepAfterClosing()
+  await speciesButton.click()
+  await editor.getByRole('button', { name: 'Edit species' }).click()
+  await editor.getByLabel('Species to edit').selectOption({ label: 'Teal · 1 living' })
+  await name.fill('Jade')
+  await editor.getByLabel('Change type').selectOption('set')
+  await editor.getByRole('checkbox', { name: 'Speed', exact: true }).check()
+  await editor.getByLabel('Speed value').fill('12')
+  await apply.click()
+  await expect(editor.getByRole('status')).toHaveText(/Updated Jade/)
+  await editor.getByRole('button', { name: 'Done' }).click()
+  await expect(speciesButton).toBeFocused()
+  await page.reload()
+
+  const details = page.getByRole('complementary', { name: 'Creature details' })
+  const creature = details.getByRole('combobox', { name: 'Creature', exact: true })
+  await selectFounder()
+  await expect(details.getByText('Jade · #1', { exact: true })).toBeVisible()
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  const replay = page.getByRole('slider', { name: 'Replay time' })
+  await replay.fill('0.1')
+  await expect(details.getByText('Blue · #1', { exact: true })).toBeVisible()
+  await expect(creature.getByRole('option', { name: /#61/ })).toHaveCount(0)
+  await replay.fill('0.2')
+  await expect(details.getByText('Teal · #1', { exact: true })).toBeVisible()
+  await expect(creature.getByRole('option', { name: '#61 · Mint' })).toHaveCount(1)
+  await expect(details.getByRole('button', { name: '0.20 s Moved to Teal' })).toBeVisible()
+  await replay.fill('0.3')
+  await expect(details.getByText('Jade · #1', { exact: true })).toBeVisible()
+  await expect(details.getByText('Speed', { exact: true }).locator('xpath=following-sibling::dd[1]')).toHaveText('12.00')
+
+  await openRunLibrary(page)
+  const library = page.getByRole('dialog', { name: 'Run Library' })
+  const original = library.locator('article').filter({ hasText: 'Browser test run' })
+  await original.getByRole('button', { name: 'Actions', exact: true }).click()
+  await original.getByRole('button', { name: 'Copy setup link' }).click()
+  await expect(library.getByText('Setup link copied. It opens a new experiment draft.')).toBeVisible()
+  const link = await page.evaluate(() => navigator.clipboard.readText())
+  const shared = setupFromLink(new URL(link).hash)
+  expect(shared.species.find(item => item.name === 'Spruce').count).toBe(10)
+  expect(shared.species.map(item => item.name)).not.toContain('Mint')
+  await page.keyboard.press('Escape')
+
+  const options = page.getByRole('button', { name: 'Run options' })
+  await options.click()
+  await page.getByRole('button', { name: 'Branch here', exact: true }).click()
+  await page.getByRole('button', { name: 'Create branch', exact: true }).click()
+  await expect(options).toHaveText('Day 2 / 10 · Ready')
+  await page.getByRole('button', { name: 'Previous day' }).click()
+  await selectFounder()
+  await replay.fill('0.3')
+  await expect(details.getByText('Jade · #1', { exact: true })).toBeVisible()
+
+  await openRunLibrary(page)
+  const branch = library.locator('article').filter({ hasText: 'Browser test run · branch' })
+  await branch.getByRole('button', { name: 'Actions', exact: true }).click()
+  const download = page.waitForEvent('download')
+  await branch.getByRole('button', { name: 'Export setup' }).click()
+  const buffer = await readFile(await (await download).path())
+  const exported = JSON.parse(buffer)
+  expect(exported.speciesActions.map(({ kind, tick }) => [kind, tick])).toEqual([['introduce', 2], ['split', 2], ['edit', 3]])
+  const invalid = { ...exported, speciesActions: [{ ...exported.speciesActions[0], tick: 0, creatureIds: [900] }] }
+  await library.locator('input[type=file]').setInputFiles({
+    name: 'invalid-species-branch.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(invalid)),
+  })
+  await expect(library.getByRole('alert')).toHaveText('This file contains incompatible run history.')
+  await expect(options).toHaveText('Day 1 / 10 · Replay')
+  await library.locator('input[type=file]').setInputFiles({ name: 'species-branch.json', mimeType: 'application/json', buffer })
+  await expect(options).toHaveText('Day 1 / 10 · Ready')
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  await selectFounder()
+  await replay.fill('0.3')
+  await expect(details.getByText('Jade · #1', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+
+  async function selectFounder() {
+    if (!await creature.isVisible()) {
+      await page.getByRole('button', { name: 'View options' }).click()
+      await page.getByRole('button', { name: 'Creatures', exact: true }).click()
+    }
+    await creature.selectOption('1')
+  }
+
+  async function stepAfterClosing() {
+    await editor.getByRole('button', { name: 'Done' }).click()
+    await stepTo(page, 0.3)
+  }
+})
+
+test('species editor fits a phone and can return to live after a replay @pages', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: { width: 375, height: 620 }, isMobile: true, hasTouch: true })
+  try {
+    const page = await context.newPage()
+    await openSimulator(page)
+    await startRun(page, '10', () => fixedDay(page, '10'))
+    const button = page.getByRole('button', { name: 'Species', exact: true })
+    const editor = page.getByRole('dialog', { name: 'Species', exact: true })
+    await button.tap()
+    const bounds = await editor.boundingBox()
+    expect(bounds.x).toBeGreaterThanOrEqual(0)
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(375)
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(620)
+    const clippedInputs = await editor.locator('.species-starting-fields .number-shell').evaluateAll(shells =>
+      shells.flatMap(shell => {
+        const outer = shell.getBoundingClientRect()
+        return [...shell.children].filter(child => {
+          const inner = child.getBoundingClientRect()
+          return inner.right > outer.right + 1 || inner.bottom > outer.bottom + 1
+        }).map(child => child.tagName)
+      })
+    )
+    expect(clippedInputs).toEqual([])
+    await editor.getByRole('button', { name: 'Sturdy' }).tap()
+    await expect(editor.getByRole('spinbutton', { name: 'Size', exact: true })).toHaveValue('16')
+    await page.keyboard.press('Escape')
+    await expect(editor).toHaveCount(0)
+    await expect(button).toBeFocused()
+    await quickThrough(page, 1)
+    await page.getByRole('button', { name: 'Watch last day' }).click()
+    await button.tap()
+    await expect(editor.getByRole('button', { name: 'Apply changes' })).toHaveCount(0)
+    await editor.getByRole('button', { name: 'Back to Live' }).tap()
+    await expect(editor.getByRole('button', { name: 'Apply changes' })).toBeEnabled()
+    await editor.getByRole('button', { name: 'Apply changes' }).tap()
+    await expect(editor.getByRole('status')).toHaveText(/Introduced 10 blobs/)
+  } finally {
+    await context.close()
+  }
 })

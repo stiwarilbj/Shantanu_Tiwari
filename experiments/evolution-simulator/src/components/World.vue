@@ -11,6 +11,8 @@ import { cost, edgePoint, homePoints, radius, refugeDistance, travel, walkthroug
 import Board from './Board.vue'
 import Flower from './Flower.vue'
 import Ribbon from './Ribbon.vue'
+import { runSpecies, speciesWithEdits } from '../engine/species-actions.js'
+import SpeciesEditor from './SpeciesEditor.vue'
 import TraitAdjustment from './TraitAdjustment.vue'
 
 const props = defineProps({ active: Boolean })
@@ -31,7 +33,8 @@ const layerNames = [
 ]
 const visible = computed(() => lab.frame?.blobs.find(b => b.id===lab.selected))
 const creatureState = computed(() => STATES[visible.value?.state])
-const species = computed(() => lab.run.setup.species.find(s => s.id===visible.value?.species))
+const fieldSpecies = computed(() => speciesWithEdits(rules.value.species, lab.frame?.speciesEdits))
+const species = computed(() => fieldSpecies.value.find(s => s.id===visible.value?.species))
 const traitStats = computed(() => {
   const blob = visible.value
   return blob ? [['Speed', format(blob.speed)], ['Size', format(blob.size)], ['Sense range', format(blob.sense)]] : []
@@ -98,7 +101,7 @@ const transportLabel = computed(() => lab.playing ? 'Pause' : lab.replay && lab.
 const playbackSpeed = computed(() => 2 ** ((lab.rate - 6) / 2))
 const rateText = computed(() => Number(playbackSpeed.value.toFixed(3))+'×')
 const liveRate = computed(() => !lab.replay && lab.playing && !lab.loading && !lab.batch ? playbackSpeed.value : null)
-const events = computed(() => (lab.frame?.events ?? []).filter(e => e.time <= (lab.frame?.time ?? 0)))
+const events = computed(() => (lab.frame?.events ?? []).filter(e => e.time <= (lab.frame?.time ?? 0) + 1e-9))
 const creatureEvents = computed(() => events.value.filter(e => e.id===lab.selected || e.target===lab.selected && e.type==='prey' ||
   e.type==='birth' && (e.parent===lab.selected || e.secondParent===lab.selected)))
 const visibleEvents = computed(() => creatureEvents.value.filter(e => eventFilter.value==='all' || e.type===eventFilter.value))
@@ -159,7 +162,10 @@ function endDay() {
   else lab.simulate(lab.liveDay,'Finish Day')
   tool.value=null
 }
+const speciesButton = ref()
 function eventName(e) {
+  if (e.type === 'introduced') return 'Introduced to the field'
+  if (e.type === 'transferred') return 'Moved to ' + (e.speciesName ?? runSpecies(lab.run, e.day, Math.round(e.time / lab.frame.stepSeconds)).find(item => item.id === e.species)?.name ?? 'new species')
   if (e.type === 'death') return e.cause
   if (e.type === 'plant') return 'Ate a plant'
   if (e.type === 'prey') return 'Hunted #'+e.target
@@ -189,9 +195,10 @@ async function copyStats() {
 watch([details, () => lab.run.id, () => lab.frame?.day, () => visible.value?.id], () => { copyState.value = null })
 watch(() => lab.run.id, () => { details.value=false; tool.value=null; layers.value.cohortSense=false; fit() })
 watch(() => lab.modal, async (current, previous) => {
-  if (current || previous !== 'traits' || !props.active) return
+  if (current || !['traits', 'species'].includes(previous) || !props.active) return
   await nextTick()
-  playbackActions.value?.focus()
+  if (previous === 'species') speciesButton.value?.focus()
+  else playbackActions.value?.focus()
 })
 watch(() => visible.value?.id, id => {
   if (id == null) layers.value.selected = false
@@ -212,11 +219,13 @@ defineExpose({ select, overhead })
 <template>
   <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead', 'is-replay':replayCanSeek }" tabindex="-1" @keydown="shortcuts">
     <section class="stage" aria-label="Simulation field">
-      <Board ref="board" :frame="lab.frame" :species="lab.run.setup.species" :layers="layers" :selected="lab.selected"
+      <Board ref="board" :frame="lab.frame" :species="fieldSpecies" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @fallback="fallback=true"/>
       <div class="view-tools">
+        <button ref="speciesButton" type="button" class="secondary world-species-button"
+          :disabled="!lab.canChangeSpecies && !lab.replay" @click="lab.openSpecies()">Species</button>
         <button class="icon" aria-label="Layers" title="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
         <button class="icon" aria-label="Follow creature" title="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
         <button class="icon view-menu-button" aria-label="View options" title="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
@@ -304,7 +313,7 @@ defineExpose({ select, overhead })
         <label>Creature <select :value="lab.selected ?? ''" @change="select(Number($event.target.value) || null)">
           <option value="">Choose a creature</option>
           <option v-if="visible && !visible.alive" :value="visible.id">#{{ visible.id }} · Deceased</option>
-          <option v-for="b in living" :key="b.id" :value="b.id">#{{ b.id }} · {{ lab.run.setup.species.find(s=>s.id===b.species)?.name }}</option>
+          <option v-for="b in living" :key="b.id" :value="b.id">#{{ b.id }} · {{ fieldSpecies.find(s=>s.id===b.species)?.name }}</option>
         </select></label>
         <template v-if="visible">
           <div class="creature-copy">
@@ -330,7 +339,7 @@ defineExpose({ select, overhead })
           ]" :key="name"><dt>{{ name }}</dt><dd>{{ value }}</dd></template></dl>
           <h3>Events</h3>
           <select v-model="eventFilter" aria-label="Filter creature events">
-            <option v-for="[type,label] in [['all','All events'],['plant','Plants'],['prey','Hunts'],['home','Refuge'],['death','Deaths'],['birth','Births'],['traits','Trait adjustments']]" :key="type" :value="type">{{ label }}</option>
+            <option v-for="[type,label] in [['all','All events'],['plant','Plants'],['prey','Hunts'],['home','Refuge'],['death','Deaths'],['birth','Births'],['traits','Trait adjustments'],['introduced','Introductions'],['transferred','Species transfers']]" :key="type" :value="type">{{ label }}</option>
           </select>
           <p v-if="!visibleEvents.length" class="quiet">No matching events at this point in the day.</p>
           <button v-for="(event,index) in visibleEvents" :key="index" class="event-row" :disabled="!lab.replay" @click="lab.seek(event.time)">
@@ -367,6 +376,7 @@ defineExpose({ select, overhead })
     </div>
     <p v-if="foodSeason" class="world-food-season">Food season · {{ foodSeason.phase }} · {{ format(foodSeason.count, 0) }} plants at dawn</p>
     <Ribbon :active="props.active" @reroll="emit('reroll')" @table="lab.modal='table'"/>
+    <SpeciesEditor v-if="props.active && lab.modal==='species'"/>
     <TraitAdjustment v-if="props.active && lab.modal==='traits'"/>
   </main>
 </template>

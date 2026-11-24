@@ -1,4 +1,5 @@
-import { applyTraitAdjustment, dawnForRun, founders, step, snapshot } from './simulation.js'
+import { applySpeciesAction, applyTraitAdjustment, dawnForRun, founders, step, snapshot } from './simulation.js'
+import { speciesActionIssue, speciesWithEdits } from './species-actions.js'
 import { rulesFor } from './config.js'
 import { traitAdjustmentGroup, validTraitAdjustment } from './trait-adjustments.js'
 import { simulateForecast } from '../forecast.js'
@@ -6,11 +7,11 @@ import { tracksForagingDecisions } from './foraging-decisions.js'
 import { TRACK_FIELDS } from '../track.js'
 
 const pause = () => new Promise(resolve => setTimeout(resolve, 0))
-let config, checkpoint, partial, records, committed = 0, stopped = false, busy = false
+let config, checkpoint, partial, records, traitAdjustments, speciesActions, order = 0, committed = 0, stopped = false, busy = false
 const emit = (type, data = {}) => postMessage({ type, ...data })
 
 function current() {
-  partial ??= dawnForRun(config, records, committed + 1, checkpoint)
+  partial ??= dawnForRun(config, records, committed + 1, checkpoint, traitAdjustments, speciesActions)
   return partial
 }
 
@@ -56,7 +57,7 @@ async function batch(target) {
 }
 
 async function replay(message) {
-  const { setup, start, day, records, id, traitAdjustments } = message
+  const { setup, start, day, records, id, traitAdjustments, speciesActions } = message
   let lastProgress = performance.now()
   function advanceReplay(state, rules, end) {
     while (!state.settled && state.tick < end) {
@@ -71,18 +72,19 @@ async function replay(message) {
   let at = message.checkpoint
   for (let i = start; i < day; i++) {
     const rules = rulesFor(setup, records, i)
-    const ctx = dawnForRun(setup, records, i, at, traitAdjustments)
+    const ctx = dawnForRun(setup, records, i, at, traitAdjustments, speciesActions)
     advanceReplay(ctx, rules, Infinity)
     at = ctx.settled.checkpoint
     await pause()
   }
-  const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at, traitAdjustments)
+  const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at, traitAdjustments, speciesActions)
   const startFrame = snapshot(state)
   const opening = structuredClone(startFrame.blobs)
   const plants = state.plants.map(p => ({ id: p.id, x: p.x, y: p.y }))
   const trackDecisions = tracksForagingDecisions(rules)
   const fields = TRACK_FIELDS + (trackDecisions ? 2 : 0)
-  const width = opening.length * fields
+  const arrivals = (speciesActions ?? []).filter(action => action.kind === 'introduce' && action.day === day && action.tick > 0)
+  const width = (opening.length + arrivals.reduce((total, action) => total + action.count, 0)) * fields
   const maxSamples = Math.max(3, Math.floor(16 * 1024 * 1024 / (Math.max(1, width) * 4)))
   let stride = state.limit == null ? 1 : Math.max(1, Math.ceil(state.limit / (maxSamples - 1)))
   let capacity = Math.min(16, maxSamples)
@@ -90,6 +92,7 @@ async function replay(message) {
   let index = 0
   let samples = 0
   function sample() {
+    for (let i = opening.length; i < state.blobs.length; i++) opening.push({ ...state.blobs[i] })
     for (const b of state.blobs) {
       frames[index++] = b.x
       frames[index++] = b.y
@@ -103,6 +106,9 @@ async function replay(message) {
         frames[index++] = b.foragingSavings
       }
     }
+    const end = (samples + 1) * width
+    frames.fill(NaN, index, end)
+    index = end
     samples++
   }
   sample()
@@ -128,7 +134,7 @@ async function replay(message) {
   const used = frames.slice(0, index)
   postMessage({ type: 'track', id, track: { day, duration: final.duration,
     stepSeconds: state.stepSeconds, ticks: state.tick, stride, fields,
-    opening, plants, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
+    opening, plants, width, speciesEdits: startFrame.speciesEdits, frames: used, events: state.events, checkpoint: state.settled.checkpoint, final } }, [used.buffer])
 }
 
 function adjustTraits({ day, tick, changes, group = {} }) {
@@ -137,7 +143,7 @@ function adjustTraits({ day, tick, changes, group = {} }) {
     return
   }
   const state = current()
-  const adjustment = { day, tick, changes }
+  const adjustment = { day, tick, changes, order: ++order }
   if (group.speciesIds !== null || group.creatureIds !== null || group.activity !== 'any') {
     adjustment.creatureIds = traitAdjustmentGroup(state.blobs, group).map(blob => blob.id)
     if (adjustment.creatureIds.length === 0) {
@@ -150,7 +156,26 @@ function adjustTraits({ day, tick, changes, group = {} }) {
     emit('trait-adjustment', { error: 'Enter an adjustment that changes at least one living blob.' })
     return
   }
+  traitAdjustments.push(adjustment)
   emit('trait-adjustment', { adjustment, partial: state, frame: snapshot(state) })
+}
+
+function changeSpecies({ day, tick, action }) {
+  if (busy || !canAdvance() || day !== committed + 1 || tick !== current().tick) {
+    emit('species-action', { error: 'The live day has moved on. Check the preview and try again.' })
+    return
+  }
+  const state = current()
+  const base = rulesFor(config, records, day)
+  const rules = { ...base, species: speciesWithEdits(base.species, state.speciesEdits) }
+  const validation = speciesActionIssue(action, rules, state.blobs)
+  if (validation) { emit('species-action', { error: validation }); return }
+  const edit = { ...action, day, tick, order: ++order }
+  if (edit.kind === 'introduce') edit.creatureIds = Array.from({ length: edit.count }, (_, i) => state.nextId + i)
+  const error = applySpeciesAction(state, base, edit)
+  if (error) { emit('species-action', { error }); return }
+  speciesActions.push(edit)
+  emit('species-action', { action: edit, partial: state, frame: snapshot(state) })
 }
 
 self.onmessage = async ({ data }) => {
@@ -165,6 +190,9 @@ self.onmessage = async ({ data }) => {
       case 'init':
         config = data.config
         records = data.records ?? []
+        traitAdjustments = data.traitAdjustments ?? []
+        speciesActions = data.speciesActions ?? []
+        order = Math.max(traitAdjustments.at(-1)?.order ?? 0, speciesActions.at(-1)?.order ?? 0)
         checkpoint = data.checkpoint ?? founders(config)
         partial = data.partial ?? null
         committed = data.committed ?? 0
@@ -192,6 +220,7 @@ self.onmessage = async ({ data }) => {
           show()
         }
         break
+      case 'species-action': changeSpecies(data); break
       case 'adjust-traits': adjustTraits(data); break
       case 'batch': if (!busy) await batch(data.target); break
       case 'stop': stopped = true; break

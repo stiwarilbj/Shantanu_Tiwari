@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useLab } from '../store.js'
 import { rulesFor, TRAITS } from '../engine/config.js'
+import { speciesWithEdits } from '../engine/species-actions.js'
 import { format } from '../engine/stats.js'
 import { adjustedTrait, MAX_TRAIT_CHANGE, traitAdjustmentGroup, validTraitChange } from '../engine/trait-adjustments.js'
 
@@ -28,8 +29,8 @@ const scoped = computed(() => groupChoice.value !== 'all' || activity.value !== 
 const living = computed(() => lab.frame?.blobs.filter(blob => blob.alive) ?? [])
 const matching = computed(() => scoped.value ? traitAdjustmentGroup(living.value, group.value) : living.value)
 const rules = computed(() => rulesFor(lab.run.setup, lab.run.revisions, lab.frame?.day ?? lab.viewing))
-const species = computed(() => rules.value.species.filter(item => item.enabled))
-const speciesNames = computed(() => new Map(rules.value.species.map(item => [item.id, item.name])))
+const species = computed(() => speciesWithEdits(rules.value.species, lab.frame?.speciesEdits).filter(item => item.enabled))
+const speciesNames = computed(() => new Map(species.value.map(item => [item.id, item.name])))
 const blobResults = computed(() => {
   const query = blobSearch.value.trim().toLowerCase()
   const picked = showSelected.value ? new Set(selectedBlobs.value) : null

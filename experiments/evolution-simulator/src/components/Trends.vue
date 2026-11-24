@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ChartNoAxesCombined, Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
 import { DEATH_CAUSES, METRICS, metricValue, format, openingSummary, openingTrends } from '../engine/stats.js'
+import { runSpecies } from '../engine/species-actions.js'
 import { foodSupplyForDay, rulesFor } from '../engine/config.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
@@ -30,8 +31,10 @@ const trendSubhead=computed(()=>{
   if (ageDemoProgress.value) return `Age walkthrough · Preparing ${ageDemoProgress.value.days}-day reference runs`
   return ageDemoError.value ? 'Age walkthrough · Reference preparation failed' : 'Age walkthrough · Reference runs'
 })
-const scopeName=computed(()=>activeRun.value.setup.species.find(s=>s.id===lab.scope)?.name ?? 'All species')
-const species=computed(()=>activeRun.value.setup.species.filter(s=>s.enabled))
+const scopeName=computed(()=>species.value.find(s=>s.id===lab.scope)?.name ?? 'All species')
+const pinnedScopeName=computed(()=>runSpecies(activeRun.value, pin.value ?? Infinity, atDawn.value ? 0 : Infinity)
+  .find(s=>s.id===lab.scope)?.name ?? scopeName.value)
+const species=computed(()=>runSpecies(activeRun.value).filter(s=>s.enabled))
 const partnerRun=computed(()=>ageDemoPair.value?.[1])
 const dawnRows=computed(()=>openingTrends(activeRun.value))
 const atDawn=computed(()=>cohort.value==='dawn')
@@ -189,9 +192,17 @@ const options=computed(()=>{
     series:METRICS.filter(metric=>!hidden.value.includes(metric.key)).map(metric=>line(metric.short,metric.color,r=>metricValue(r,metric.key),{
       axis:metric.key==='population'?'y1':'y',integer:metric.key==='population',dash:metric.key==='deathAge'?[3,3]:undefined
     }))}
-  charts.births={id:'births',title:'Births and Deaths',unit:'Births above zero · deaths below zero',legend:true,hideable:true,
+  const movements = [
+    ['Introduced', '#83B3CE', 'introduced', 1],
+    ['Transferred in', '#BEABE9', 'transferredIn', 1],
+    ['Transferred out', '#D38C80', 'transferredOut', -1],
+  ].filter(([, , key]) => rows.value.some(row => row[key]) || futureRows.value.some(row => row[key]))
+  charts.births={id:'births',title:movements.length ? 'Population Changes' : 'Births and Deaths',
+    unit:movements.length ? 'Blobs gained and lost per day' : 'Births above zero · deaths below zero',legend:true,hideable:true,
     series:[line('Births','#A1BD67',r=>r.births,{bar:true,integer:true}),
       line('Deaths','#BD5558',r=>r.deaths == null ? null : -r.deaths,{bar:true,integer:true}),
+      ...movements.map(([label, color, key, sign]) => line(label, color,
+        row => row[key] == null ? null : row[key] * sign, {bar:true,integer:true})),
       line('Net','#FFFDFC',r=>r.net,{integer:true,area:'origin',fill:'#FFFDFC10'}),
       ...(causes.value?DEATH_CAUSES.map((cause,i)=>
         line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A','#BEABE9'][i],r=>r.causes && -(r.causes[cause] ?? 0),
@@ -447,7 +458,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
       <div v-if="!ageDemoVisible && !rows.length" class="notice" role="status">{{ lab.completed?'Choose a different range.':'Complete Day 1 to see trends.' }}
         <button v-if="!lab.completed" class="secondary" @click="emit('watch',1)">Watch World</button></div>
       <div v-if="pinned && !ageDemoVisible" ref="pinSummary" class="pinned-summary">
-        <div id="pinned-day-details"><strong>Day {{ pin }} · Pinned</strong><small>{{ scopeName }} · {{ pinned.population }} blobs at {{ cohort }} · {{ pinned.births }} births · {{ pinned.deaths }} deaths</small></div>
+        <div id="pinned-day-details"><strong>Day {{ pin }} · Pinned</strong><small>{{ pinnedScopeName }} · {{ pinned.population }} blobs at {{ cohort }} · {{ pinned.births }} births · {{ pinned.deaths }} deaths</small></div>
         <button class="secondary" @click="lab.modal='table'">View table</button><button class="secondary" @click="watchSight(pin)">Show sense circles</button>
         <button ref="watchPinnedDay" class="primary" aria-describedby="pinned-day-details" @click="emit('watch',pin)">Watch day</button><button class="icon" aria-label="Clear pinned day" @click="pin=null">×</button>
       </div>

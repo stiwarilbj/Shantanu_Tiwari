@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { CircleX, Download, FastForward, Upload } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
+import { runSpecies } from '../engine/species-actions.js'
 import { csv, download, setupLink } from '../export.js'
 import AdvancedStats from './AdvancedStats.vue'
 import GenerationTable from './GenerationTable.vue'
@@ -94,7 +95,10 @@ function exportRun() {
   close()
 }
 function setupDownload(run) {
-  download('evolution-setup.json','application/json',JSON.stringify({setup:run.setup,revisions:run.revisions},null,2))
+  download('evolution-setup.json','application/json',JSON.stringify({ setup:run.setup, revisions:run.revisions,
+    ...(run.speciesActions?.length && { speciesActions: run.speciesActions }),
+    ...(run.traitAdjustments?.length && { traitAdjustments: run.traitAdjustments }),
+  },null,2))
 }
 async function share(run) {
   const link=!run.revisions.length && setupLink(run.setup)
@@ -110,8 +114,8 @@ async function importSetup(event) {
     const setup=data.setup ?? data
     const errors=Object.values(validate(setup))
     if(errors.length) { message.value=errors[0]; return }
-    if(data.revisions?.length) {
-      if(!await lab.importBranch(setup,data.revisions)) message.value='The branch history contains incompatible setup revisions.'
+    if(data.revisions?.length || data.speciesActions != null || data.traitAdjustments != null) {
+      if(!await lab.importBranch(setup,data.revisions,data.speciesActions,data.traitAdjustments)) message.value='This file contains incompatible run history.'
       return
     }
     lab.openSettings(setup)
@@ -186,7 +190,7 @@ onMounted(()=>dialog.value.showModal())
         <button class="secondary" :aria-pressed="exportKind==='setup'" @click="exportKind='setup'">Setup JSON</button></div>
       <template v-if="exportKind==='csv'">
         <label class="dialog-field">Scope <select v-model="exportScope"><option value="all">All species</option><option value="*">All scopes</option>
-          <option v-for="s in lab.run.setup.species.filter(s=>s.enabled)" :key="s.id" :value="s.id">{{ s.name }}</option></select></label>
+          <option v-for="s in runSpecies(lab.run).filter(s=>s.enabled)" :key="s.id" :value="s.id">{{ s.name }}</option></select></label>
         <label class="dialog-field">From day <input type="number" v-model.number="start" min="1" :max="end"></label>
         <label class="dialog-field">Through day <input type="number" v-model.number="end" :min="start" :max="lab.completed"></label>
         <p class="quiet">{{ exportRowCount }} data rows · Trait stats at dusk</p>

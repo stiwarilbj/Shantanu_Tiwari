@@ -1,6 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { DEATH_CAUSES, METRICS, foragingStats, format, survivalStats, traitSpread } from '../engine/stats.js'
+import { runSpecies } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
 import { useForecast } from '../use-forecast.js'
 import ForecastStatus from './ForecastStatus.vue'
@@ -20,7 +21,7 @@ const views = {
     color: '#71D2C0',
     read: survivalStats,
     metrics: [
-      { key:'survivalRate', label:'Survival rate', unit:'Percent of starting creatures that survived', suffix:'%', min:0, max:100 },
+      { key:'survivalRate', label:'Survival rate', unit:'Percent of participants that survived', suffix:'%', min:0, max:100 },
       { key:'growthRate', label:'Net population growth', unit:'Percent change from opening to closing population', suffix:'%' },
       { key:'birthRate', label:'Births per 100 starting creatures', option:'Births per 100 starters', unit:'Births per 100 starting creatures', min:0 },
     ],
@@ -46,8 +47,9 @@ const views = {
   },
 }
 
-const species = computed(() => lab.run.setup.species.filter(item => item.enabled))
-const scopeName = computed(() => species.value.find(item => item.id === lab.scope)?.name ?? 'All species')
+const species = computed(() => runSpecies(lab.run).filter(item => item.enabled))
+const scopeName = computed(() => runSpecies(lab.run, reading.value?.day ?? Infinity)
+  .find(item => item.id === lab.scope)?.name ?? species.value.find(item => item.id === lab.scope)?.name ?? 'All species')
 const section = computed(() => views[view.value])
 const metric = computed(() => section.value.metrics.find(item => item.key === chosen[view.value]))
 const traitMetric = computed(() => traits.find(item => item.key === trait.value))
@@ -87,6 +89,11 @@ const readings = computed(() => {
     ['Closing population', format(row.population, 0)],
     ['Births', format(row.births, 0)],
     ['Deaths', format(row.deaths, 0)],
+    ...(row.introduced || row.transferredIn || row.transferredOut ? [
+      ['Introduced', format(row.introduced, 0)],
+      ['Transferred in', format(row.transferredIn, 0)],
+      ['Transferred out', format(row.transferredOut, 0)],
+    ] : []),
     ...DEATH_CAUSES.map(cause => [cause, format(row.causes?.[cause] ?? 0, 0)]),
   ]
   if (view.value === 'traits') return [

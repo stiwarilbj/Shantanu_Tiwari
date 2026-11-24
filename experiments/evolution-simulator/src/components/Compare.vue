@@ -9,6 +9,7 @@ import { useForecast } from '../use-forecast.js'
 import { useLab } from '../store.js'
 import { trackFrame } from '../track.js'
 import { rulesFor, usesWalkthroughForaging, WALKTHROUGH_RULE_VERSION } from '../engine/config.js'
+import { runSpecies, speciesWithEdits } from '../engine/species-actions.js'
 import { format, METRICS, metricValue } from '../engine/stats.js'
 import { SIZE_MUTATION_SEED, sizeMutationPair } from '../experiments.js'
 
@@ -60,7 +61,15 @@ const experimentSizes=computed(()=>{
 })
 const frames=computed(()=>tracks.value.map((track,index)=>track
   ? trackFrame(track,track.duration*fractions.value[index]) : null))
-const commonSpecies=computed(()=>left.value?.setup.species.filter(s=>s.enabled&&right.value?.setup.species.some(b=>b.enabled&&b.id===s.id)) ?? [])
+const commonSpecies = computed(() => {
+  const entries = runs.value.flatMap(run => run ? runSpecies(run).filter(item => item.enabled) : [])
+  return [...new Map(entries.map(item => [item.id, item])).values()]
+})
+const boardSpecies = computed(() => runs.value.map((run, index) => {
+  const frame = frames.value[index]
+  if (!run || !frame) return []
+  return speciesWithEdits(rulesFor(run.setup, run.revisions, frame.day).species, frame.speciesEdits)
+}))
 const rows=computed(()=>Array.from({length:horizon.value},(_,i)=>({day:i+1,
   a:left.value.summaries[i].rows[scope.value],b:right.value.summaries[i].rows[scope.value]})))
 const leftForecast = useForecast(() => left.value, () => rows.value)
@@ -93,13 +102,18 @@ const sequenceReady=computed(()=>days.value[0]===6 && days.value[1]===77 && trac
 const sequenceButtonText=computed(()=>sequence.value ? 'Stop video sequence' : 'Play video sequence')
 const huntMetric={ key:'hunts', label:'Successful hunts', color:'#D38C80', count:true }
 const trendMetrics=[...METRICS,huntMetric]
-const comparisonMetrics=[
+const comparisonMetrics=computed(()=>[
   ...METRICS,
   { key:'births', label:'Births', color:'#A1BD67', count:true },
   { key:'deaths', label:'Deaths', color:'#BD5558', count:true },
+  ...(runs.value.some(run => run?.speciesActions?.length) ? [
+    { key:'introduced', label:'Introduced', count:true },
+    { key:'transferredIn', label:'Transferred in', count:true },
+    { key:'transferredOut', label:'Transferred out', count:true },
+  ] : []),
   huntMetric,
   { key:'plants', label:'Plants eaten', color:'#B7D65A', count:true },
-]
+])
 function valueFor(row, metric) {
   return metric.count ? row?.[metric.key] : metricValue(row,metric.key)
 }
@@ -414,7 +428,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
       <div class="paired-boards" :class="{ 'reveal-boards':reveal }" :style="{ '--divider':divider+'%' }">
         <section v-for="(run,index) in runs" :key="run.id" :aria-label="names[index]"
           :class="[index===0 ? 'run-left' : 'run-right', { 'quiet-board':emphasis!=='both' && emphasis!==(index===0 ? 'left' : 'right') }]">
-          <Board v-show="frames[index]" :ref="element=>boards[index]=element" :frame="frames[index]" :species="run.setup.species" :layers="layers"
+          <Board v-show="frames[index]" :ref="element=>boards[index]=element" :frame="frames[index]" :species="boardSpecies[index]" :layers="layers"
             :camera="cameras[index]" :scope="scope" :dim="scope!=='all'" :selected="selections[index]" :follow="selections[index]!=null" @select="selections[index]=$event"/>
           <h2>{{ run.setup.name }} <small>Day {{ days[index] }} · Seed {{ run.setup.seed }} · {{ format(frames[index]?.time,1) }} s</small></h2>
         </section>

@@ -11,6 +11,7 @@ import { agingRules, oldAgeRisk, travelSpeedPercent } from './aging.js'
 import { DECISION, foragingDecisionsFor, tracksForagingDecisions } from './foraging-decisions.js'
 import { startingPose, territoryPositions } from './starting-territories.js'
 import { adjustedTrait } from './trait-adjustments.js'
+import { speciesActionIssue, speciesEditsAfter, speciesTraitValue, speciesWithEdits } from './species-actions.js'
 
 export const STATES = ['Searching', 'Foraging', 'Chasing', 'Fleeing', 'Returning', 'Home', 'Dead', 'Born']
 const MIN_POSITIVE_TRAIT = 2 ** -1022
@@ -33,11 +34,12 @@ function standardSpawn(blob, i, count, edges, seed, day, refugeWidth) {
   return startingPose(blob, edge, along, refugeWidth, seed, day)
 }
 
-export function dawnForRun(setup, revisions, day, checkpoint, adjustments) {
+export function dawnForRun(setup, revisions, day, checkpoint, adjustments, speciesActions) {
   const rules = rulesFor(setup, revisions, day)
   const state = dawn(rules, day, checkpoint, rulesFor(setup, revisions, day - 1))
-  const scheduled = adjustments?.filter(edit => edit.day === day)
-  if (scheduled?.length) {
+  const scheduled = [...(adjustments ?? []), ...(speciesActions ?? [])].filter(edit => edit.day === day)
+    .sort((a, b) => a.tick - b.tick || (a.order ?? 0) - (b.order ?? 0))
+  if (scheduled.length) {
     state.scheduledAdjustments = scheduled
     state.nextAdjustment = 0
     applyScheduledAdjustments(state, rules)
@@ -47,12 +49,12 @@ export function dawnForRun(setup, revisions, day, checkpoint, adjustments) {
 
 export function dawn(config, day, checkpoint, previous = config) {
   const { roster, nextId } = checkpoint
-  const walkthrough = config.metabolism === 'walkthrough'
+  config = effectiveSpecies(config, checkpoint)
+  previous = effectiveSpecies(previous, checkpoint)
   const foraging = usesWalkthroughForaging(config)
-  const trackDecisions = tracksForagingDecisions(config)
   const { refugeWidth, plants } = openingHabitat(config, day)
   const inheritedEdges = foraging && !refugeWidth
-  const stepSeconds = walkthrough ? WALKTHROUGH_STEP : DT
+  const stepSeconds = config.metabolism === 'walkthrough' ? WALKTHROUGH_STEP : DT
   const species = new Map(config.species.map(s => [s.id, s]))
   const territories = territoryPositions(config, day, previous, roster, refugeWidth)
   const edges = inheritedEdges || territories ? null : shuffle([0, 1, 2, 3], config.seed, day, 2)
@@ -63,22 +65,30 @@ export function dawn(config, day, checkpoint, previous = config) {
       ? { ...(original.edge ?? edgePoint(FIELD * random(config.seed, 3, day, original.id, 0),
         FIELD * random(config.seed, 3, day, original.id, 1))), angle: 0 }
       : standardSpawn({ id: original.id, r }, slots.get(original.id), roster.length, edges, config.seed, day, refugeWidth))
-    const settings = species.get(original.species)
-    const energy = settings.energy
-    const movement = movementTraits(original, config, settings, stepSeconds)
-    return { ...original, ...position, r, energy, capacity: energy, credits: 0, preyCredits: 0,
-      state: 0, alive: true, home: false, returning: false, target: null,
-      velocityX: 0, velocityY: 0, ...movement,
-      ...(trackDecisions && {
-        foragingSettings: foragingDecisionsFor(config, settings),
-        foragingDecision: DECISION.searching,
-        foragingSavings: 0,
-      }) }
+    return initializeBlob(original, position, r, config, species.get(original.species), stepSeconds)
   })
   if (!foraging) blobs.sort((a, b) => a.id - b.id)
   const limit = endsWhenSettled(config) ? null : Math.round(config.duration / 10 / stepSeconds)
   return { day, tick: 0, stepSeconds, limit, refugeWidth,
-    nextId, opening: roster, blobs, plants, events: [], settled: false }
+    nextId, opening: roster, blobs, plants, events: [], settled: false,
+    ...(checkpoint.speciesEdits && { speciesEdits: checkpoint.speciesEdits }) }
+}
+
+function effectiveSpecies(config, state) {
+  const species = speciesWithEdits(config.species, state.speciesEdits)
+  return species === config.species ? config : { ...config, species }
+}
+
+function initializeBlob(original, position, r, config, settings, stepSeconds) {
+  const energy = settings.energy
+  return { ...original, ...position, r, energy, capacity: energy, credits: 0, preyCredits: 0,
+    state: 0, alive: true, home: false, returning: false, target: null,
+    velocityX: 0, velocityY: 0, ...movementTraits(original, config, settings, stepSeconds),
+    ...(tracksForagingDecisions(config) && {
+      foragingSettings: foragingDecisionsFor(config, settings),
+      foragingDecision: DECISION.searching,
+      foragingSavings: 0,
+    }) }
 }
 
 function record(ctx, blob, time, type, extra = {}) {
@@ -95,6 +105,7 @@ function movementTraits(blob, config, species, stepSeconds) {
 
 export function applyTraitAdjustment(ctx, config, changes, creatureIds) {
   if (ctx.settled) return 0
+  config = effectiveSpecies(config, ctx)
   const species = new Map(config.species.map(s => [s.id, s]))
   const targets = creatureIds == null ? null : new Set(creatureIds)
   const time = ctx.tick * ctx.stepSeconds
@@ -112,10 +123,58 @@ export function applyTraitAdjustment(ctx, config, changes, creatureIds) {
   return affected
 }
 
+export function applySpeciesAction(ctx, config, action) {
+  if (ctx.settled) return 'This generation has ended.'
+  const rules = effectiveSpecies(config, ctx)
+  const issue = speciesActionIssue(action, rules, ctx.blobs)
+  if (issue) return issue
+  const { kind, id, count, creatureIds, definition, traits } = action
+  if (kind === 'introduce' && (creatureIds?.length !== count ||
+      creatureIds.some((creature, index) => creature !== ctx.nextId + index))) return 'The next creature IDs have changed.'
+  const time = ctx.tick * ctx.stepSeconds
+  ctx.speciesEdits = speciesEditsAfter(ctx.speciesEdits, action)
+  ctx.events.push({ day: ctx.day, time, type: 'species-edit', edit: ctx.speciesEdits[id], species: id })
+  if (kind === 'introduce') {
+    const edges = shuffle([0, 1, 2, 3], config.seed, ctx.day, 54, ctx.tick)
+    for (const [index, creature] of creatureIds.entries()) {
+      const { speed, size, sense } = definition
+      const original = { id: creature, species: id, parent: null, age: 0, born: ctx.day, speed, size, sense }
+      const r = radius(size)
+      const position = standardSpawn({ id: creature, r }, index, count, edges, config.seed, ctx.day, ctx.refugeWidth)
+      const blob = initializeBlob(original, position, r, config, definition, ctx.stepSeconds)
+      ctx.blobs.push(blob)
+      record(ctx, blob, time, 'introduced', { blob: { ...blob } })
+    }
+    ctx.nextId += count
+    return ''
+  }
+  const targets = new Set(creatureIds)
+  const settings = definition ?? rules.species.find(item => item.id === id)
+  for (const blob of ctx.blobs) {
+    if (!targets.has(blob.id)) continue
+    if (kind === 'split') {
+      const fromSpecies = blob.species
+      blob.species = id
+      if (tracksForagingDecisions(config)) blob.foragingSettings = foragingDecisionsFor(config, settings)
+      record(ctx, blob, time, 'transferred', { fromSpecies, speciesName: settings.name })
+    }
+    const next = Object.fromEntries(TRAITS.map(trait => [trait, speciesTraitValue(blob, trait, traits, config)]))
+    if (TRAITS.every(trait => next[trait] === blob[trait]) && kind !== 'split') continue
+    const properties = { ...next, r: radius(next.size),
+      ...movementTraits({ ...blob, ...next }, config, settings, ctx.stepSeconds) }
+    Object.assign(blob, properties)
+    record(ctx, blob, time, 'traits', { traits: properties })
+  }
+  return ''
+}
+
 function applyScheduledAdjustments(ctx, config) {
   let edit = ctx.scheduledAdjustments?.[ctx.nextAdjustment]
   while (edit?.tick === ctx.tick) {
-    applyTraitAdjustment(ctx, config, edit.changes, edit.creatureIds)
+    if (edit.kind) {
+      const issue = applySpeciesAction(ctx, config, edit)
+      if (issue) throw new Error(issue)
+    } else applyTraitAdjustment(ctx, config, edit.changes, edit.creatureIds)
     edit = ctx.scheduledAdjustments[++ctx.nextAdjustment]
   }
 }
@@ -357,6 +416,7 @@ export function step(ctx, config, count = 1, skipIdle = false) {
 
 function advance(ctx, config, count, skipIdle) {
   if (ctx.settled) return ctx.settled
+  config = effectiveSpecies(config, ctx)
   const limit = stepLimit(ctx, config)
   const stop = Math.min(limit, ctx.tick + count)
   const hasActive = () => ctx.blobs.some(b => b.alive && !b.home)
@@ -417,6 +477,7 @@ function breed(ctx, config, time, settings, rules, first, second) {
 
 export function dusk(ctx, config) {
   if (ctx.settled) return ctx.settled
+  config = effectiveSpecies(config, ctx)
   const closing = []
   const time = (ctx.limit ?? ctx.tick) * (ctx.stepSeconds ?? DT)
   const species = new Map(config.species.map(s => [s.id, s]))
@@ -474,7 +535,8 @@ export function dusk(ctx, config) {
   }
   ctx.events.sort((a, b) => a.time - b.time)
   ctx.settled = { summary: summaries(ctx.day, config, ctx.opening, closing, ctx.events, ctx.plants.length,
-    ctx.plants.filter(p => !p.eaten).length), checkpoint: { roster: closing, nextId: ctx.nextId } }
+    ctx.plants.filter(p => !p.eaten).length, !!ctx.speciesEdits), checkpoint: { roster: closing, nextId: ctx.nextId,
+      ...(ctx.speciesEdits && { speciesEdits: ctx.speciesEdits }) } }
   return ctx.settled
 }
 
@@ -482,6 +544,7 @@ export function snapshot(ctx) {
   const stepSeconds = ctx.stepSeconds ?? DT
   const time = ctx.tick * stepSeconds
   const duration = ctx.settled ? time : ctx.limit == null ? null : ctx.limit * stepSeconds
-  return { day: ctx.day, time, duration, stepSeconds, refugeWidth: ctx.refugeWidth ?? 0,
-    blobs: [...ctx.blobs, ...(ctx.newborns ?? [])], plants: ctx.plants.filter(p => !p.eaten), events: ctx.events }
+  return { day: ctx.day, time, duration, stepSeconds, nextId: ctx.nextId, refugeWidth: ctx.refugeWidth ?? 0,
+    blobs: [...ctx.blobs, ...(ctx.newborns ?? [])], plants: ctx.plants.filter(p => !p.eaten), events: ctx.events,
+    ...(ctx.speciesEdits && { speciesEdits: ctx.speciesEdits }) }
 }

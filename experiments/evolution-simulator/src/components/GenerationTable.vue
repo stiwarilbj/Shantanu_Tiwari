@@ -1,6 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, ref } from 'vue'
 import { format, METRICS, metricValue } from '../engine/stats.js'
+import { runSpecies } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
 import { useForecast } from '../use-forecast.js'
 import ForecastStatus from './ForecastStatus.vue'
@@ -9,16 +10,23 @@ const lab = useLab()
 const emit = defineEmits(['watch'])
 const TrendPlot = defineAsyncComponent(() => import('./TrendPlot.vue'))
 const generations = computed(() => lab.run.summaries)
-const species = computed(() => lab.run.setup.species.filter(item => item.enabled))
+const species = computed(() => runSpecies(lab.run).filter(item => item.enabled))
 const view = ref('table')
 const stat = ref('population')
 const statSelect = ref(null)
 const pinnedDay = ref(null)
-const columns = [
+const movements = [
+  { key:'introduced', label:'Introduced' },
+  { key:'transferredIn', label:'Transferred in' },
+  { key:'transferredOut', label:'Transferred out' },
+]
+const hasMovements = computed(() => !!lab.run.speciesActions?.length)
+const columns = computed(() => [
   { key:'opening', label:'Opening population' },
   { key:'population', label:'Closing population' },
   { key:'births', label:'Births' },
   { key:'deaths', label:'Deaths' },
+  ...(hasMovements.value ? movements : []),
   { key:'net', label:'Net change' },
   ...METRICS.filter(metric => metric.key !== 'population')
     .map(({ key, label, unit, color }) => ({ key, label, unit, color, average:true })),
@@ -26,13 +34,14 @@ const columns = [
   { key:'plants', label:'Plants eaten' },
   { key:'plantsLeft', label:'Plants left', unit:'field total' },
   { key:'hunts', label:'Successful hunts' },
-]
+])
 
 function valueOf(row, column) {
-  return column.average ? metricValue(row, column.key) : row?.[column.key]
+  if (column.average) return metricValue(row, column.key)
+  return row?.[column.key] ?? (row && movements.includes(column) ? 0 : undefined)
 }
 
-const column = computed(() => columns.find(item => item.key === stat.value))
+const column = computed(() => columns.value.find(item => item.key === stat.value) ?? columns.value[1])
 const chartRow = ({ day, rows, ifExtended }) => ({ day, value: valueOf(rows[lab.scope], column.value), ifExtended })
 const trendRows = computed(() => generations.value.map(chartRow))
 const forecast = useForecast(() => lab.run, () => generations.value, () => view.value === 'trend')
@@ -83,6 +92,7 @@ async function showTrend(key) {
         <thead>
           <tr>
             <th scope="col">Generation</th>
+            <th v-if="hasMovements && lab.scope !== 'all'" scope="col">Species</th>
             <th v-for="column in columns" :key="column.key" scope="col" :aria-label="column.label">
               <button type="button" :aria-label="'View '+column.label+' trend'" @click="showTrend(column.key)">
                 {{ column.label }}<small v-if="column.unit">{{ column.unit }}</small>
@@ -91,8 +101,9 @@ async function showTrend(key) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in generations" :key="record.day" v-memo="[record, lab.scope]">
+          <tr v-for="record in generations" :key="record.day" v-memo="[record, lab.scope, hasMovements]">
             <th scope="row"><button class="link" :aria-label="'Replay generation '+record.day" @click="emit('watch',record.day)">{{ record.day }}</button></th>
+            <td v-if="hasMovements && lab.scope !== 'all'">{{ runSpecies(lab.run, record.day).find(item => item.id === lab.scope)?.name ?? '—' }}</td>
             <td v-for="column in columns" :key="column.key" :title="valueOf(record.rows[lab.scope],column)?.toString()">
               {{ format(valueOf(record.rows[lab.scope],column), column.average ? 2 : 0) }}
             </td>

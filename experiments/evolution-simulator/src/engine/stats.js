@@ -25,7 +25,7 @@ export function distribution(values) {
   return { n, mean, min: values[0], p25: quantile(0.25), p75: quantile(0.75), max: values[n - 1], sd }
 }
 
-export function summaries(day, config, opening, closing, events, supply, plantsLeft) {
+export function summaries(day, config, opening, closing, events, supply, plantsLeft, hasEdits) {
   const rows = {}
   const causes = usesAgingRules(config) ? DEATH_CAUSES : legacyDeathCauses
   for (const id of ['all', ...config.species.filter(s => s.enabled).map(s => s.id)]) {
@@ -34,9 +34,13 @@ export function summaries(day, config, opening, closing, events, supply, plantsL
     const scoped = events.filter(belongs)
     const deaths = scoped.filter(event => event.type === 'death')
     const births = scoped.filter(event => event.type === 'birth').length
+    const introduced = scoped.filter(event => event.type === 'introduced').length
+    const transferredIn = id === 'all' ? 0 : scoped.filter(event => event.type === 'transferred').length
+    const transferredOut = id === 'all' ? 0 : events.filter(event => event.type === 'transferred' && event.fromSpecies === id).length
     rows[id] = {
       day, opening: opening.filter(belongs).length, population: lives.length, births,
-      deaths: deaths.length, net: births - deaths.length, food: supply, plantsLeft,
+      deaths: deaths.length, net: births - deaths.length + introduced + transferredIn - transferredOut,
+      ...(hasEdits && { introduced, transferredIn, transferredOut }), food: supply, plantsLeft,
       plants: scoped.filter(e => e.type === 'plant').length,
       hunts: scoped.filter(e => e.type === 'prey').length,
       causes: Object.fromEntries(causes
@@ -63,10 +67,12 @@ function rate(numerator, denominator, scale = 1) {
 }
 
 export function survivalStats(row) {
-  const { opening, population, births, deaths, causes } = row ?? {}
+  const { opening, population, births, deaths, causes, introduced, transferredIn, transferredOut } = row ?? {}
+  const participants = opening + (introduced ?? 0) + (transferredIn ?? 0)
   return {
     opening, population, births, deaths, causes,
-    survivalRate: rate(difference(opening, deaths), opening, 100),
+    ...(introduced != null && { introduced, transferredIn, transferredOut }),
+    survivalRate: rate(difference(participants, deaths), participants, 100),
     growthRate: rate(difference(population, opening), opening, 100),
     birthRate: rate(births, opening, 100),
   }

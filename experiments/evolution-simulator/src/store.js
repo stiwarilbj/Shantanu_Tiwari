@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
 import { dawnForRun, founders, snapshot } from './engine/simulation.js'
+import { validSpeciesHistory } from './engine/species-actions.js'
 import { validTraitAdjustment } from './engine/trait-adjustments.js'
 import { DT, clamp } from './engine/geometry.js'
 import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
@@ -19,6 +20,12 @@ const last = run => run?.summaries.at(-1)?.day ?? 0
 const extinctionDay = run => run?.latest.roster.length === 0
   ? run.summaries.find(row => row.rows.all.population === 0)?.day ?? null
   : null
+function historyAhead(run, frame) {
+  const tick = Math.round(frame.time / frame.stepSeconds)
+  return [run.speciesActions?.at(-1), run.traitAdjustments?.at(-1)].some(
+    edit => edit && (edit.day > frame.day || (edit.day === frame.day && edit.tick > tick)),
+  )
+}
 const hasEnded = frame => frame?.duration != null && frame.time >= frame.duration
 function recordDay(run, { day, checkpoint, summary }) {
   const checkpoints = day % 10 === 0 ? [...run.checkpoints, { day, ...checkpoint }] : run.checkpoints
@@ -81,6 +88,7 @@ export const useLab = defineStore('lab', () => {
   const batch = shallowRef(null), saved = ref(0), error = ref('')
   const workerReady = ref(false), connecting = ref(false), workerError = ref('')
   const pending = ref(false), adjustingTraits = ref(false), traitAdjustmentError = ref('')
+  const speciesResult = shallowRef(null)
   const selected = ref(null), following = ref(false)
   const settings = ref(false), draft = ref(null), modal = ref(null), targetDay = ref(null), branchFrom = ref(null)
   const branchRequest = shallowRef(null)
@@ -97,10 +105,14 @@ export const useLab = defineStore('lab', () => {
   const liveDay = computed(() => liveFrame.value?.day ?? completed.value + 1)
   const canEnterLive = computed(() => workerReady.value && !batch.value && !extinctDay.value &&
     completed.value < (run.value?.setup.days ?? 0))
-  const canOpenTraitAdjustment = computed(() => canEnterLive.value && !replay.value && !loading.value &&
-    frame.value?.day > completed.value && !dayEnded.value && frame.value.blobs.some(blob => blob.alive))
-  const canAdjustTraits = computed(() => canOpenTraitAdjustment.value && !playing.value && !pending.value &&
-    !adjustingTraits.value && frame.value === liveFrame.value)
+  const canChangeSpecies = computed(() => canEnterLive.value && !replay.value && !loading.value &&
+    frame.value?.day > completed.value && !dayEnded.value)
+  const recordedChangesAhead = computed(() => canChangeSpecies.value && historyAhead(run.value, frame.value))
+  const canAdjustSpecies = computed(() => canChangeSpecies.value && !playing.value && !pending.value &&
+    !adjustingTraits.value && !recordedChangesAhead.value && frame.value === liveFrame.value)
+  const canOpenTraitAdjustment = computed(() => canChangeSpecies.value && !recordedChangesAhead.value &&
+    frame.value.blobs.some(blob => blob.alive))
+  const canAdjustTraits = computed(() => canOpenTraitAdjustment.value && canAdjustSpecies.value)
   const canMoveNext = computed(() => viewing.value < completed.value ||
     (viewing.value === completed.value && canEnterLive.value))
   const status = computed(() => {
@@ -203,7 +215,8 @@ export const useLab = defineStore('lab', () => {
           }
         }
         writer.postMessage({ type: 'init', config: value.setup, checkpoint: value.latest,
-          committed: last(value), partial: value.partial, records: value.revisions })
+          committed: last(value), partial: value.partial, records: value.revisions,
+          traitAdjustments: value.traitAdjustments, speciesActions: value.speciesActions })
       } catch {
         fail('The simulation could not start.')
       }
@@ -219,20 +232,22 @@ export const useLab = defineStore('lab', () => {
 
   function receive(data) {
     if (data.type === 'advanced') pending.value = false
-    if (data.type === 'trait-adjustment') {
+    if (data.type === 'trait-adjustment' || data.type === 'species-action') {
       clearTimeout(adjustmentTimer)
       if (data.error) {
         adjustingTraits.value = false
         traitAdjustmentError.value = data.error
       } else {
         const token = epoch
+        const key = data.action ? 'speciesActions' : 'traitAdjustments'
         run.value = { ...run.value, partial: data.partial,
-          traitAdjustments: [...(run.value.traitAdjustments ?? []), data.adjustment] }
+          [key]: [...(run.value[key] ?? []), data.action ?? data.adjustment] }
         liveFrame.value = data.frame
         void persist().then(() => {
           if (token !== epoch) return
           showLiveFrame(data.frame)
           adjustingTraits.value = false
+          if (data.action) speciesResult.value = data.action
           if (modal.value === 'traits') modal.value = null
         })
       }
@@ -361,7 +376,7 @@ export const useLab = defineStore('lab', () => {
     viewing.value = day
     frame.value = null
     if (day > last(value)) {
-      frame.value = snapshot(value.partial ?? dawnForRun(value.setup, value.revisions, day, value.latest))
+      frame.value = snapshot(value.partial ?? dawnForRun(value.setup, value.revisions, day, value.latest, value.traitAdjustments, value.speciesActions))
     }
     liveFrame.value = frame.value
     if (restoredTrack) {
@@ -475,7 +490,7 @@ export const useLab = defineStore('lab', () => {
       watchForProgress()
       try {
         job.postMessage({ type: 'replay', id, setup: value.setup, records: value.revisions, traitAdjustments: value.traitAdjustments,
-          start: start.day + 1, checkpoint: start, day })
+          speciesActions: value.speciesActions, start: start.day + 1, checkpoint: start, day })
       } catch { stopped() }
     })
   }
@@ -555,7 +570,7 @@ export const useLab = defineStore('lab', () => {
     stopPlayback()
     replay.value = false
     through.value = true
-    if (run.value.traitAdjustments?.some(edit => edit.day === completed.value + 1)) restart = false
+    if ([run.value.traitAdjustments, run.value.speciesActions].some(edits => edits?.some(edit => edit.day === completed.value + 1))) restart = false
     if (restart && liveFrame.value?.day > completed.value && liveFrame.value.time > 0) {
       const day = completed.value + 1
       const { setup, revisions, latest } = run.value
@@ -630,6 +645,24 @@ export const useLab = defineStore('lab', () => {
     adjustmentTimer = setTimeout(() => reportFailure('The trait adjustment timed out.'), WORKER_STARTUP_TIMEOUT)
     try { writer.postMessage({ type: 'adjust-traits', day, tick: Math.round(time / stepSeconds), changes, group }) }
     catch { reportFailure('The trait adjustment could not reach the simulation.') }
+  }
+
+  function openSpecies() {
+    if (!canChangeSpecies.value && !replay.value) return
+    stopPlayback()
+    traitAdjustmentError.value = ''
+    speciesResult.value = null
+    modal.value = 'species'
+  }
+
+  function changeSpecies(action) {
+    if (!canAdjustSpecies.value) return
+    const { day, time, stepSeconds } = frame.value
+    adjustingTraits.value = true
+    traitAdjustmentError.value = ''
+    adjustmentTimer = setTimeout(() => reportFailure('The species change timed out.'), WORKER_STARTUP_TIMEOUT)
+    try { writer.postMessage({ type: 'species-action', day, tick: Math.round(time / stepSeconds), action: copy(action) }) }
+    catch { reportFailure('The species change could not reach the simulation.') }
   }
 
   function moveDay(delta) {
@@ -765,12 +798,23 @@ export const useLab = defineStore('lab', () => {
     return useRun(value, false, restoreDay, isCurrent)
   }
 
-  async function importBranch(setup,revisions) {
-    if (Object.keys(validate(setup)).length || !validateRevisions(setup,revisions)) return false
-    cancelBranch()
+  async function importBranch(setup, revisions = [], speciesActions = [], traitAdjustments = []) {
+    if (Object.keys(validate(setup)).length || !validateRevisions(setup, revisions) ||
+        !validSpeciesHistory(setup, revisions, speciesActions) || !Array.isArray(traitAdjustments) ||
+        !traitAdjustments.every(edit => edit && Number.isInteger(edit.day) && edit.day >= 1 && edit.day <= setup.days &&
+          Number.isInteger(edit.tick) && edit.tick >= 0 && validTraitAdjustment(edit.changes) &&
+          (edit.order == null || Number.isSafeInteger(edit.order) && edit.order > 0) &&
+          (edit.creatureIds == null || Array.isArray(edit.creatureIds) && edit.creatureIds.every(Number.isSafeInteger)))) return false
     const value=makeRun(setup)
     value.revisions=copy(revisions)
-    value.forkDay=revisions.at(-1).day-1
+    if (revisions.length) value.forkDay = revisions.at(-1).day - 1
+    value.speciesActions = copy(speciesActions)
+    value.traitAdjustments = copy(traitAdjustments)
+    if (speciesActions[0]?.day === 1 && speciesActions[0].tick === 0) {
+      try { dawnForRun(value.setup, value.revisions, 1, value.latest, value.traitAdjustments, value.speciesActions) }
+      catch { return false }
+    }
+    cancelBranch()
     modal.value=null
     draft.value=null
     await useRun(value,true)
@@ -819,6 +863,7 @@ export const useLab = defineStore('lab', () => {
       const after = await checkpointAt(base, day)
       if (!current() || run.value?.id !== base.id) return
       const value = { ...makeRun(setup), source: base.id, forkDay: day, latest: after,
+        speciesActions: base.speciesActions?.filter(edit => edit.day <= day) ?? [],
         traitAdjustments: base.traitAdjustments?.filter(edit => edit.day <= day) ?? [],
         summaries: base.summaries.filter(r => r.day <= day),
         checkpoints: [...base.checkpoints.filter(c => c.day < day), { day, ...after }],
@@ -840,6 +885,7 @@ export const useLab = defineStore('lab', () => {
   }
 
   return { run, library, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
+    canChangeSpecies, canAdjustSpecies, recordedChangesAhead, openSpecies, changeSpecies, speciesResult,
     canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
     canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,

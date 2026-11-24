@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Bookmark, ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Dices, Layers, Ellipsis, Info } from 'lucide-vue-next'
+import { rulesFor } from '../engine/config.js'
+import { runSpecies, speciesWithEdits } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
 import { useForecast } from '../use-forecast.js'
@@ -11,6 +13,14 @@ import ExtinctionIcon from './ExtinctionIcon.vue'
 const props = defineProps({ active: Boolean })
 const emit = defineEmits(['reroll', 'table'])
 const lab = useLab()
+const scopeSpecies = computed(() => {
+  const frame = lab.frame
+  if (!frame) return runSpecies(lab.run).filter(item => item.enabled)
+  const rules = rulesFor(lab.run.setup, lab.run.revisions, frame.day)
+  const current = speciesWithEdits(rules.species, frame.speciesEdits).filter(item => item.enabled)
+  const historicalSelection = runSpecies(lab.run).find(item => item.id === lab.scope && !current.some(s => s.id === item.id))
+  return historicalSelection ? [...current, historicalSelection] : current
+})
 const scroll = ref(null), fold = ref(false), legend = ref(false), panel = ref(null), inspection = ref(null)
 const mode = ref('classic'), rotation = ref(0), dayInput = ref(1)
 const focusDay = ref(lab.viewing), detail = ref(null), detailX = ref(null)
@@ -301,7 +311,7 @@ function escapeRibbon(event) {
         </button>
         <select v-model="lab.scope" aria-label="Generation statistics species">
           <option value="all">All species</option>
-          <option v-for="s in lab.run.setup.species.filter(s=>s.enabled)" :key="s.id" :value="s.id">{{ s.name }}</option>
+          <option v-for="s in scopeSpecies" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
         <button v-if="fold" class="icon compact" aria-label="Expand generations" @click="fold=false"><ChevronUp :size="18"/></button>
       </div>
