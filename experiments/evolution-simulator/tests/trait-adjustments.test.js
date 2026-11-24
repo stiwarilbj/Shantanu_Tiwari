@@ -51,11 +51,11 @@ test('live, resumed, batched, and forecast runs apply each intervention at the s
   setup.species[1].enabled = true
   const initial = founders(setup)
   const live = dawnForRun(setup, [], 1, initial)
-  const orangeIds = traitAdjustmentGroup(live.blobs, { speciesId: 'orange', activity: 'active' }).map(blob => blob.id)
+  const orangeIds = traitAdjustmentGroup(live.blobs, { speciesIds: ['orange'], creatureIds: null, activity: 'active' }).map(blob => blob.id)
   const traitAdjustments = [
     { day: 1, tick: 0, changes: { speed: 0.25, size: 0, sense: 0 } },
     { day: 1, tick: 3, changes: { speed: 2.5, size: -1, sense: 10 }, creatureIds: orangeIds },
-    { day: 1, tick: 3, changes: { speed: -0.75, size: 0, sense: 0 } },
+    { day: 1, tick: 3, changes: { speed: -0.75, size: 0, sense: 0 }, creatureIds: [live.blobs[0].id, orangeIds[0]] },
     { day: 1, tick: 9, changes: { speed: 0, size: 0, sense: -2 } },
   ]
   for (const { tick, changes, creatureIds } of traitAdjustments) {
@@ -82,11 +82,17 @@ test('group filters intersect species and activity and only edit the selected li
   const [blueHome, blueActive, orangeHome, orangeActive, orangeDead] = state.blobs
   blueHome.home = orangeHome.home = orangeDead.home = true
   orangeDead.alive = false
-  const group = (speciesId, activity) => traitAdjustmentGroup(state.blobs, { speciesId, activity })
+  const group = (speciesIds, activity, creatureIds = null) => traitAdjustmentGroup(state.blobs, { speciesIds, activity, creatureIds })
   assert.deepEqual(group(null, 'home'), [blueHome, orangeHome])
-  assert.deepEqual(group('orange', 'any'), [orangeHome, orangeActive])
-  assert.deepEqual(group('orange', 'active'), [orangeActive])
-  const targets = group('orange', 'home').map(blob => blob.id)
+  assert.deepEqual(group(['orange'], 'any'), [orangeHome, orangeActive])
+  assert.deepEqual(group(['orange'], 'active'), [orangeActive])
+  assert.deepEqual(group(['blue', 'orange'], 'active'), [blueActive, orangeActive])
+  const picked = [blueHome.id, orangeHome.id, orangeActive.id, orangeDead.id, 999]
+  assert.deepEqual(group(null, 'any', picked), [blueHome, orangeHome, orangeActive])
+  assert.deepEqual(group(null, 'home', picked), [blueHome, orangeHome])
+  assert.deepEqual(group([], 'any'), [])
+  assert.deepEqual(group(null, 'any', []), [])
+  const targets = group(['orange'], 'home', picked).map(blob => blob.id)
   assert.deepEqual(targets, [orangeHome.id])
   const before = state.blobs.map(blob => blob.speed)
   const changes = { speed: 2, size: 0, sense: 0 }

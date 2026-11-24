@@ -12,8 +12,13 @@ export function validTraitAdjustment(changes) {
     TRAITS.some(trait => changes[trait] !== 0)
 }
 
-export function traitAdjustmentGroup(blobs, { speciesId, activity }) {
-  return blobs.filter(blob => blob.alive && (speciesId === null || blob.species === speciesId) &&
+export function traitAdjustmentGroup(blobs, { speciesIds, creatureIds, activity }) {
+  if ((speciesIds !== null && !Array.isArray(speciesIds)) ||
+      (creatureIds !== null && !Array.isArray(creatureIds))) return []
+  const species = speciesIds === null ? null : new Set(speciesIds)
+  const creatures = creatureIds === null ? null : new Set(creatureIds)
+  return blobs.filter(blob => blob.alive && (species === null || species.has(blob.species)) &&
+    (creatures === null || creatures.has(blob.id)) &&
     (activity === 'any' || activity === (blob.home ? 'home' : 'active')))
 }
 

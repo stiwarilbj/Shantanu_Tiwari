@@ -138,7 +138,7 @@ function adjustTraits({ day, tick, changes, group = {} }) {
   }
   const state = current()
   const adjustment = { day, tick, changes }
-  if (group.speciesId !== null || group.activity !== 'any') {
+  if (group.speciesIds !== null || group.creatureIds !== null || group.activity !== 'any') {
     adjustment.creatureIds = traitAdjustmentGroup(state.blobs, group).map(blob => blob.id)
     if (adjustment.creatureIds.length === 0) {
       emit('trait-adjustment', { error: 'No living blobs match this group.' })
