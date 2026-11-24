@@ -1,6 +1,7 @@
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
-import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults,
-  TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
+import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
+  REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
+  usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
   const entries = Object.entries(values ?? {}).filter(([key, value]) => value !== defaults[key])
@@ -50,6 +51,20 @@ function unpackTerritory({ tt, ...setup }, field = false) {
   return setup
 }
 
+const seasonLinkOrder = ['peak', 'lean', 'decline', 'recovery', 'peakDay', 'enabled']
+function packSeasons(season) {
+  const values = seasonLinkOrder.map(key => season?.[key] === FOOD_SEASON_DEFAULTS[key] ? null : season?.[key] ?? null)
+  while (values.at(-1) === null) values.pop()
+  return values.length ? values : undefined
+}
+
+function unpackSeasons({ fs, ...setup }) {
+  if (Array.isArray(fs)) {
+    setup.foodSeasons = Object.fromEntries(seasonLinkOrder.flatMap((key, index) => fs[index] == null ? [] : [[key, fs[index]]]))
+  }
+  return setup
+}
+
 export function setupLink(setup) {
   let compact = setup
   if (usesReproductionRules(setup)) {
@@ -63,6 +78,7 @@ export function setupLink(setup) {
       ...(usesAgingRules(setup) && { aging: omitDefaults(setup.aging, AGING_DEFAULTS) }),
       ...(foraging && { foragingDecisions: undefined, fd: fieldDecisions.length ? fieldDecisions : undefined }),
       ...(territories && { territories: undefined, tt: fieldTerritory.length ? fieldTerritory : undefined }),
+      ...(usesFoodSeasonsRules(setup) && { foodSeasons: undefined, fs: packSeasons(setup.foodSeasons) }),
       reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
       species: setup.species.map(item => {
         const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
@@ -96,7 +112,8 @@ export function setupFromLink(hash) {
   if (!usesForagingDecisionRules(setup)) return setupWithRuleDefaults(setup)
   const decoded = { ...unpackForaging(setup), species: setup.species.map(unpackForaging) }
   if (!usesTerritoryRules(setup)) return setupWithRuleDefaults(decoded)
-  return setupWithRuleDefaults({ ...unpackTerritory(decoded, true), species: decoded.species.map(item => unpackTerritory(item)) })
+  const withTerritories = { ...unpackTerritory(decoded, true), species: decoded.species.map(item => unpackTerritory(item)) }
+  return setupWithRuleDefaults(usesFoodSeasonsRules(setup) ? unpackSeasons(withTerritories) : withTerritories)
 }
 
 export function download(name, mime, content) {

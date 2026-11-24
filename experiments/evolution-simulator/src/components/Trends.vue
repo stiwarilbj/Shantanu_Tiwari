@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ChartNoAxesCombined, Dices, Download, FastForward, Layers, RotateCcw, Table2 } from 'lucide-vue-next'
 import { DEATH_CAUSES, METRICS, metricValue, format, openingSummary, openingTrends } from '../engine/stats.js'
+import { foodSupplyForDay, rulesFor } from '../engine/config.js'
 import { prepareExperiment, useLab } from '../store.js'
 import { sizeMutationPair, SIZE_MUTATION_DAYS, SIZE_MUTATION_SEED } from '../experiments.js'
 import TrendPlot from './TrendPlot.vue'
@@ -35,6 +36,16 @@ const partnerRun=computed(()=>ageDemoPair.value?.[1])
 const dawnRows=computed(()=>openingTrends(activeRun.value))
 const atDawn=computed(()=>cohort.value==='dawn')
 const cohortLabel=computed(()=>atDawn.value?'Dawn':'Dusk')
+function supplyAt(day) {
+  const { setup, revisions } = activeRun.value
+  return foodSupplyForDay(rulesFor(setup, revisions, day), day)
+}
+function describeFoodDay(row) {
+  const supply = row?.supply
+  if (!supply?.phase) return ''
+  const percent = format(supply.multiplier, Number.isInteger(supply.multiplier) ? 0 : 2)
+  return `${supply.phase} · ${percent}% of base supply${supply.limit ? ' · Limited to ' + format(supply.limit, 0) + ' plants' : ''}`
+}
 const rows=computed(()=>{
   const activeSource=atDawn.value?dawnRows.value:activeRun.value.summaries
   const partner=partnerRun.value
@@ -42,6 +53,7 @@ const rows=computed(()=>{
   const visible=range.value==='all'?activeSource:range.value==='custom' ? activeSource.filter(d=>d.day>=from.value && d.day<=to.value) : activeSource.slice(-Number(range.value))
   const closing=new Map(activeRun.value.summaries.map(d=>[d.day,d.rows[lab.scope]?.population]))
   return visible.filter(d=>!partner || d.day<=partner.summaries.length).map(d=>({day:d.day,...d.rows[lab.scope],scopes:d.rows,closing:closing.get(d.day),
+    supply: supplyAt(d.day),
     wide:ageDemoPair.value ? d.rows[lab.scope] : null,
     narrow:partnerSource?.[d.day-1]?.rows[lab.scope] ?? null,
   }))
@@ -61,10 +73,13 @@ const futureRows = computed(() => {
     const a = atCohort(record, index ? left[index - 1] : activeRun.value.summaries[end - 1])
     const b = atCohort(partner, index ? right[index - 1] : partnerRun.value?.summaries[end - 1])
     return { day, ...a?.rows[lab.scope], scopes: a?.rows, closing: record?.rows[lab.scope]?.population,
+      supply: record ? supplyAt(day) : null,
       wide: a?.rows[lab.scope], narrow: b?.rows[lab.scope], ifExtended: record?.ifExtended,
       narrowExtended: partner?.ifExtended }
   })
 })
+const showsFoodSeasons = computed(() => rows.value.some(row => row.supply?.phase) ||
+  futureRows.value.some(row => row.supply?.phase))
 const pinned=computed(()=>rows.value.find(row=>row.day===pin.value)?.scopes[lab.scope])
 const peakDay=computed(()=>{
   let peak=null
@@ -182,8 +197,10 @@ const options=computed(()=>{
         line(cause,['#F0B29F','#D89482','#EB7B72','#DDA66A','#BEABE9'][i],r=>r.causes && -(r.causes[cause] ?? 0),
           {integer:true,dash:[3+i,3],width:1.3})):[])
     ]}
-  charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,series:[
+  charts.food={id:'food',title:'Food',unit:'Resources per day',legend:true,hideable:true,
+    describeDay:showsFoodSeasons.value ? describeFoodDay : undefined,series:[
     line(lab.scope==='all'?'Food available':'Shared plant supply','#BDBAB0',r=>r.food,{dash:[4,3],integer:true,zero:true}),
+    ...(showsFoodSeasons.value ? [line('Base schedule','#92BDDB',r=>r.supply?.base,{dash:[2,4],integer:true})] : []),
     line('Food eaten','#B7D65A',r=>r.plants,{integer:true,area:'origin',fill:'#B7D65A12'}),
     line('Creatures eaten','#D38C80',r=>r.hunts,{dash:[6,3,2,3],integer:true})
   ]}

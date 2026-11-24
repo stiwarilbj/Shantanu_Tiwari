@@ -4,7 +4,7 @@ import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, Chevro
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { STATES } from '../engine/simulation.js'
-import { rulesFor, usesWalkthroughForaging } from '../engine/config.js'
+import { foodSupplyForDay, rulesFor, usesWalkthroughForaging } from '../engine/config.js'
 import { DECISION, tracksForagingDecisions } from '../engine/foraging-decisions.js'
 import { format, runSpeedRange } from '../engine/stats.js'
 import { cost, edgePoint, homePoints, radius, refugeDistance, travel, walkthroughStepCost } from '../engine/geometry.js'
@@ -37,6 +37,12 @@ const traitStats = computed(() => {
   return blob ? [['Speed', format(blob.speed)], ['Size', format(blob.size)], ['Sense range', format(blob.sense)]] : []
 })
 const rules = computed(() => rulesFor(lab.run.setup,lab.run.revisions,lab.frame?.day ?? lab.viewing))
+const foodSeason = computed(() => {
+  const day = lab.frame?.day
+  if (day == null || !rules.value.foodSeasons?.enabled) return null
+  const supply = foodSupplyForDay(rules.value, day)
+  return supply.phase ? supply : null
+})
 const foragingDecision = computed(() => {
   const blob = visible.value
   if (!blob || !tracksForagingDecisions(rules.value)) return ''
@@ -359,6 +365,7 @@ defineExpose({ select, overhead })
         </button>
       </div>
     </div>
+    <p v-if="foodSeason" class="world-food-season">Food season · {{ foodSeason.phase }} · {{ format(foodSeason.count, 0) }} plants at dawn</p>
     <Ribbon :active="props.active" @reroll="emit('reroll')" @table="lab.modal='table'"/>
     <TraitAdjustment v-if="props.active && lab.modal==='traits'"/>
   </main>

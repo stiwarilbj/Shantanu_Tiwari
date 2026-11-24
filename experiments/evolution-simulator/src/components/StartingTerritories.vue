@@ -53,7 +53,7 @@ const preview = computed(() => {
     'patchRelocation', 'patchInterval', 'refugePercent']
   if (draft.scheduleMode !== 'constant') habitatKeys.push('schedule')
   if (errors.days || day > draft.days) return { text: 'Set a run length that includes Day ' + day }
-  if (Object.keys(errors).some(key => territoryIssue(key) || habitatKeys.includes(key) ||
+  if (Object.keys(errors).some(key => territoryIssue(key) || habitatKeys.includes(key) || key.startsWith('foodSeasons.') ||
       key === 'species' || /\.(count|size|name|color)$/.test(key))) {
     return { text: 'Check the territory, habitat, and species settings to preview Day ' + day }
   }

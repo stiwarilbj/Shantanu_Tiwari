@@ -31,7 +31,7 @@ const agingSpecies = ref(null), previewAge = ref(8), foragingScenario = ref('mem
 const foragingSpecies = ref(null), territorySpecies = ref(null)
 const body = ref(null), fields = ref(null), currentPage = ref('basic'), group = ref(null)
 const categories = [
-  { label: 'Field & food', topics: { food: 'Plant supply', habitat: 'Field layout', territory: 'Starting territories' } },
+  { label: 'Field & food', topics: { food: 'Plant supply', seasons: 'Food seasons', habitat: 'Field layout', territory: 'Starting territories' } },
   { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting' } },
   { label: 'Life cycle', topics: { reproduction: 'Reproduction', inheritance: 'Inheritance & mutation', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
@@ -44,7 +44,7 @@ function commitForecastCycles(event) {
   if (forecastCyclesValid.value || event.type === 'blur') forecastCycles.value = String(forecastPreferences.cycles)
 }
 const advancedFields = {
-  schedule: 'food', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
+  schedule: 'food', foodSeasons: 'seasons', foodPlacement: 'habitat', patchCount: 'habitat', patchRadius: 'habitat',
   patchRelocation: 'habitat', patchInterval: 'habitat', refugePercent: 'habitat',
   territories: 'territory', territory: 'territory',
   huntingAdvantage: 'hunting', firstHuntingDay: 'hunting',
@@ -355,7 +355,7 @@ onMounted(()=>dialog.value.showModal())
           </nav>
 
           <section v-else id="advanced-group" class="advanced-group" :aria-label="category.topics[group]">
-            <HabitatSettings v-if="group === 'food' || group === 'habitat'" v-model:day="previewDay"
+            <HabitatSettings v-if="['food', 'seasons', 'habitat'].includes(group)" v-model:day="previewDay"
               :topic="group" :draft="draft" :fork="fork" :run="lab.run" :issue="issue"/>
             <template v-else-if="group === 'territory'">
               <StartingTerritories v-if="usesTerritoryRules(draft)" v-model:species="territorySpecies"
@@ -546,7 +546,7 @@ onMounted(()=>dialog.value.showModal())
       </div>
       <footer class="settings-footer">
         <div v-if="titleErrors.length" class="settings-errors issue" tabindex="-1" role="alert"><p>Review the setup</p><ul><li v-for="error in titleErrors" :key="error.key">{{ error.message }}</li></ul></div>
-        <p>{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} plants per founder</p>
+        <p>{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} {{ draft.foodSeasons?.enabled ? 'base plants' : 'plants' }} per founder</p>
         <p v-if="lab.draftChanged && fork==null" class="quiet">Draft has changes <button type="button" class="link" @click="discarding=true">Discard changes</button></p>
         <p v-if="discarding">Restore the setup you opened? <button type="button" class="secondary" @click="discard">Discard draft</button> <button type="button" class="link" @click="discarding=false">Keep editing</button></p>
         <p v-if="lab.branchPreparing!=null" class="quiet" role="status">Preparing branch from Day {{ lab.branchPreparing }}…</p>

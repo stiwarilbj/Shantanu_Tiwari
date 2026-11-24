@@ -7,7 +7,7 @@ import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, futureRows:{ type:Array, default:() => [] }, series:Array, unit:String, color:String, min:Number, max:Number,
-  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean })
+  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean, describeDay:Function })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
 const predictedIndex = ref(null), showPredictionReading = ref(false)
@@ -16,6 +16,7 @@ const hidden = ref([])
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
   [hovered.value, props.pin].find(day => day != null && props.rows.some(row => row.day === day)) ?? null)
+const pinnedDescription = computed(() => props.describeDay?.(props.rows.find(row => row.day === props.pin)))
 const hasSamples = computed(() => projections.value.length > 0 ||
   props.series.some(series => props.rows.some(row => series.value(row) != null)))
 const projections = computed(() => props.series.flatMap((series, index) => {
@@ -37,7 +38,8 @@ const predictionReading = computed(() => {
     (extended ? 'Predicted · If extended' : 'Predicted')+' · '+(props.embedded ? 'Generation ' : 'Day ')+row.day,
     ...readings.map(({ series, values }) => seriesReading(series, values[index], series.spread?.(row))+
       (!extended && isExtended(series, row) ? ' (If extended)' : '')),
-  ].join(' · ')
+    props.describeDay?.(row),
+  ].filter(Boolean).join(' · ')
 })
 
 function seriesReading(series, value, spread) {
@@ -285,7 +287,11 @@ function create() {
             return (projected ? extended ? 'Predicted · If extended · ' : 'Predicted · ' : '') +
               (props.embedded ? 'Generation ' : 'Day ')+item?.label
           },
-          afterTitle:()=>props.scope ?? '',
+          afterTitle(items) {
+            const item = items[0]
+            const row = item?.dataset.projection ? props.futureRows[item.dataIndex - props.rows.length] : props.rows[item?.dataIndex]
+            return [props.scope, props.describeDay?.(row)].filter(Boolean)
+          },
           label(item) {
             const p=item.dataset.projection
             const series=p?.series ?? props.series[item.datasetIndex]
@@ -360,6 +366,9 @@ function downloadChart() {
         <i :style="{borderColor:s.color,borderTopStyle:s.dash?'dashed':'solid'}"></i>{{ s.label }}
       </button>
     </div>
+    <p v-if="describeDay" class="plot-day-description" role="status">
+      {{ pinnedDescription ? 'Day ' + pin + ' · ' + pinnedDescription : '' }}
+    </p>
     <div v-if="focus || spotlight" class="focused-actions">
       <button class="secondary" :disabled="!active || predictedIndex!=null" @click="emit('pin',active)">Pin day</button>
       <button class="secondary" @click="downloadChart">Download chart PNG</button>

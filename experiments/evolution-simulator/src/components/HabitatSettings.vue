@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref, watchEffect } from 'vue'
 import { Trash2 } from 'lucide-vue-next'
-import { huntingOnDay, rulesFor, usesHabitatRules, validate } from '../engine/config.js'
+import { FOOD_SEASON_FIELDS, foodSupplyForDay, huntingOnDay, rulesFor, usesHabitatRules, validate } from '../engine/config.js'
 import { FIELD } from '../engine/geometry.js'
 import { openingHabitat } from '../engine/habitat.js'
+import { format } from '../engine/stats.js'
 import NumberField from './NumberField.vue'
 
 const { topic, draft, fork, run, issue } = defineProps({
@@ -12,26 +13,59 @@ const { topic, draft, fork, run, issue } = defineProps({
 const previewDay = defineModel('day')
 const map = ref(null)
 const custom = computed(() => usesHabitatRules(draft))
+const errors = computed(() => validate(draft))
+const supplyIssue = computed(() => {
+  const issues = errors.value
+  return issues.food || (draft.scheduleMode !== 'constant' && issues.schedule) ||
+    Object.entries(issues).find(([key]) => key.startsWith('foodSeasons.'))?.[1]
+})
+const season = computed(() => draft.foodSeasons)
+const cycleLength = computed(() => {
+  if (errors.value['foodSeasons.decline'] || errors.value['foodSeasons.recovery']) return null
+  return season.value.decline + season.value.recovery
+})
+const rulesAt = day => fork != null && day <= fork ? rulesFor(run.setup, run.revisions, day) : draft
 const preview = computed(() => {
   const day = previewDay.value
   if (day === '') return { text: 'Enter a day to see its plant count' }
   if (!Number.isInteger(draft.days) || draft.days < 1) return { text: 'Set the run length first' }
   if (!Number.isInteger(day) || day < 1 || day > draft.days) return { text: `Enter a whole day from 1 to ${draft.days}` }
   const saved = fork != null && day <= fork
-  const rules = saved ? rulesFor(run.setup, run.revisions, day) : draft
-  const errors = saved ? {} : validate(rules)
+  const rules = rulesAt(day)
+  const issues = saved ? {} : errors.value
   if (!saved) {
-    const keys = ['food', 'seed', 'foodPlacement', 'patchCount', 'patchRadius', 'patchRelocation', 'patchInterval', 'refugePercent']
-    if (rules.scheduleMode !== 'constant') keys.push('schedule')
-    const error = keys.find(key => errors[key])
-    if (error) return { text: errors[error] }
+    const keys = ['seed', 'foodPlacement', 'patchCount', 'patchRadius', 'patchRelocation', 'patchInterval', 'refugePercent']
+    const error = supplyIssue.value || issues[keys.find(key => issues[key])]
+    if (error) return { text: error }
   }
   const habitat = openingHabitat(rules, day)
-  const hunting = errors.firstHuntingDay || errors.huntingAdvantage ? 'Check hunting settings' :
+  const hunting = issues.firstHuntingDay || issues.huntingAdvantage ? 'Check hunting settings' :
     huntingOnDay(rules, day) ? 'Hunting active' : 'Hunting off'
   const refuge = habitat.refugeWidth ? `Refuge covers ${100 * habitat.refugeWidth / FIELD}% from each edge` : 'No refuge border'
-  return { habitat, text: `Day ${day} · ${habitat.plants.length.toLocaleString('en-US')} plants at dawn${saved ? ' (saved)' : ''}`,
+  return { habitat, supply: foodSupplyForDay(rules, day), text: `Day ${day} · ${habitat.plants.length.toLocaleString('en-US')} plants at dawn${saved ? ' (saved)' : ''}`,
     details: `${refuge} · ${hunting}` }
+})
+const seasonPlot = computed(() => {
+  const { supply } = preview.value
+  if (topic !== 'seasons' || !supply?.phase) return null
+  const day = previewDay.value
+  const peak = day - supply.offset
+  const first = Math.max(1, peak)
+  const last = Math.min(draft.days, peak + supply.cycleLength)
+  const samples = []
+  for (let d = first; d <= last; d++) {
+    const rules = rulesAt(d)
+    if (rules === draft && supplyIssue.value) break
+    samples.push(foodSupplyForDay(rules, d))
+  }
+  if (samples.length <= day - first) return null
+  const high = Math.max(...samples.flatMap(sample => [sample.count, sample.base]))
+  const low = Math.min(...samples.flatMap(sample => [sample.count, sample.base]))
+  const x = index => samples.length === 1 ? 160 : 8 + index * 304 / (samples.length - 1)
+  const y = value => high === low ? 42 : 74 - (value - low) * 64 / (high - low)
+  const points = key => samples.map((sample, index) => x(index) + ',' + y(sample[key])).join(' ')
+  return { first, last: first + samples.length - 1, count: points('count'), base: points('base'),
+    x: x(day - first), y: y(supply.count) }
 })
 watchEffect(() => {
   const canvas = map.value
@@ -101,6 +135,24 @@ function addAnchor() {
     </template>
     <p v-else-if="draft.schedule.length" class="quiet">Constant runs use the daily food count. Starting the run clears any invalid schedule points.</p>
   </div>
+  <div v-else-if="topic === 'seasons'" class="advanced-block">
+    <h3>Food seasons</h3>
+    <template v-if="season">
+      <label class="advanced-toggle">
+        <input id="foodSeasons.enabled" v-model="season.enabled" type="checkbox"> Enable food seasons
+      </label>
+      <p class="quiet">A gradual cycle changes the base plant supply across the whole field. The plant count stays between 10 and 1,000.</p>
+      <template v-if="season.enabled">
+        <NumberField v-for="field in FOOD_SEASON_FIELDS" :key="field.key" :id="'foodSeasons.' + field.key"
+          v-model="season[field.key]" :label="field.label" :min="field.min" :max="field.max"
+          :error="errors['foodSeasons.' + field.key]"/>
+        <p v-if="cycleLength" class="quiet">Cycle length · {{ cycleLength }} generations · Pick a first peak day from 1 to {{ cycleLength }}</p>
+        <NumberField id="foodSeasons.peakDay" v-model="season.peakDay" label="First peak day in cycle" :min="1"
+          :max="cycleLength ?? 200" :disabled="!cycleLength" :error="errors['foodSeasons.peakDay']"/>
+      </template>
+    </template>
+    <p v-else class="quiet">This setup uses its original food rules.</p>
+  </div>
   <div v-else class="advanced-block">
     <h3>Field layout</h3>
     <template v-if="custom">
@@ -140,8 +192,22 @@ function addAnchor() {
           aria-describedby="food-preview-result" @keydown.enter.prevent>
       </label>
       <output id="food-preview-result" for="food-preview-day">{{ preview.text }}</output>
+      <output v-if="preview.supply?.phase" for="food-preview-day" class="season-preview-reading">
+        {{ preview.supply.phase }} · {{ format(preview.supply.multiplier, Number.isInteger(preview.supply.multiplier) ? 0 : 2) }}% of {{ format(preview.supply.base, 0) }} base plants
+        <template v-if="preview.supply.limit"> · {{ preview.supply.limit === 10 ? 'Minimum' : 'Maximum' }} of {{ format(preview.supply.limit, 0) }} applied</template>
+      </output>
       <p v-if="preview.details" class="quiet">{{ preview.details }}</p>
     </div>
     <canvas v-if="preview.habitat" ref="map" width="320" height="320" aria-hidden="true"></canvas>
+    <figure v-if="seasonPlot" class="season-plot">
+      <figcaption>Food cycle · {{ seasonPlot.first === seasonPlot.last ? 'Day ' + seasonPlot.first : 'Days ' + seasonPlot.first + '–' + seasonPlot.last }}</figcaption>
+      <svg viewBox="0 0 320 82" aria-hidden="true">
+        <path :d="'M' + seasonPlot.x + ' 5V78'" class="season-cycle-marker"/>
+        <polyline :points="seasonPlot.base" class="season-base-line"/>
+        <polyline :points="seasonPlot.count" class="season-count-line"/>
+        <circle :cx="seasonPlot.x" :cy="seasonPlot.y" r="3.5"/>
+      </svg>
+      <div class="season-plot-key"><span>Plants at dawn</span><span>Base schedule</span></div>
+    </figure>
   </div>
 </template>

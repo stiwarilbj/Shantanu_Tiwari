@@ -12,7 +12,8 @@ export const FORAGING_DECISION_RULE_VERSION = 10
 export const TERRITORY_RULE_VERSION = 11
 export const OPTIONAL_RULES_VERSION = 12
 export const PRECISE_THRESHOLDS_RULE_VERSION = 13
-export const VERSION = PRECISE_THRESHOLDS_RULE_VERSION
+export const FOOD_SEASONS_RULE_VERSION = 14
+export const VERSION = FOOD_SEASONS_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -24,6 +25,15 @@ export const HABITAT_DEFAULTS = Object.freeze({
   huntingAdvantage: 25,
   firstHuntingDay: 1,
 })
+export const FOOD_SEASON_DEFAULTS = Object.freeze({
+  enabled: false, peak: 150, lean: 50, decline: 4, recovery: 8, peakDay: 1,
+})
+export const FOOD_SEASON_FIELDS = [
+  { key: 'peak', label: 'Peak supply (%)', min: 100, max: 200 },
+  { key: 'lean', label: 'Lean supply (%)', min: 0, max: 100 },
+  { key: 'decline', label: 'Generations from peak to leanest', min: 1, max: 100 },
+  { key: 'recovery', label: 'Generations from leanest to peak', min: 1, max: 100 },
+]
 export const REPRODUCTION_DEFAULTS = Object.freeze({
   parentMode: 'single',
   minimumBreedingAge: 0,
@@ -74,6 +84,7 @@ export const usesWalkthroughForaging = config => usesStandardDeviation(config) &
 export const usesRefugeBorder = config => config.version >= REFUGE_RULE_VERSION
 export const usesImprovedSteering = config => config.version >= STEERING_RULE_VERSION && !usesWalkthroughForaging(config)
 export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
+export const usesFoodSeasonsRules = config => config.version >= FOOD_SEASONS_RULE_VERSION
 export const usesReproductionRules = config => config.version >= REPRODUCTION_RULE_VERSION
 export const usesAgingRules = config => config.version >= AGING_RULE_VERSION
 export const usesForagingDecisionRules = config => config.version >= FORAGING_DECISION_RULE_VERSION
@@ -92,6 +103,7 @@ export const huntingOnDay = (config, day) => config.predation &&
 export function setupWithRuleDefaults(setup) {
   if (usesOptionalRules(setup)) setup = { ...setup, advanced: { ...ADVANCED_DEFAULTS, ...setup.advanced } }
   if (usesHabitatRules(setup)) setup = { ...HABITAT_DEFAULTS, ...setup }
+  if (usesFoodSeasonsRules(setup)) setup = { ...setup, foodSeasons: { ...FOOD_SEASON_DEFAULTS, ...setup.foodSeasons } }
   if (usesAgingRules(setup)) setup = { ...setup, aging: { ...AGING_DEFAULTS, ...setup.aging } }
   if (usesForagingDecisionRules(setup)) {
     setup = { ...setup, foragingDecisions: { ...FORAGING_DEFAULTS, ...setup.foragingDecisions } }
@@ -188,6 +200,16 @@ export function validate(config) {
     if (config.predation) {
       number('huntingAdvantage', 'Minimum hunting size advantage', config.huntingAdvantage, 5, 100)
       number('firstHuntingDay', 'First hunting day', config.firstHuntingDay, 1, Number.isInteger(config.days) ? config.days : 1000)
+    }
+  }
+  if (usesFoodSeasonsRules(config) && config.foodSeasons !== undefined) {
+    const season = config.foodSeasons
+    if (typeof season?.enabled !== 'boolean') errors['foodSeasons.enabled'] = 'Choose whether food seasons are enabled.'
+    if (season?.enabled === true) {
+      for (const { key, label, min, max } of FOOD_SEASON_FIELDS) number('foodSeasons.' + key, label, season[key], min, max)
+      if (!errors['foodSeasons.decline'] && !errors['foodSeasons.recovery']) {
+        number('foodSeasons.peakDay', 'First peak day in cycle', season.peakDay, 1, season.decline + season.recovery)
+      }
     }
   }
   if (usesReproductionRules(config) && config.reproduction !== undefined && advancedRuleEnabled(config, 'breeding')) {
@@ -310,7 +332,7 @@ export function validate(config) {
   return errors
 }
 
-export function plantsForDay(config, day) {
+function basePlantsForDay(config, day) {
   if (config.scheduleMode === 'constant') return config.food
   let previous = { day: 1, food: config.food }
   for (const next of [...config.schedule].sort((a, b) => a.day - b.day)) {
@@ -322,6 +344,32 @@ export function plantsForDay(config, day) {
     previous = next
   }
   return previous.food
+}
+
+export function foodSupplyForDay(config, day) {
+  const base = basePlantsForDay(config, day)
+  const season = config.foodSeasons
+  if (!usesFoodSeasonsRules(config) || season?.enabled !== true) {
+    return { base, count: base, multiplier: 100, phase: null }
+  }
+  const { peak, lean, decline, recovery, peakDay } = season
+  const cycleLength = decline + recovery
+  const offset = ((day - peakDay) % cycleLength + cycleLength) % cycleLength
+  const falling = offset < decline
+  const elapsed = falling ? offset : offset - decline
+  const length = falling ? decline : recovery
+  const phase = offset === 0 ? 'Peak' : offset === decline ? 'Leanest' : falling ? 'Falling' : 'Recovering'
+  const turn = elapsed / length
+  // Keep exact half-plant ties from drifting below the rounding threshold.
+  const progress = turn === 1 / 3 ? 0.25 : turn === 0.5 ? 0.5 : turn === 2 / 3 ? 0.75 : (1 - Math.cos(Math.PI * turn)) / 2
+  const multiplier = falling ? peak + (lean - peak) * progress : lean + (peak - lean) * progress
+  const rounded = Math.round(base * multiplier / 100)
+  const count = Math.max(10, Math.min(1000, rounded))
+  return { base, count, multiplier, phase, offset, cycleLength, limit: rounded === count ? null : count }
+}
+
+export function plantsForDay(config, day) {
+  return foodSupplyForDay(config, day).count
 }
 
 export function rulesFor(setup, revisions, day) {

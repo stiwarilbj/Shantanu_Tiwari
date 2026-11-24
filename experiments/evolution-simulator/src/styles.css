@@ -155,6 +155,7 @@ dd{margin:0;font-family:var(--mono);color:var(--cream);text-align:right}
 .event-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--subtle);width:100%;text-align:left;padding:6px 0}
 .event-row time{font:12px var(--mono);color:var(--focus)}
 .time-rail{display:flex;flex:none;position:relative;z-index:6}
+.world-food-season{flex:none;margin:0;padding:5px 12px 2px;color:var(--muted);font:11px/1.4 var(--mono);text-align:center}
 .time-track{flex:1;min-width:0;position:relative;padding-bottom:2px;background:linear-gradient(to top,#35534c 2px,transparent 2px)}
 .time-fill{position:absolute;inset:auto auto 0 0;height:2px;background:var(--rail);width:var(--elapsed)}
 .time-thumb{position:absolute;left:var(--elapsed);top:calc(100% - 1px);border-radius:50%;width:7px;height:7px;background:var(--rail);transform:translate(-50%,-50%);display:none}
@@ -559,6 +560,19 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .habitat-preview h3{grid-column:1/-1}
 .habitat-preview .schedule-preview{display:grid;align-content:start;padding:0}
 .habitat-preview canvas{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:5px}
+.season-preview-reading{font:12px/1.5 var(--mono)}
+.season-plot{grid-column:1/-1;min-width:0;margin:4px 0 0;padding:10px;border:1px solid var(--line);border-radius:5px}
+.season-plot figcaption,.season-plot-key{color:var(--muted);font:11px/1.4 var(--mono)}
+.season-plot svg{display:block;width:100%;height:92px}
+.season-plot polyline,.season-plot path{fill:none;vector-effect:non-scaling-stroke}
+.season-count-line{stroke:#B7D65A;stroke-width:2}.season-plot circle{fill:#B7D65A}
+.season-base-line{stroke:#92BDDB;stroke-dasharray:3 4;stroke-width:1.5}
+.season-cycle-marker{stroke:var(--muted);stroke-opacity:.6}
+.season-plot-key{display:flex;flex-wrap:wrap;gap:4px 14px}
+.season-plot-key span::before{content:'';display:inline-block;width:14px;margin-inline-end:5px;border-top:2px solid #B7D65A;vertical-align:middle}
+.season-plot-key span+span::before{border-top:2px dashed #92BDDB}
+.plot-day-description{margin:0;padding:2px 12px 8px;color:var(--muted);font:11px/1.4 var(--mono)}
+.plot-day-description:empty{padding:0}
 .settings-footer{flex:none;text-align:center;padding:4px 10px 7px;color:var(--muted);border-top:1px solid var(--subtle)}
 .settings-footer>small{display:inline;margin-left:6px;font-size:9px}.settings-footer p{margin:1px 0;font-size:9px;line-height:1.1}
 .settings-errors{max-width:500px;max-height:min(22dvh,128px);overflow:auto;overscroll-behavior:contain;margin:4px auto 6px;text-align:left;border:1px solid #894f47;border-radius:5px;padding:6px 8px}
