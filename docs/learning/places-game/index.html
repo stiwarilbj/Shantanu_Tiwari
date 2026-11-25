@@ -255,6 +255,9 @@
         .filter-feedback:empty {
             margin: 0;
         }
+        #guessStatus.guess-correct {
+            color: #166534;
+        }
         .search-container .form-control[aria-invalid="true"] {
             border-color: #a52330;
         }
@@ -546,13 +549,13 @@
 
                 <div class="input-group">
                     <input type="text" id="placeInput" class="form-control" aria-label="Place name or place and country"
-                           placeholder="e.g., Paris, France" disabled>
+                           aria-describedby="guessStatus" placeholder="e.g., Paris, France" disabled>
                     <button id="enterBtn" class="btn btn-primary" disabled>
                         <i class="fas fa-check"></i> Enter Place
                     </button>
                 </div>
 
-                <p id="guessStatus" class="filter-feedback" role="status"></p>
+                <p id="guessStatus" class="filter-feedback" role="status" aria-atomic="true"></p>
 
                 <div class="game-actions">
                     <button id="startBtn" class="btn btn-success" type="button">
@@ -596,7 +599,10 @@
         let pausedMs = 0;
         let nextSaveAt;
         let score = 0;
-        let guessedPlaces = [];
+        const guessedPlaces = [];
+        const acceptedAnswers = new Set();
+        let latestGuess;
+        let guessEditVersion = 0;
         let setupCount = null;
         let activeRound;
         let nextRoundId = 0;
@@ -671,7 +677,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=2');
+            const worker = new Worker('places-worker.js?v=3');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -929,8 +935,9 @@
                 activeRound = undefined;
             }
             guessQueue = Promise.resolve();
+            latestGuess = undefined;
             placesWorker?.postMessage({ type: 'clearRound' });
-            guessStatus.textContent = '';
+            showGuessFeedback('');
         }
 
         async function prepareRound(starting = false) {
@@ -1022,10 +1029,10 @@
         function beginRound(minutes) {
             pausedMs = minutes * 60_000;
             score = 0;
-            guessedPlaces = [];
+            placeInput.value = '';
+            clearGuessedPlaces();
 
             updateScoreDisplay();
-            updateGuessedPlacesDisplay();
             updatePlaceInputPlaceholder();
 
             pauseBtn.disabled = false;
@@ -1076,7 +1083,7 @@
             roundJob = undefined;
             invalidateRound();
             score = 0;
-            guessedPlaces = [];
+            clearGuessedPlaces();
             setupCount = null;
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
@@ -1087,7 +1094,6 @@
 
             updateTimerDisplay();
             updateScoreDisplay();
-            updateGuessedPlacesDisplay();
 
             pauseBtn.disabled = true;
             setGuessingEnabled(false);
@@ -1128,6 +1134,20 @@
             }
         }
 
+        function showGuessFeedback(message, correct = false) {
+            guessStatus.classList.toggle('guess-correct', correct);
+            guessStatus.textContent = message;
+        }
+
+        function reportGuess(submission, message, correct = false) {
+            if (latestGuess !== submission) return;
+            // Keep new typing intact if the worker answered after the player moved on.
+            if (!correct && getRemainingMs() > 0 && guessEditVersion === submission.editVersion && !placeInput.value) {
+                placeInput.value = submission.text;
+            }
+            showGuessFeedback(message, correct);
+        }
+
         function enterPlace() {
             if (roundDeadline === null || !activeRound) return;
             if (getRemainingMs() === 0) {
@@ -1135,43 +1155,50 @@
                 return;
             }
 
-            const guess = placeInput.value.trim();
+            const text = placeInput.value;
+            const guess = text.trim();
+            showGuessFeedback('');
+            placeInput.focus({ preventScroll: true });
             if (!guess) return;
+
+            const submission = { text, editVersion: guessEditVersion };
+            latestGuess = submission;
             placeInput.value = '';
-            guessStatus.textContent = '';
 
             const round = activeRound;
             const index = indexRound(round);
             const lookup = index.promise.then(() => {
                 if (activeRound !== round) return;
-                const job = requestPlaces('guess', { roundId: round.id, guess });
+                const job = requestPlaces('guess', { roundId: round.id, guess, includeFeedback: true });
                 round.guesses.add(job);
                 return job.promise.finally(() => round.guesses.delete(job));
-            }).then(place => ({ place }), () => {
+            }).catch(() => {
                 if (round.index === index) round.index = undefined;
-                return { failed: true };
+                return { reason: 'unavailable' };
             });
 
             // Apply results in submission order, even if a reply arrives after pausing or expiry.
             guessQueue = guessQueue.then(async () => {
-                const { place, failed } = await lookup;
+                const result = await lookup;
                 if (activeRound !== round) return;
-                if (failed) {
-                    guessStatus.textContent = 'Could not check that answer. Try entering it again';
+
+                if (!result?.place) {
+                    let message = 'Place not found for this round';
+                    if (result?.reason === 'country') message = 'Check the country';
+                    else if (result?.reason === 'unavailable') message = 'Could not check that answer. Try entering it again';
+                    reportGuess(submission, message);
                     return;
                 }
-                if (!place) return;
 
-                const duplicate = guessedPlaces.some(guessed =>
-                    guessed.city.toLowerCase() === place.city.toLowerCase() &&
-                    (!round.needsCountry || guessed.country?.toLowerCase() === place.country_name.toLowerCase())
-                );
-                if (duplicate) return;
+                const place = { city: result.place.city, country: result.place.country_name };
+                if (!appendGuessedPlace(place, round.needsCountry)) {
+                    reportGuess(submission, 'Already counted');
+                    return;
+                }
 
                 score++;
-                guessedPlaces.push({ city: place.city, country: place.country_name });
                 updateScoreDisplay();
-                updateGuessedPlacesDisplay();
+                reportGuess(submission, 'Counted', true);
                 if (getRemainingMs() > 0) saveGameState();
             });
         }
@@ -1342,20 +1369,29 @@
             scoreDisplay.textContent = score;
         }
 
-        function updateGuessedPlacesDisplay() {
-            if (guessedPlaces.length === 0) {
-                guessedPlacesContainer.innerHTML = '<p class="text-muted">No places guessed yet</p>';
-                return;
-            }
-            let html = '';
-            guessedPlaces.forEach(place => {
-                if (activeRound?.needsCountry ?? currentGameMode === 'placeAndCountry') {
-                    html += `<div class="place-item">${place.city}, ${place.country}</div>`;
-                } else {
-                    html += `<div class="place-item">${place.city}</div>`;
-                }
-            });
-            guessedPlacesContainer.innerHTML = html;
+        function clearGuessedPlaces() {
+            guessedPlaces.length = 0;
+            acceptedAnswers.clear();
+            const empty = document.createElement('p');
+            empty.className = 'text-muted';
+            empty.textContent = 'No places guessed yet';
+            guessedPlacesContainer.replaceChildren(empty);
+        }
+
+        function appendGuessedPlace(place, needsCountry) {
+            const city = place.city.toLowerCase();
+            const key = needsCountry ? JSON.stringify([city, place.country?.toLowerCase()]) : city;
+            if (acceptedAnswers.has(key)) return false;
+
+            acceptedAnswers.add(key);
+            if (guessedPlaces.length === 0) guessedPlacesContainer.firstElementChild?.remove();
+            guessedPlaces.push(place);
+
+            const row = document.createElement('div');
+            row.className = 'place-item';
+            row.textContent = needsCountry && place.country ? `${place.city}, ${place.country}` : place.city;
+            guessedPlacesContainer.append(row);
+            return true;
         }
 
         function saveGameState(remainingMs = getRemainingMs()) {
@@ -1442,12 +1478,13 @@
                     const savedMs = saved.remainingMs ?? (saved.timeLeft || 0) * 1000;
                     pausedMs = Number.isFinite(savedMs) ? Math.max(0, savedMs) : 0;
                     score = saved.score || 0;
-                    guessedPlaces = saved.guessedPlaces || [];
+                    for (const place of saved.guessedPlaces || []) {
+                        appendGuessedPlace(place, currentGameMode === 'placeAndCountry');
+                    }
                     setPanelVisibility(rulesBtn, rulesContainer, saved.isRulesVisible);
                     setPanelVisibility(showSearchBtn, searchContainer, saved.isSearchVisible);
                     updateTimerDisplay();
                     updateScoreDisplay();
-                    updateGuessedPlacesDisplay();
                 }
 
                 if (pausedMs > 0) {
@@ -1465,6 +1502,10 @@
         }
 
         enterBtn.addEventListener('click', enterPlace);
+        placeInput.addEventListener('input', () => {
+            guessEditVersion++;
+            showGuessFeedback('');
+        });
         placeInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 enterPlace();

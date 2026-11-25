@@ -33,7 +33,7 @@ self.addEventListener('message', async ({ data: { id, type, ...payload } }) => {
     }
 });
 
-async function runRequest(type, { filters, roundId, needsCountry, guess }, id, cancelled) {
+async function runRequest(type, { filters, roundId, needsCountry, guess, includeFeedback }, id, cancelled) {
     switch (type) {
         case 'setup':
             return (await getSetupPlaces(filters)).length;
@@ -44,9 +44,11 @@ async function runRequest(type, { filters, roundId, needsCountry, guess }, id, c
             if (!cancelled()) round = { id: roundId, key: poolKey(filters), places, groups, needsCountry };
             return places.length;
         }
-        case 'guess':
+        case 'guess': {
             if (round?.id !== roundId) throw new Error('Round index is unavailable');
-            return findMatchingPlace(round, guess);
+            const result = checkGuess(round, guess);
+            return includeFeedback ? result : result.place ?? null;
+        }
         case 'examples': {
             const places = round && round.id === roundId ? round.places : await getSetupPlaces(filters);
             if (cancelled()) return;
@@ -246,10 +248,10 @@ function shuffle(places) {
     return places;
 }
 
-function findMatchingPlace({ places, groups, needsCountry }, guess) {
+function checkGuess({ places, groups, needsCountry }, guess) {
     const lowerGuess = guess.toLowerCase();
     const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
-    if (needsCountry && parts.length < 2) return null;
+    if (needsCountry && parts.length < 2) return { reason: 'country' };
 
     // Either name can contain commas, so try each possible separator.
     const candidatePairs = needsCountry ? parts.slice(0, -1).map((_, index) => [
@@ -263,7 +265,7 @@ function findMatchingPlace({ places, groups, needsCountry }, guess) {
         const index = groups.get(guessedCountry)?.byName.get(guessedCity);
         if (index !== undefined) firstIndex = Math.min(firstIndex, index);
     }
-    if (firstIndex !== Infinity) return places[firstIndex];
+    if (firstIndex !== Infinity) return { place: places[firstIndex] };
 
     for (const [guessedCity, guessedCountry] of candidatePairs) {
         for (const [country, group] of groups) {
@@ -282,7 +284,16 @@ function findMatchingPlace({ places, groups, needsCountry }, guess) {
             }
         }
     }
-    return firstIndex === Infinity ? null : places[firstIndex];
+    if (firstIndex !== Infinity) return { place: places[firstIndex] };
+
+    if (needsCountry) {
+        if (!parts.at(-1)) return { reason: 'country' };
+        // An exact city in a different country is a useful hint after both matching passes fail.
+        for (const group of groups.values()) {
+            if (candidatePairs.some(([city]) => group.byName.has(city))) return { reason: 'country' };
+        }
+    }
+    return { reason: 'not-found' };
 }
 
 function isCloseMatch(first, second) {
