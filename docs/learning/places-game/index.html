@@ -951,7 +951,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=8');
+            const worker = new Worker('places-worker.js?v=9');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;

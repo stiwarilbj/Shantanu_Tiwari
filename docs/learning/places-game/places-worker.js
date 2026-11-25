@@ -2,6 +2,8 @@ let catalog;
 let countryIndexes;
 let setupPool;
 let round;
+const MAX_CACHED_ROUND_INDEXES = 2;
+const roundIndexes = new Map();
 const loadedPlaces = new Map();
 const pendingLoads = new Map();
 const activeRequests = new Set();
@@ -51,15 +53,29 @@ async function runRequest(type, payload, id, cancelled) {
         case 'setup':
             return (await getSetupPlaces(filters)).length;
         case 'round': {
-            const places = await getSetupPlaces(filters);
-            if (cancelled()) return;
-            const index = await indexRound(places, needsCountry, spelling, cancelled);
-            if (cancelled()) return;
-            round = { id: roundId, key: poolKey(filters), places, needsCountry, spelling, ...index };
+            const key = poolKey(filters);
+            const cacheKey = JSON.stringify([catalog.revision, key, needsCountry, spelling]);
+            let index = roundIndexes.get(cacheKey);
+            if (index) {
+                roundIndexes.delete(cacheKey);
+            } else {
+                const places = await getSetupPlaces(filters);
+                if (cancelled()) return;
+                const lookup = await indexRound(places, needsCountry, spelling, cancelled);
+                if (cancelled()) return;
+                index = { key, places, needsCountry, spelling, ...lookup };
+            }
+            // Keep dictionary positions and their ordered place list together across attempts.
+            roundIndexes.set(cacheKey, index);
+            if (roundIndexes.size > MAX_CACHED_ROUND_INDEXES) {
+                roundIndexes.delete(roundIndexes.keys().next().value);
+            }
+            round = { ...index, id: roundId };
+            const { places, groups } = index;
             if (savedGuesses) {
                 const guesses = savedGuesses.flatMap(({ city, country }) => {
                     const countryKey = needsCountry || allowsMissingAccents(spelling) ? nameKey(country, spelling) : '';
-                    const group = index.groups.get(countryKey);
+                    const group = groups.get(countryKey);
                     const place = places[group?.byName.get(nameKey(city, spelling))];
                     return place ? [{ city: place.city, country: place.country_name }] : [];
                 });
