@@ -20,7 +20,7 @@ function createPlacesStorage(countries) {
             start: letter(start),
             end: letter(end),
             minutes: ['1', '2', '3', '5', 'practice'].includes(minutes) ? minutes : '1',
-            spelling: ['strict', 'relaxed'].includes(spelling) ? spelling : 'standard',
+            spelling: ['strict', 'accent-friendly', 'relaxed'].includes(spelling) ? spelling : 'standard',
             hints: ['clues', 'after'].includes(hints) ? hints : 'examples'
         };
     }

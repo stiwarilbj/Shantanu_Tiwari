@@ -373,10 +373,10 @@
                 width: 50%;
             }
             .settings-card .col:has(> #timeSelect) {
-                width: 55%;
+                width: 52%;
             }
             .settings-card .col:has(> #spellingSelect) {
-                width: 45%;
+                width: 48%;
             }
             .settings-card .setting-mode {
                 width: 100%;
@@ -389,9 +389,14 @@
         }
         @container (width < 40rem) {
             .settings-card .form-select {
-                padding-inline: 0.375rem 1rem;
+                padding-inline: 0.25rem 1rem;
                 background-position: right 0.3125rem center;
                 background-size: 0.625rem auto;
+            }
+        }
+        @container (width < 17.5em) {
+            .settings-card .col:has(> #timeSelect, > #spellingSelect) {
+                width: 100%;
             }
         }
         @container (width >= 24rem) {
@@ -451,16 +456,16 @@
                     --bs-gutter-x: 0.375rem;
                 }
                 .settings-card .col {
-                    width: 17%;
+                    width: 16%;
                 }
                 .settings-card .col:has(> #timeSelect) {
                     width: 23%;
                 }
                 .settings-card .setting-mode {
-                    width: 27%;
+                    width: 24%;
                 }
                 .settings-card .col:has(> #spellingSelect) {
-                    width: 16%;
+                    width: 21%;
                 }
                 .settings-card .form-select {
                     padding-inline: 0.375rem 1rem;
@@ -539,7 +544,8 @@
                     <li>Pick a 1–5 minute time limit or <strong>Untimed practice</strong>, then set any letter or country filters. Select <strong>Load places</strong> if prompted, then select <strong>Start Game</strong>. In practice, select <strong>Finish Practice</strong> when you're ready to review your guesses.</li>
                     <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
-                    <li>Each correct answer earns one point. <strong>Standard</strong> allows one typo or swapped neighboring letters per name. <strong>Strict</strong> requires exact spelling, with any capitalization. <strong>Relaxed</strong> also accepts missing accents and familiar country names like USA, UK, and Czechia. If more than one place matches, try the exact spelling or add the country.</li>
+                    <li>Each correct answer earns one point. <strong>Standard</strong> allows one typo or swapped neighboring letters per name. <strong>Strict</strong> requires exact spelling, with any capitalization.</li>
+                    <li><strong>Accent-friendly</strong> fills in missing accents when the answer is clear. Type “Sao Luis, Brazil” to see “Counted as São Luís, Brazil”. <strong>Relaxed</strong> also accepts missing accents, along with typos and familiar country names like USA, UK, and Czechia. If more than one place matches, try the exact spelling or add the country.</li>
                     <li><strong>Search</strong> by first or last letter, country, or name length. Separate terms with commas. <strong>Include</strong> checks for every term in the place or country, and <strong>Don't Include</strong> skips any match.</li>
                     <li><strong>Display Places</strong> shows up to eight examples using your filters. In Preferences, switch to <strong>Clues only</strong> for a hint without the name, or <strong>After the round</strong> to unlock Search and examples when you finish.</li>
                     <li>To take a break, select <strong>Pause</strong>, then <strong>Resume Game</strong> when you're ready. Use Preferences to choose what happens when you switch away.</li>
@@ -628,6 +634,7 @@
                         <select id="spellingSelect" class="form-select">
                             <option value="standard" selected>Standard</option>
                             <option value="strict">Strict</option>
+                            <option value="accent-friendly">Accent-friendly</option>
                             <option value="relaxed">Relaxed</option>
                         </select>
                     </div>
@@ -803,7 +810,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"],"dailyStarts":{"worldwide":"ABCDEFGHIJKLMNOPQRSTUVWXYZ","regions":[[7,"CDLSV"],[8,"A"],[9,"ABCDEFGHKLMNOPRSTW"],[10,"ABEFGHKLMNOPRSTW"],[16,"B"],[21,"P"],[25,"ABCDEFGIJLMNOPRSTUV"],[27,"O"],[30,"S"],[32,"BCLMPS"],[36,"C"],[37,"BCDHJLSXYZ"],[38,"ACLMPST"],[43,"G"],[46,"BDHKLMOPSV"],[48,"S"],[61,"K"],[62,"ABCDEFGHJLMNOPRSTVW"],[66,"ABCDEFGHIKLMNOPRSTUVWZ"],[68,"AKMNPS"],[70,"MS"],[75,"LS"],[77,"BKMNPST"],[79,"ABCDGHJKLMNPRSTUV"],[80,"KS"],[81,"ABDGHKMNQRST"],[83,"C"],[85,"ABCDFGILMNOPRSTVZ"],[86,"BCMS"],[87,"AHIKMNSTY"],[113,"ABCDEFGHIJLMNOPRSTVXZ"],[124,"ABDGHKLMNOSVW"],[132,"S"],[134,"K"],[137,"CDL"],[140,"P"],[141,"ABCDGIKLMNPST"],[142,"BCDGJKLMNOPRSTWZ"],[143,"ACFMPSV"],[146,"ABCDFGHILMNOPRSTV"],[147,"ABCDGIKLMNOPRSTUVYZ"],[155,"A"],[161,"O"],[168,"ABCDEFGHIJLMNOPRSTUVZ"],[173,"BHS"],[174,"ABCGLMRSW"],[178,"M"],[179,"AB"],[185,"ABGKS"],[189,"BCDKLMNPRSTVZ"],[191,"ABCDEFGHKLMNPRSTW"],[192,"ABCDEFGHIJKLMNOPRSTUVWY"],[198,"H"],[200,"A"]]}}</script>
-    <script src="places-storage.js?v=9"></script>
+    <script src="places-storage.js?v=10"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -944,7 +951,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=7');
+            const worker = new Worker('places-worker.js?v=8');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -1318,7 +1325,7 @@
                         clearExamples();
                     }
                     if (count > 0) {
-                        for (const place of result.guesses) appendGuessedPlace(place, round.needsCountry);
+                        for (const place of result.guesses) appendGuessedPlace(place, round);
                         score = guessedPlaces.length;
                         updateScoreDisplay();
                         saveRound();
@@ -1577,17 +1584,19 @@
                     reportGuess(submission, guessProblem(attempt.detail, round.needsCountry));
                 } else {
                     const place = { city: result.place.city, country: result.place.country_name };
-                    if (appendGuessedPlace(place, round.needsCountry)) {
+                    const label = round.needsCountry || result.accentCorrection === 'pair' ?
+                        `${place.city}, ${place.country}` : place.city;
+                    if (appendGuessedPlace(place, round)) {
                         score++;
                         updateScoreDisplay();
-                        reportGuess(submission, 'Counted', true);
+                        reportGuess(submission, result.accentCorrection ? `Counted as ${label}` : 'Counted', true);
                         playSound('correct');
                         attempt.outcome = result.match;
                     } else {
                         reportGuess(submission, 'Already counted');
                         attempt.outcome = 'duplicate';
                     }
-                    attempt.detail = round.needsCountry ? `${place.city}, ${place.country}` : place.city;
+                    attempt.detail = label;
                 }
 
                 round.attempts.push(attempt);
@@ -1712,11 +1721,12 @@
 
         function showClue(payload) {
             const needsCountry = countrySelect.value === 'placeAndCountry';
+            const spelling = spellingSelect.value;
             const usesRoundGuesses = activeRound?.needsCountry === needsCountry &&
                 Object.entries(payload.filters).every(([key, value]) => activeRound.filters[key] === value);
             const guessed = usesRoundGuesses ? [...acceptedAnswers] : [];
             shownClueKey = undefined;
-            requestResults(examplePlacesContainer, 'clue', { ...payload, needsCountry, guessed },
+            requestResults(examplePlacesContainer, 'clue', { ...payload, needsCountry, guessed, spelling },
                 'No unguessed places match these filters', showExamples, (container, [clue]) => {
                     // An answer can score while the worker is choosing a clue.
                     if (usesRoundGuesses && acceptedAnswers.has(clue.answerKey)) {
@@ -1938,9 +1948,10 @@
             guessedPlacesContainer.replaceChildren(empty);
         }
 
-        function appendGuessedPlace(place, needsCountry) {
-            const city = place.city.toLowerCase();
-            const key = needsCountry ? JSON.stringify([city, place.country?.toLowerCase()]) : city;
+        function appendGuessedPlace(place, { needsCountry, setup: { spelling } }) {
+            const answerName = name => spelling === 'accent-friendly' ? name.toLowerCase().normalize() : name.toLowerCase();
+            const city = answerName(place.city);
+            const key = needsCountry ? JSON.stringify([city, answerName(place.country)]) : city;
             if (acceptedAnswers.has(key)) return false;
 
             acceptedAnswers.add(key);

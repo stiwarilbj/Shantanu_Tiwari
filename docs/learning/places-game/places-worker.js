@@ -58,7 +58,7 @@ async function runRequest(type, payload, id, cancelled) {
             round = { id: roundId, key: poolKey(filters), places, needsCountry, spelling, ...index };
             if (savedGuesses) {
                 const guesses = savedGuesses.flatMap(({ city, country }) => {
-                    const countryKey = needsCountry || spelling === 'relaxed' ? nameKey(country, spelling) : '';
+                    const countryKey = needsCountry || allowsMissingAccents(spelling) ? nameKey(country, spelling) : '';
                     const group = index.groups.get(countryKey);
                     const place = places[group?.byName.get(nameKey(city, spelling))];
                     return place ? [{ city: place.city, country: place.country_name }] : [];
@@ -92,14 +92,15 @@ async function runRequest(type, payload, id, cancelled) {
     }
 }
 
-function findClue(places, { needsCountry, guessed }) {
+function findClue(places, { needsCountry, guessed, spelling }) {
     const excluded = new Set(guessed);
+    const identitySpelling = spelling === 'accent-friendly' ? spelling : 'standard';
     const first = Math.floor(Math.random() * places.length);
     for (let offset = 0; offset < places.length; offset++) {
         const { city, country_name: country } = places[(first + offset) % places.length];
         // Use the same identity as scoring, including shared names in Place and Country mode.
-        const name = city.toLowerCase();
-        const answerKey = needsCountry ? JSON.stringify([name, country.toLowerCase()]) : name;
+        const name = nameKey(city, identitySpelling);
+        const answerKey = needsCountry ? JSON.stringify([name, nameKey(country, identitySpelling)]) : name;
         if (!excluded.has(answerKey)) {
             return [{ answerKey, country, letters: city.match(/\p{L}/gu)?.length ?? 0 }];
         }
@@ -224,12 +225,17 @@ function foldName(name) {
     return name.normalize('NFD').replace(/\p{M}/gu, '');
 }
 
+function allowsMissingAccents(spelling) {
+    return spelling === 'accent-friendly' || spelling === 'relaxed';
+}
+
 async function indexRound(places, needsCountry, spelling, cancelled) {
     const groups = new Map();
-    const relaxed = spelling === 'relaxed';
-    const foldedNames = relaxed ? new Map() : null;
+    const useAccentLookup = allowsMissingAccents(spelling);
+    const useTypoLookup = spelling === 'standard' || spelling === 'relaxed';
+    const foldedNames = useAccentLookup ? new Map() : null;
     await visitInBatches(places, (place, index) => {
-        const country = needsCountry || relaxed ? nameKey(place.country_name, spelling) : '';
+        const country = needsCountry || useAccentLookup ? nameKey(place.country_name, spelling) : '';
         let group = groups.get(country);
         if (!group) {
             group = { byName: new Map(), byLength: new Map() };
@@ -239,11 +245,11 @@ async function indexRound(places, needsCountry, spelling, cancelled) {
         if (group.byName.has(city)) return;
 
         group.byName.set(city, index);
-        if (spelling !== 'strict') {
+        if (useTypoLookup) {
             if (!group.byLength.has(city.length)) group.byLength.set(city.length, []);
             group.byLength.get(city.length).push(city);
         }
-        if (relaxed) {
+        if (useAccentLookup) {
             const key = foldName(city);
             const existing = foldedNames.get(key);
             if (existing === undefined) foldedNames.set(key, index);
@@ -374,6 +380,7 @@ function splitNames(guess) {
 
 async function reviewExclusions({ filters, needsCountry, spelling, guesses }, cancelled) {
     const relaxed = spelling === 'relaxed';
+    const useAccentLookup = allowsMissingAccents(spelling);
     const requests = new Map();
     const results = guesses.map(() => null);
     for (const [index, guess] of guesses.entries()) {
@@ -382,7 +389,7 @@ async function reviewExclusions({ filters, needsCountry, spelling, guesses }, ca
         const names = needsCountry ? pairs : [[typed, ''], ...pairs.filter(([, country]) => country)];
         for (const [city, country] of names) {
             if (!city || (needsCountry && !country)) continue;
-            const key = relaxed ? foldName(city) : city;
+            const key = useAccentLookup ? foldName(city) : city;
             const matches = requests.get(key) ?? [];
             matches.push({ index, city, country });
             requests.set(key, matches);
@@ -393,21 +400,16 @@ async function reviewExclusions({ filters, needsCountry, spelling, guesses }, ca
     const { country, start, end } = filters;
     function inspect(place, foundLocally) {
         const city = nameKey(place.city, spelling);
-        const key = relaxed ? foldName(city) : city;
+        const key = useAccentLookup ? foldName(city) : city;
         const matches = requests.get(key);
         if (!matches) return;
         const placeCountry = nameKey(place.country_name, spelling);
         for (const match of matches) {
             const current = results[match.index];
             if (foundLocally?.has(match.index) || current?.length === 0) continue;
-            if (relaxed && !keepsTypedAccents(match.city, city, key)) continue;
-            if (match.country && match.country !== placeCountry) {
-                if (!relaxed) continue;
-                const folded = foldName(match.country);
-                const alias = countryAliases.get(folded);
-                if (alias ? alias !== placeCountry :
-                    foldName(placeCountry) !== folded || !keepsTypedAccents(match.country, placeCountry, folded)) continue;
-            }
+            if (useAccentLookup && !keepsTypedAccents(match.city, city, key)) continue;
+            if (match.country && match.country !== placeCountry &&
+                (!useAccentLookup || !matchesAccentCountry(match.country, placeCountry, relaxed))) continue;
 
             const excluded = [];
             if (!matchesFilters(place, country, '', '')) excluded.push('country');
@@ -436,34 +438,54 @@ function foldedMatches(foldedNames, foldedCity) {
 
 function keepsTypedAccents(typed, canonical, folded) {
     if (typed === folded) return true;
-    const groups = /\P{M}\p{M}*/gu;
-    const typedLetters = typed.normalize('NFD').match(groups);
-    const canonicalLetters = canonical.normalize('NFD').match(groups);
-    // Folding has already matched the base letters. Respect accents the player included.
-    return typedLetters.every((letter, i) =>
-        (letter.match(/\p{M}/gu) ?? []).every(mark => canonicalLetters[i].includes(mark)));
+    const characters = Array.from(typed.normalize('NFD'));
+    let next = 0;
+    // Only a mark can be skipped. Each mark the player typed stays with its original letter.
+    for (const character of canonical.normalize('NFD')) {
+        if (character === characters[next]) next++;
+        else if (!/\p{M}/u.test(character)) return false;
+    }
+    return next === characters.length;
 }
 
-function findRelaxedAnswer({ groups, places, foldedNames }, attempts) {
+function matchesAccentCountry(typed, canonical, relaxed) {
+    const folded = foldName(typed);
+    const alias = relaxed ? countryAliases.get(folded) : undefined;
+    return alias ? alias === canonical :
+        foldName(canonical) === folded && keepsTypedAccents(typed, canonical, folded);
+}
+
+function findAccentAnswer({ places, foldedNames, needsCountry, spelling }, attempts) {
+    const relaxed = spelling === 'relaxed';
     let match;
     for (const [city, country] of attempts) {
         const foldedCity = foldName(city);
-        const foldedCountry = foldName(country);
-        const alias = countryAliases.get(foldedCountry);
         for (const index of foldedMatches(foldedNames, foldedCity)) {
             const place = places[index];
             const name = nameKey(place.city);
             const countryName = nameKey(place.country_name);
-            if (country && (alias ? countryName !== alias : foldName(countryName) !== foldedCountry ||
-                !keepsTypedAccents(country, countryName, foldedCountry))) continue;
+            if (country && !matchesAccentCountry(country, countryName, relaxed)) continue;
             if (!keepsTypedAccents(city, name, foldedCity)) continue;
-            if (match !== undefined && match !== index) return { reason: 'ambiguous' };
-            match = index;
+            if (match) {
+                if (match.index === index) continue;
+                if (relaxed || needsCountry || match.name !== name) return { reason: 'ambiguous' };
+                // A city shared by several countries scores once in Accent-friendly place-only rounds.
+                if (match.index < index) continue;
+            }
+            const restoredAccent = city !== name ||
+                (country && country !== countryName && foldName(country) === foldName(countryName));
+            match = { index, name, accentCorrection: restoredAccent ? (country ? 'pair' : 'place') : undefined };
         }
     }
-    if (match !== undefined) return { place: places[match] };
+    if (!match) return null;
+    const result = { place: places[match.index], match: 'corrected' };
+    if (match.accentCorrection) result.accentCorrection = match.accentCorrection;
+    return result;
+}
 
-    // Keep Standard's one-edit allowance, but count it only when it identifies one place.
+// Keep Standard's one-edit allowance in Relaxed when it identifies one place.
+function findRelaxedTypo({ groups, places }, attempts) {
+    let match;
     for (const [city, country] of attempts) {
         const alias = countryAliases.get(foldName(country));
         for (const [countryName, group] of groups) {
@@ -479,7 +501,7 @@ function findRelaxedAnswer({ groups, places, foldedNames }, attempts) {
             }
         }
     }
-    if (match !== undefined) return { place: places[match] };
+    if (match !== undefined) return { place: places[match], match: 'corrected' };
     return null;
 }
 
@@ -490,12 +512,12 @@ function checkSpellingGuess(round, guess) {
     if (needsCountry && !pairs.length) return { reason: 'country' };
 
     if (!needsCountry) {
-        const exactCity = spelling === 'strict' ? groups.get('')?.byName.get(city) :
+        const exactCity = !foldedNames ? groups.get('')?.byName.get(city) :
             foldedMatches(foldedNames, foldName(city)).find(index => nameKey(places[index].city) === city);
         if (exactCity !== undefined) return { place: places[exactCity], match: 'exact' };
     }
 
-    if (needsCountry || spelling === 'relaxed') {
+    if (needsCountry || foldedNames) {
         let exactPair = Infinity;
         for (const [city, country] of pairs) {
             const index = groups.get(country)?.byName.get(city);
@@ -504,17 +526,28 @@ function checkSpellingGuess(round, guess) {
         if (exactPair !== Infinity) return { place: places[exactPair], match: 'exact' };
     }
 
-    if (spelling === 'relaxed') {
+    if (foldedNames) {
         const attempts = needsCountry ? pairs : [[city, ''], ...pairs];
-        const result = findRelaxedAnswer(round, attempts);
-        if (result) return result.place ? { ...result, match: 'corrected' } : result;
+        const accent = findAccentAnswer(round, attempts);
+        if (accent) return accent;
+        if (spelling === 'relaxed') {
+            const typo = findRelaxedTypo(round, attempts);
+            if (typo) return typo;
+        }
     }
 
     if (needsCountry) {
         for (const [city] of pairs) {
-            if (foldedNames?.has(foldName(city))) return { reason: 'country' };
-            for (const group of groups.values()) {
-                if (group.byName.has(city)) return { reason: 'country' };
+            if (foldedNames) {
+                const folded = foldName(city);
+                if (foldedMatches(foldedNames, folded).some(index =>
+                    spelling === 'relaxed' || keepsTypedAccents(city, nameKey(places[index].city), folded))) {
+                    return { reason: 'country' };
+                }
+            } else {
+                for (const group of groups.values()) {
+                    if (group.byName.has(city)) return { reason: 'country' };
+                }
             }
         }
     }
