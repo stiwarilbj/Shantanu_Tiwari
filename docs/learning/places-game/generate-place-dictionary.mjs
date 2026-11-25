@@ -56,26 +56,88 @@ if (args.length && !check) {
 
 const world = JSON.stringify({ countries, runs }) + '\n';
 const revision = createHash('sha256').update(world).digest('hex').slice(0, 16);
-// Count distinct city answers, since a place-only round scores a shared name once.
-function eligibleStarts(cities) {
-    const counts = new Map();
-    for (const city of new Set(cities.map(city => city.toLowerCase()))) {
-        const start = city[0];
-        counts.set(start, (counts.get(start) ?? 0) + 1);
+
+// Each axis starts with Any, followed by A–Z. Lowercase boundaries outside a–z match only Any.
+const letters = ['', ...'abcdefghijklmnopqrstuvwxyz'];
+const axisSize = letters.length;
+
+function countFilters(names) {
+    const counts = new Uint32Array(axisSize ** 2);
+    for (const name of names) {
+        const start = letters.indexOf(name[0]);
+        const end = letters.indexOf(name.at(-1));
+        counts[0]++;
+        if (start > 0) counts[start * axisSize]++;
+        if (end > 0) counts[end]++;
+        if (start > 0 && end > 0) counts[start * axisSize + end]++;
     }
-    return Array.from('abcdefghijklmnopqrstuvwxyz').filter(start => counts.get(start) >= 60).join('').toUpperCase();
+    return counts;
 }
 
-const worldwide = eligibleStarts(countries.flatMap(([, cities]) => cities));
-const regions = countries.flatMap(([, cities], index) => {
-    const starts = eligibleStarts(cities);
+function packCounts(counts) {
+    // Positive values are counts. Negative values skip zeros, and trailing zeros are implicit.
+    const packed = [];
+    let zeros = 0;
+    for (const count of counts) {
+        if (count === 0) {
+            zeros++;
+        } else {
+            if (zeros) packed.push(-zeros);
+            packed.push(count);
+            zeros = 0;
+        }
+    }
+    return packed;
+}
+
+function verifyCounts(packed, names, label, distinct = false) {
+    const decoded = packed.flatMap(value => value < 0 ? Array(-value).fill(0) : [value]);
+    if (decoded.length > axisSize ** 2) throw new Error(`Too many filter counts for ${label}`);
+    for (const [row, start] of letters.entries()) {
+        const startingNames = names.filter(name => name.startsWith(start));
+        for (const [column, end] of letters.entries()) {
+            const matches = startingNames.filter(name => name.endsWith(end));
+            const expected = distinct ? new Set(matches).size : matches.length;
+            const actual = decoded[row * axisSize + column] ?? 0;
+            if (actual !== expected) {
+                throw new Error(`Incorrect filter count for ${label}, ${start || 'Any'}…${end || 'Any'}: ${actual}, expected ${expected}`);
+            }
+        }
+    }
+}
+
+const namesByCountry = countries.map(([, cities]) => cities.map(city => city.toLowerCase()));
+const pairNames = namesByCountry.flat();
+const distinctNames = [...new Set(pairNames)];
+const distinctCounts = countFilters(distinctNames);
+const countsByCountry = namesByCountry.map(countFilters);
+const filterCounts = {
+    worldwideNames: packCounts(distinctCounts),
+    worldwidePairs: packCounts(countFilters(pairNames)),
+    byCountry: countsByCountry.map(packCounts)
+};
+
+if (check) {
+    verifyCounts(filterCounts.worldwideNames, pairNames, 'Any Country', true);
+    verifyCounts(filterCounts.worldwidePairs, pairNames, 'Place and Country');
+    filterCounts.byCountry.forEach((packed, index) => verifyCounts(packed, namesByCountry[index], countries[index][0]));
+}
+
+function eligibleStarts(counts) {
+    return letters.filter((letter, index) => letter && counts[index * axisSize] >= 60).join('').toUpperCase();
+}
+
+const worldwide = eligibleStarts(distinctCounts);
+const regions = countsByCountry.flatMap((counts, index) => {
+    const starts = eligibleStarts(counts);
     return starts ? [[index, starts]] : [];
 });
 if (!worldwide) throw new Error('The daily challenge needs a starting letter with at least 60 distinct places');
 const catalog = JSON.stringify({
     revision,
     countries: countries.map(([country]) => country),
-    dailyStarts: { worldwide, regions }
+    dailyStarts: { worldwide, regions },
+    filterCounts
 }).replaceAll('<', '\\u003c');
 const catalogTag = /(<script type="application\/json" id="countryCatalog">)[^<]*(<\/script>)/;
 const page = readFileSync(pageFile, 'utf8');

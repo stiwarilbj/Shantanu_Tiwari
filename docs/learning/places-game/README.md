@@ -1,6 +1,6 @@
 # Place Naming Game
 
-The page includes the country list. The game downloads `places/world.json` for worldwide play or a file from `places/countries/` for a specific country.
+Choose a country and letters. The game checks your filters right away and asks you to change them if no places match. Select **Load places**, then **Start Game** when the dictionary is ready. Search, examples, and clues also load places when needed.
 
 Choose **Untimed practice** under **Time Limit** to play with the same filters and scoring at your own pace. Select **Finish Practice** to review your guesses. Preferences lists practice scores and timed scores separately.
 
