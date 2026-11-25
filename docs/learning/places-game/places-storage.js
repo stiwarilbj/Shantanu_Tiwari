@@ -102,8 +102,19 @@ function createPlacesStorage(countries) {
                 if (typeof place?.city !== 'string' || !place.city.trim() || place.city.length > 256 ||
                     !countries.has(place.country)) return [];
                 return [{ city: place.city, country: place.country }];
-            })
+            }),
+            attempts: checkedAttempts(value.attempts)
         };
+    }
+
+    function checkedAttempts(value) {
+        if (!Array.isArray(value)) return [];
+        return value.flatMap(attempt => {
+            const { guess, outcome, detail } = isObject(attempt) ? attempt : {};
+            if (typeof guess !== 'string' || !guess.trim() || guess.length > 257 ||
+                !['exact', 'corrected', 'duplicate', 'miss'].includes(outcome)) return [];
+            return [{ guess, outcome, detail: boundedText(detail, 512) }];
+        });
     }
 
     return {

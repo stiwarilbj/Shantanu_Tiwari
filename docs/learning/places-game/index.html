@@ -199,6 +199,22 @@
             padding: 0.375rem 0.5rem;
             overflow-wrap: anywhere;
         }
+        .round-review {
+            border-top: 1px solid #dbe9f3;
+            padding-top: 0.5rem;
+        }
+        .round-review summary {
+            width: fit-content;
+            color: #155b91;
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 0.15em;
+        }
+        .round-review-list {
+            max-height: min(18rem, 42dvh);
+            overflow: auto;
+            overflow-wrap: anywhere;
+        }
         .search-results-container {
             flex: 1;
             min-inline-size: 0;
@@ -670,6 +686,16 @@
                         </div>
                     </div>
                 </div>
+                <details id="roundReview" class="round-review" hidden>
+                    <summary>Round review</summary>
+                    <div class="mt-2 small">
+                        <p id="reviewNote" class="text-muted mb-2" role="status"></p>
+                        <ol id="reviewAttempts" class="round-review-list list-group list-group-numbered mb-2"
+                            aria-label="Submitted guesses" tabindex="0" hidden></ol>
+                        <div id="reviewFilters" aria-live="polite"></div>
+                        <button id="retryRoundBtn" class="btn btn-outline-primary btn-sm" type="button">Retry same setup</button>
+                    </div>
+                </details>
             </div>
         </div>
     </main>
@@ -738,7 +764,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=5"></script>
+    <script src="places-storage.js?v=6"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -804,6 +830,11 @@
         const exampleLabel = document.getElementById('exampleLabel');
         const guessedPlacesContainer = document.getElementById('guessedPlaces');
         const examplePlacesContainer = document.getElementById('examplePlaces');
+        const roundReview = document.getElementById('roundReview');
+        const reviewNote = document.getElementById('reviewNote');
+        const reviewAttempts = document.getElementById('reviewAttempts');
+        const reviewFilters = document.getElementById('reviewFilters');
+        const retryRoundBtn = document.getElementById('retryRoundBtn');
 
         const searchIncludeInput = document.getElementById('searchIncludeInput');
         const searchExcludeInput = document.getElementById('searchExcludeInput');
@@ -849,7 +880,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=6');
+            const worker = new Worker('places-worker.js?v=7');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -1155,6 +1186,7 @@
         function invalidateRound() {
             if (activeRound) {
                 activeRound.index?.cancel();
+                activeRound.reviewJob?.cancel();
                 for (const job of activeRound.guesses) job.cancel();
                 activeRound = undefined;
             }
@@ -1162,6 +1194,10 @@
             latestGuess = undefined;
             placesWorker?.postMessage({ type: 'clearRound' });
             showGuessFeedback('');
+            roundReview.hidden = true;
+            roundReview.open = false;
+            reviewAttempts.replaceChildren();
+            reviewFilters.replaceChildren();
         }
 
         function newAttemptId() {
@@ -1179,6 +1215,7 @@
                 filters,
                 needsCountry: countrySelect.value === 'placeAndCountry',
                 guesses: new Set(),
+                attempts: needsResume?.attempts ?? [],
                 playing: false
             };
             if (starting) {
@@ -1376,6 +1413,15 @@
             showGuessFeedback(message, correct);
         }
 
+        function guessProblem(reason, needsCountry) {
+            if (reason === 'country') return 'Check the country';
+            if (reason === 'ambiguous') return needsCountry
+                ? 'More than one place matches. Try the exact place and country names'
+                : 'More than one place matches. Try the exact spelling or add the country';
+            if (reason === 'unavailable') return 'Could not check that answer. Try entering it again';
+            return 'Place not found for this round';
+        }
+
         function enterPlace() {
             if (!activeRound?.playing) return;
             if (roundDeadline !== null && getRemainingMs() === 0) {
@@ -1410,32 +1456,32 @@
                 const result = await lookup;
                 if (activeRound !== round) return;
 
+                const attempt = { guess: guess.length > 256 ? `${guess.slice(0, 256)}…` : guess };
                 if (!result?.place) {
-                    let message = 'Place not found for this round';
-                    if (result?.reason === 'country') message = 'Check the country';
-                    else if (result?.reason === 'ambiguous') message = round.needsCountry
-                        ? 'More than one place matches. Try the exact place and country names'
-                        : 'More than one place matches. Try the exact spelling or add the country';
-                    else if (result?.reason === 'unavailable') message = 'Could not check that answer. Try entering it again';
-                    reportGuess(submission, message);
-                    return;
+                    attempt.outcome = 'miss';
+                    attempt.detail = result?.reason ?? 'not-found';
+                    reportGuess(submission, guessProblem(attempt.detail, round.needsCountry));
+                } else {
+                    const place = { city: result.place.city, country: result.place.country_name };
+                    if (appendGuessedPlace(place, round.needsCountry)) {
+                        score++;
+                        updateScoreDisplay();
+                        reportGuess(submission, 'Counted', true);
+                        attempt.outcome = result.match;
+                    } else {
+                        reportGuess(submission, 'Already counted');
+                        attempt.outcome = 'duplicate';
+                    }
+                    attempt.detail = round.needsCountry ? `${place.city}, ${place.country}` : place.city;
                 }
 
-                const place = { city: result.place.city, country: result.place.country_name };
-                if (!appendGuessedPlace(place, round.needsCountry)) {
-                    reportGuess(submission, 'Already counted');
-                    return;
-                }
-
-                score++;
-                updateScoreDisplay();
-                reportGuess(submission, 'Counted', true);
+                round.attempts.push(attempt);
                 if (roundIsOpen(round)) saveRound();
-                else if (round.finishedAt) recordScore(round);
+                else if (attempt.outcome === 'exact' || attempt.outcome === 'corrected') recordScore(round);
             });
         }
 
-        function showResultMessage(container, message, retry) {
+        function showResultMessage(container, message, retry, retryLabel = 'Retry loading') {
             const status = document.createElement('p');
             status.className = 'text-muted';
             status.setAttribute('role', 'status');
@@ -1445,7 +1491,7 @@
                 const button = document.createElement('button');
                 button.className = 'btn btn-outline-secondary btn-sm';
                 button.type = 'button';
-                button.textContent = 'Retry loading';
+                button.textContent = retryLabel;
                 button.addEventListener('click', retry);
                 container.append(button);
             }
@@ -1614,7 +1660,101 @@
             updateStartButton();
             discardSavedRound(activeRound?.attemptId);
             recordScore(activeRound);
+            reviewNote.hidden = false;
+            reviewNote.textContent = 'Checking your last guesses…';
+            reviewAttempts.hidden = true;
+            retryRoundBtn.disabled = true;
+            roundReview.hidden = false;
         }
+
+        roundReview.addEventListener('toggle', async () => {
+            const round = activeRound;
+            if (!roundReview.open || !round?.finishedAt || round.reviewRendered) return;
+            await guessQueue;
+            if (!roundReview.open || activeRound !== round || round.reviewRendered) return;
+            renderRoundReview(round);
+        });
+
+        function renderRoundReview(round) {
+            round.reviewRendered = true;
+            const misses = new Map();
+            const entries = document.createDocumentFragment();
+            let reviewedPoints = 0;
+            for (const { guess, outcome, detail } of round.attempts) {
+                const row = document.createElement('li');
+                row.className = 'list-group-item py-1 px-2';
+                const name = document.createElement('strong');
+                const result = document.createElement('span');
+                result.className = 'text-muted ms-2';
+                name.textContent = guess;
+                if (outcome === 'exact') {
+                    result.textContent = 'Accepted as typed · +1 point';
+                    reviewedPoints++;
+                } else if (outcome === 'corrected') {
+                    result.textContent = `Accepted with a correction · ${detail} · +1 point`;
+                    reviewedPoints++;
+                } else if (outcome === 'duplicate') {
+                    result.textContent = `Already counted · ${detail}`;
+                } else {
+                    result.textContent = guessProblem(detail, round.needsCountry);
+                    if (detail !== 'unavailable') {
+                        const targets = misses.get(guess) ?? [];
+                        targets.push(result);
+                        misses.set(guess, targets);
+                    }
+                }
+                row.append(name, result);
+                entries.append(row);
+            }
+            reviewAttempts.replaceChildren(entries);
+            reviewAttempts.hidden = !round.attempts.length;
+            reviewNote.textContent = reviewedPoints < score ? 'Earlier guesses are listed under Guessed Places.'
+                : round.attempts.length ? '' : 'No guesses were submitted this round.';
+            reviewNote.hidden = !reviewNote.textContent;
+            retryRoundBtn.disabled = false;
+            const { country, start, end } = round.filters;
+            if (misses.size && (country !== 'any' || start || end)) explainReviewMisses(round, misses);
+        }
+
+        async function explainReviewMisses(round, misses) {
+            const { filters, needsCountry, setup: { spelling } } = round;
+            const guesses = [...misses.keys()];
+            showResultMessage(reviewFilters, 'Checking which filters ruled out guesses…');
+            const job = requestPlaces('review', { filters, needsCountry, spelling, guesses });
+            round.reviewJob = job;
+            try {
+                const results = await job.promise;
+                if (activeRound !== round) return;
+                const rules = {
+                    country: `Country must be ${filters.country}`,
+                    start: `Must start with ${filters.start.toUpperCase()}`,
+                    end: `Must end with ${filters.end.toUpperCase()}`
+                };
+                results.forEach((excluded, index) => {
+                    if (!excluded?.length) return;
+                    const reason = excluded.map(rule => rules[rule]).join(' · ');
+                    for (const target of misses.get(guesses[index])) {
+                        target.textContent = `Outside the filters · ${reason}`;
+                    }
+                });
+                reviewFilters.replaceChildren();
+            } catch {
+                if (activeRound === round) {
+                    showResultMessage(reviewFilters, 'Could not check the filters.', () => explainReviewMisses(round, misses), 'Retry filter check');
+                }
+            } finally {
+                if (round.reviewJob === job) round.reviewJob = undefined;
+            }
+        }
+
+        retryRoundBtn.addEventListener('click', () => {
+            if (!activeRound?.finishedAt || !activeRound.reviewRendered) return;
+            applySettings(activeRound.setup);
+            savePreferences();
+            roundJob?.cancel();
+            prepareRound(true);
+            startBtn.focus({ preventScroll: true });
+        });
 
         function refreshTimer() {
             if (roundDeadline === null) return;
@@ -1752,7 +1892,8 @@
                 id: activeRound.attemptId,
                 setup: activeRound.setup,
                 remainingMs: practice ? null : remainingMs,
-                guesses: guessedPlaces
+                guesses: guessedPlaces,
+                attempts: activeRound.attempts
             });
         }
 

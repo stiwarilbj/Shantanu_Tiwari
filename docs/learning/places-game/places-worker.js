@@ -72,6 +72,8 @@ async function runRequest(type, payload, id, cancelled) {
             const result = round.spelling === 'standard' ? checkGuess(round, guess) : checkSpellingGuess(round, guess);
             return includeFeedback ? result : result.place ?? null;
         }
+        case 'review':
+            return reviewExclusions(payload, cancelled);
         case 'examples':
         case 'clue': {
             const places = round && round.id === roundId ? round.places : await getSetupPlaces(filters);
@@ -308,16 +310,20 @@ function shuffle(places) {
     return places;
 }
 
+function standardPairs(parts) {
+    // Either name can contain commas, so try each possible separator.
+    return parts.slice(0, -1).map((_, index) => [
+        parts.slice(0, index + 1).join(', '),
+        parts.slice(index + 1).join(', '),
+    ]);
+}
+
 function checkGuess({ places, groups, needsCountry }, guess) {
     const lowerGuess = guess.toLowerCase();
     const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
     if (needsCountry && parts.length < 2) return { reason: 'country' };
 
-    // Either name can contain commas, so try each possible separator.
-    const candidatePairs = needsCountry ? parts.slice(0, -1).map((_, index) => [
-        parts.slice(0, index + 1).join(', '),
-        parts.slice(index + 1).join(', '),
-    ]) : [[lowerGuess, '']];
+    const candidatePairs = needsCountry ? standardPairs(parts) : [[lowerGuess, '']];
 
     // When multiple splits match, keep the first answer in dictionary order.
     let firstIndex = Infinity;
@@ -325,7 +331,7 @@ function checkGuess({ places, groups, needsCountry }, guess) {
         const index = groups.get(guessedCountry)?.byName.get(guessedCity);
         if (index !== undefined) firstIndex = Math.min(firstIndex, index);
     }
-    if (firstIndex !== Infinity) return { place: places[firstIndex] };
+    if (firstIndex !== Infinity) return { place: places[firstIndex], match: 'exact' };
 
     for (const [guessedCity, guessedCountry] of candidatePairs) {
         for (const [country, group] of groups) {
@@ -344,7 +350,7 @@ function checkGuess({ places, groups, needsCountry }, guess) {
             }
         }
     }
-    if (firstIndex !== Infinity) return { place: places[firstIndex] };
+    if (firstIndex !== Infinity) return { place: places[firstIndex], match: 'corrected' };
 
     if (needsCountry) {
         if (!parts.at(-1)) return { reason: 'country' };
@@ -364,6 +370,63 @@ function splitNames(guess) {
         if (city && country) pairs.push([city, country]);
     }
     return pairs;
+}
+
+async function reviewExclusions({ filters, needsCountry, spelling, guesses }, cancelled) {
+    const relaxed = spelling === 'relaxed';
+    const requests = new Map();
+    const results = guesses.map(() => null);
+    for (const [index, guess] of guesses.entries()) {
+        const typed = nameKey(guess, spelling);
+        const pairs = spelling === 'standard' ? standardPairs(typed.split(',').map(part => part.trim())) : splitNames(typed);
+        const names = needsCountry ? pairs : [[typed, ''], ...pairs.filter(([, country]) => country)];
+        for (const [city, country] of names) {
+            if (!city || (needsCountry && !country)) continue;
+            const key = relaxed ? foldName(city) : city;
+            const matches = requests.get(key) ?? [];
+            matches.push({ index, city, country });
+            requests.set(key, matches);
+        }
+    }
+    if (!requests.size) return results;
+
+    const { country, start, end } = filters;
+    function inspect(place, foundLocally) {
+        const city = nameKey(place.city, spelling);
+        const key = relaxed ? foldName(city) : city;
+        const matches = requests.get(key);
+        if (!matches) return;
+        const placeCountry = nameKey(place.country_name, spelling);
+        for (const match of matches) {
+            const current = results[match.index];
+            if (foundLocally?.has(match.index) || current?.length === 0) continue;
+            if (relaxed && !keepsTypedAccents(match.city, city, key)) continue;
+            if (match.country && match.country !== placeCountry) {
+                if (!relaxed) continue;
+                const folded = foldName(match.country);
+                const alias = countryAliases.get(folded);
+                if (alias ? alias !== placeCountry :
+                    foldName(placeCountry) !== folded || !keepsTypedAccents(match.country, placeCountry, folded)) continue;
+            }
+
+            const excluded = [];
+            if (!matchesFilters(place, country, '', '')) excluded.push('country');
+            if (!matchesFilters(place, 'any', start, '')) excluded.push('start');
+            if (!matchesFilters(place, 'any', '', end)) excluded.push('end');
+            if (!current || excluded.length < current.length) results[match.index] = excluded;
+        }
+    }
+
+    const dictionary = await loadPlaces(country);
+    if (cancelled()) return;
+    await visitInBatches(dictionary, place => inspect(place), cancelled);
+    if (!cancelled() && country !== 'any' && results.some(result => result === null)) {
+        const foundLocally = new Set(results.flatMap((result, index) => result ? [index] : []));
+        const worldwide = await loadPlaces('any');
+        if (cancelled()) return;
+        await visitInBatches(worldwide, place => inspect(place, foundLocally), cancelled);
+    }
+    return results;
 }
 
 function foldedMatches(foldedNames, foldedCity) {
@@ -429,7 +492,7 @@ function checkSpellingGuess(round, guess) {
     if (!needsCountry) {
         const exactCity = spelling === 'strict' ? groups.get('')?.byName.get(city) :
             foldedMatches(foldedNames, foldName(city)).find(index => nameKey(places[index].city) === city);
-        if (exactCity !== undefined) return { place: places[exactCity] };
+        if (exactCity !== undefined) return { place: places[exactCity], match: 'exact' };
     }
 
     if (needsCountry || spelling === 'relaxed') {
@@ -438,13 +501,13 @@ function checkSpellingGuess(round, guess) {
             const index = groups.get(country)?.byName.get(city);
             if (index !== undefined) exactPair = Math.min(exactPair, index);
         }
-        if (exactPair !== Infinity) return { place: places[exactPair] };
+        if (exactPair !== Infinity) return { place: places[exactPair], match: 'exact' };
     }
 
     if (spelling === 'relaxed') {
         const attempts = needsCountry ? pairs : [[city, ''], ...pairs];
         const result = findRelaxedAnswer(round, attempts);
-        if (result) return result;
+        if (result) return result.place ? { ...result, match: 'corrected' } : result;
     }
 
     if (needsCountry) {

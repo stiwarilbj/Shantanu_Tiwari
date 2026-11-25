@@ -4,6 +4,8 @@ The page includes the country list. The game downloads `places/world.json` for w
 
 Choose **Untimed practice** under **Time Limit** to play with the same filters and scoring at your own pace. Select **Finish Practice** to review your guesses. Preferences lists practice scores and timed scores separately.
 
+After a timed round or practice session, open **Round review** to see which guesses scored as typed, which needed a spelling correction, and which were already counted. If the game recognizes a place ruled out by your country or letter filters, it explains why. Choose **Retry same setup** to start a fresh round with the same rules.
+
 In Preferences, choose **Examples** to see place names, **Clues only** to get the country and letter count of an unguessed answer, or **After the round** to open Search and examples once you finish. Spaces and punctuation don't count toward a clue's letter count. Choose your hint mode before starting a round.
 
 In Preferences, name your settings and select **Save current setup** to keep up to five favorites. Select a saved name to fill in the country or mode, letters, time limit, spelling, and hints before you start. To update a favorite, save again under the same name.
