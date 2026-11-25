@@ -56,7 +56,27 @@ if (args.length && !check) {
 
 const world = JSON.stringify({ countries, runs }) + '\n';
 const revision = createHash('sha256').update(world).digest('hex').slice(0, 16);
-const catalog = JSON.stringify({ revision, countries: countries.map(([country]) => country) }).replaceAll('<', '\\u003c');
+// Count distinct city answers, since a place-only round scores a shared name once.
+function eligibleStarts(cities) {
+    const counts = new Map();
+    for (const city of new Set(cities.map(city => city.toLowerCase()))) {
+        const start = city[0];
+        counts.set(start, (counts.get(start) ?? 0) + 1);
+    }
+    return Array.from('abcdefghijklmnopqrstuvwxyz').filter(start => counts.get(start) >= 60).join('').toUpperCase();
+}
+
+const worldwide = eligibleStarts(countries.flatMap(([, cities]) => cities));
+const regions = countries.flatMap(([, cities], index) => {
+    const starts = eligibleStarts(cities);
+    return starts ? [[index, starts]] : [];
+});
+if (!worldwide) throw new Error('The daily challenge needs a starting letter with at least 60 distinct places');
+const catalog = JSON.stringify({
+    revision,
+    countries: countries.map(([country]) => country),
+    dailyStarts: { worldwide, regions }
+}).replaceAll('<', '\\u003c');
 const catalogTag = /(<script type="application\/json" id="countryCatalog">)[^<]*(<\/script>)/;
 const page = readFileSync(pageFile, 'utf8');
 if (!catalogTag.test(page)) throw new Error('Missing countryCatalog in index.html');

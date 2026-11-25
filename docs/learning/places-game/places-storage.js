@@ -103,6 +103,14 @@ function createPlacesStorage(countries) {
         return groups;
     }
 
+    function checkedDaily(value) {
+        if (typeof value?.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.date) ||
+            typeof value.revision !== 'string' || !/^[a-f0-9]{16}$/.test(value.revision)) return null;
+        const date = new Date(value.date + 'T00:00:00Z');
+        return Number.isFinite(date.getTime()) && date.toISOString().startsWith(value.date)
+            ? { date: value.date, revision: value.revision } : null;
+    }
+
     function history(value, practice = false) {
         if (!Array.isArray(value)) return [];
         const knownIds = new Set();
@@ -114,7 +122,12 @@ function createPlacesStorage(countries) {
                 return [];
             }
             knownIds.add(entry.id);
-            return [{ id: entry.id, score: entry.score, finishedAt: entry.finishedAt, setup, assists: checkedAssists(entry.assists) }];
+            const daily = checkedDaily(entry.daily);
+            return [{
+                id: entry.id, score: entry.score, finishedAt: entry.finishedAt, setup,
+                assists: checkedAssists(entry.assists),
+                ...(daily && !practice ? { daily } : {})
+            }];
         }).sort((a, b) => b.finishedAt - a.finishedAt);
         // Keep the recent history, five attempts per challenge, and older personal bests.
         const retained = new Set(entries.slice(0, 20));
@@ -143,7 +156,8 @@ function createPlacesStorage(countries) {
                 return [{ city: place.city, country: place.country }];
             }),
             attempts: checkedAttempts(value.attempts),
-            assists: checkedAssists(value.assists)
+            assists: checkedAssists(value.assists),
+            daily: practice ? null : checkedDaily(value.daily)
         };
     }
 

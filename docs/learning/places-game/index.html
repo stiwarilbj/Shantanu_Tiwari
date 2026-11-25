@@ -634,6 +634,7 @@
                         </select>
                     </div>
                 </div>
+                <p id="dailyRoundLabel" class="small text-muted mt-2 mb-0" role="status" hidden></p>
                 <p id="roundFilterWarning" class="filter-feedback" role="status"></p>
             </section>
 
@@ -710,6 +711,12 @@
                 <button class="btn-close" aria-label="Close Preferences" autofocus></button>
             </form>
         </div>
+        <section aria-label="Daily challenge">
+            <button id="dailyChallengeBtn" type="button" class="btn btn-outline-primary btn-sm"
+                aria-describedby="dailyChallengeRules dailyChallengeLocked">Today’s challenge</button>
+            <p id="dailyChallengeRules" class="small text-muted mt-2 mb-0"></p>
+            <p id="dailyChallengeLocked" class="small text-muted mt-1 mb-0" hidden>Finish or reset the current round to play</p>
+        </section>
         <section>
             <label for="leaveMode" class="form-label fw-semibold mb-1">When I leave a round</label>
             <select id="leaveMode" class="form-select form-select-sm" aria-describedby="leaveModeHint">
@@ -777,8 +784,8 @@
         </section>
     </dialog>
 
-    <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=7"></script>
+    <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"],"dailyStarts":{"worldwide":"ABCDEFGHIJKLMNOPQRSTUVWXYZ","regions":[[7,"CDLSV"],[8,"A"],[9,"ABCDEFGHKLMNOPRSTW"],[10,"ABEFGHKLMNOPRSTW"],[16,"B"],[21,"P"],[25,"ABCDEFGIJLMNOPRSTUV"],[27,"O"],[30,"S"],[32,"BCLMPS"],[36,"C"],[37,"BCDHJLSXYZ"],[38,"ACLMPST"],[43,"G"],[46,"BDHKLMOPSV"],[48,"S"],[61,"K"],[62,"ABCDEFGHJLMNOPRSTVW"],[66,"ABCDEFGHIKLMNOPRSTUVWZ"],[68,"AKMNPS"],[70,"MS"],[75,"LS"],[77,"BKMNPST"],[79,"ABCDGHJKLMNPRSTUV"],[80,"KS"],[81,"ABDGHKMNQRST"],[83,"C"],[85,"ABCDFGILMNOPRSTVZ"],[86,"BCMS"],[87,"AHIKMNSTY"],[113,"ABCDEFGHIJLMNOPRSTVXZ"],[124,"ABDGHKLMNOSVW"],[132,"S"],[134,"K"],[137,"CDL"],[140,"P"],[141,"ABCDGIKLMNPST"],[142,"BCDGJKLMNOPRSTWZ"],[143,"ACFMPSV"],[146,"ABCDFGHILMNOPRSTV"],[147,"ABCDGIKLMNOPRSTUVYZ"],[155,"A"],[161,"O"],[168,"ABCDEFGHIJLMNOPRSTUVZ"],[173,"BHS"],[174,"ABCGLMRSW"],[178,"M"],[179,"AB"],[185,"ABGKS"],[189,"BCDKLMNPRSTVZ"],[191,"ABCDEFGHKLMNPRSTW"],[192,"ABCDEFGHIJKLMNOPRSTUVWY"],[198,"H"],[200,"A"]]}}</script>
+    <script src="places-storage.js?v=8"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -792,6 +799,7 @@
         let guessEditVersion = 0;
         let setupCount = null;
         let activeRound;
+        let selectedDaily = null;
         let nextRoundId = 0;
         let guessQueue = Promise.resolve();
         let restoringRound;
@@ -847,6 +855,10 @@
         const roundReview = document.getElementById('roundReview');
         const reviewBest = document.getElementById('reviewBest');
         const scorebookSetup = document.getElementById('scorebookSetup');
+        const dailyChallengeBtn = document.getElementById('dailyChallengeBtn');
+        const dailyChallengeRules = document.getElementById('dailyChallengeRules');
+        const dailyChallengeLocked = document.getElementById('dailyChallengeLocked');
+        const dailyRoundLabel = document.getElementById('dailyRoundLabel');
         const reviewNote = document.getElementById('reviewNote');
         const reviewAttempts = document.getElementById('reviewAttempts');
         const reviewFilters = document.getElementById('reviewFilters');
@@ -1040,15 +1052,20 @@
             countrySelect.addEventListener('change', handleCountryChangeAndSaveSettings);
             [letterSelect, endLetterSelect].forEach(select => {
                 select.addEventListener('change', () => {
+                    setDailySelection(null);
                     savePreferences();
                     refreshSetup();
                 });
             });
             timeSelect.addEventListener('change', () => {
+                setDailySelection(null);
                 updateTimerDisplay();
                 savePreferences();
             });
-            spellingSelect.addEventListener('change', savePreferences);
+            spellingSelect.addEventListener('change', () => {
+                setDailySelection(null);
+                savePreferences();
+            });
 
             searchBtn.addEventListener('click', performSearch);
             [searchIncludeInput, searchExcludeInput, searchMinLengthInput, searchMaxLengthInput].forEach(input => {
@@ -1077,7 +1094,8 @@
         }
 
         function studyToolsLocked() {
-            return hintMode.value === 'after' && !activeRound?.finishedAt;
+            return hintMode.value === 'after' &&
+                (!activeRound?.finishedAt || Boolean(selectedDaily && selectedDaily !== activeRound.daily));
         }
 
         function updateStudyTools() {
@@ -1101,14 +1119,14 @@
             hintModeHelp.textContent = hintMode.disabled ? 'Finish or reset the round to change this setting.' : help[hintMode.value];
         }
 
-        function refreshSetup() {
+        function refreshSetup(preload = false) {
             clearExamples();
             roundJob?.cancel();
             roundJob = undefined;
             setupCount = null;
             roundLoadState = 'idle';
             const { country } = roundFilters();
-            if (country !== 'any' || ['loading', 'ready'].includes(dictionaryStates.get(country))) {
+            if (preload || country !== 'any' || ['loading', 'ready'].includes(dictionaryStates.get(country))) {
                 prepareRound();
             } else {
                 updateStartButton();
@@ -1116,6 +1134,7 @@
         }
 
         function handleCountryChangeAndSaveSettings() {
+            setDailySelection(null);
             updatePlaceInputPlaceholder();
             savePreferences();
             refreshSetup();
@@ -1162,6 +1181,8 @@
 
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
+            dailyChallengeBtn.disabled = readingSavedState || countrySelect.disabled;
+            dailyChallengeLocked.hidden = !dailyChallengeBtn.disabled;
             const running = Boolean(activeRound?.playing);
             const finishing = Boolean(activeRound?.finishing);
             const canResume = roundIsOpen() && !running && !finishing;
@@ -1229,6 +1250,7 @@
                 id: ++nextRoundId,
                 attemptId: needsResume?.id ?? newAttemptId(),
                 setup: currentSettings(),
+                daily: selectedDaily,
                 filters,
                 needsCountry: countrySelect.value === 'placeAndCountry',
                 guesses: new Set(),
@@ -1785,7 +1807,7 @@
 
         retryRoundBtn.addEventListener('click', () => {
             if (!activeRound?.finishedAt || !activeRound.reviewRendered) return;
-            applySettings(activeRound.setup);
+            applySettings(activeRound.setup, activeRound.daily);
             savePreferences();
             roundJob?.cancel();
             prepareRound(true);
@@ -1867,7 +1889,37 @@
             };
         }
 
-        function applySettings(setup) {
+        function dailyChallengeFor(date = new Date().toISOString().slice(0, 10)) {
+            const { worldwide, regions } = catalog.dailyStarts;
+            let seed = 2166136261;
+            for (const character of `${date}/${catalog.revision}`) {
+                seed = Math.imul(seed ^ character.charCodeAt(0), 16777619);
+            }
+            const [countryIndex, starts] = (seed & 1) && regions.length
+                ? regions[(seed >>> 1) % regions.length] : [-1, worldwide];
+            return {
+                daily: { date, revision: catalog.revision },
+                setup: {
+                    country: catalog.countries[countryIndex] ?? 'any',
+                    start: starts[(seed >>> 12) % starts.length],
+                    end: 'any',
+                    minutes: seed & 256 ? '2' : '1',
+                    spelling: 'standard',
+                    hints: 'after'
+                }
+            };
+        }
+
+        function setDailySelection(daily) {
+            selectedDaily = daily;
+            dailyRoundLabel.hidden = !daily;
+            dailyRoundLabel.textContent = daily ? `Daily challenge · ${daily.date} UTC` : '';
+        }
+
+        function applySettings(setup, daily = null) {
+            const expected = daily?.revision === catalog.revision ? dailyChallengeFor(daily.date).setup : null;
+            const validDaily = expected && storage.challengeKey(expected) === storage.challengeKey(setup) && setup.hints === expected.hints;
+            setDailySelection(validDaily ? daily : null);
             countrySelect.value = setup.country;
             letterSelect.value = setup.start;
             endLetterSelect.value = setup.end;
@@ -1930,7 +1982,8 @@
                 remainingMs: practice ? null : remainingMs,
                 guesses: guessedPlaces,
                 attempts: activeRound.attempts,
-                assists: activeRound.assists
+                assists: activeRound.assists,
+                ...(activeRound.daily ? { daily: activeRound.daily } : {})
             });
         }
 
@@ -1939,7 +1992,7 @@
         }
 
         function recordScore(round) {
-            const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score, assists: round.assists };
+            const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score, assists: round.assists, daily: round.daily };
             const record = round.setup.minutes === 'practice' ? 'practice-history' : 'history';
             const history = (storage.available ? storage.read(record) : null) ?? scoreHistories[record];
             const earlier = history.filter(item => item.id !== entry.id);
@@ -1968,7 +2021,7 @@
             }
 
             restoringRound = savedRound;
-            applySettings(savedRound.setup);
+            applySettings(savedRound.setup, savedRound.daily);
             pausedMs = savedRound.remainingMs ?? 0;
             updateTimerDisplay();
             setGuessingEnabled(false);
@@ -2133,7 +2186,7 @@
             bests.replaceChildren(...bestRows);
             recent.replaceChildren(...(group?.recent ?? []).map(entry => {
                 const row = document.createElement('li');
-                row.textContent = `${pointsLabel(entry.score)} · ${assistsLabel(entry.assists)} · ${scoreDates.format(entry.finishedAt)}`;
+                row.textContent = `${pointsLabel(entry.score)} · ${scoreDetails(entry)}`;
                 return row;
             }));
         }
@@ -2147,11 +2200,16 @@
             return assists.length ? assists.map(aid => aidLabels[aid]).join(', ') : 'No hints';
         }
 
+        function scoreDetails(entry) {
+            const date = entry.daily ? `Daily challenge ${entry.daily.date} UTC` : scoreDates.format(entry.finishedAt);
+            return `${assistsLabel(entry.assists)} · ${date}`;
+        }
+
         function renderScoreHistory(listId, emptyId, entries) {
             const list = document.getElementById(listId);
             list.replaceChildren(...entries.slice(0, 20).map(entry => {
                 const row = document.createElement('li');
-                row.textContent = `${pointsLabel(entry.score)} · ${challengeLabel(entry.setup)} · ${assistsLabel(entry.assists)} · ${scoreDates.format(entry.finishedAt)}`;
+                row.textContent = `${pointsLabel(entry.score)} · ${challengeLabel(entry.setup)} · ${scoreDetails(entry)}`;
                 return row;
             }));
             list.hidden = !entries.length;
@@ -2187,12 +2245,26 @@
         });
 
         hintMode.addEventListener('change', () => {
+            setDailySelection(null);
             updateStudyTools();
             clearExamples();
             preferencesStatus.textContent = savePreferences() ? '' : storageWarning;
         });
 
+        dailyChallengeBtn.addEventListener('click', () => {
+            if (dailyChallengeBtn.disabled) return;
+            const { daily, setup } = dailyChallengeFor();
+            applySettings(setup, daily);
+            refreshSetup(true);
+            preferencesDialog.close();
+            startBtn.focus();
+        });
+
         preferencesBtn.addEventListener('click', () => {
+            const { daily, setup } = dailyChallengeFor();
+            const country = setup.country === 'any' ? 'Any country' : setup.country;
+            const time = setup.minutes === '1' ? '1 minute' : `${setup.minutes} minutes`;
+            dailyChallengeRules.textContent = `${daily.date} UTC · ${country} · Starts with ${setup.start} · ${time} · Standard spelling · Hints after the round`;
             renderSavedSetups();
             setupStatus.textContent = '';
             if (storage.available) loadScoreHistories();

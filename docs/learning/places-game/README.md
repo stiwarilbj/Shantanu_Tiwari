@@ -6,6 +6,8 @@ Choose **Untimed practice** under **Time Limit** to play with the same filters a
 
 After a timed round or practice session, open **Round review** to see which guesses scored as typed, which needed a spelling correction, and which were already counted. If the game recognizes a place ruled out by your country or letter filters, it explains why. Choose **Retry same setup** to start a fresh round with the same rules.
 
+Choose **Today’s challenge** in Preferences to load the day’s rules, then select **Start Game** when ready. Everyone using the same dictionary version gets the same challenge for that UTC date, with at least 60 distinct answers and hints locked until the round ends. Finished attempts show the challenge date in your local scorebook.
+
 Open **Scorebook** in Preferences to see your best scores and five recent attempts for each challenge. A challenge uses the same timer, country or answer mode, letter filters, and spelling rules. Rounds where you revealed a clue, examples, or Search results have a separate best score. Older rounds without a hint record still appear with **Hint use unknown**. Beat a known best and **Round review** shows the improvement.
 
 In Preferences, choose **Examples** to see place names, **Clues only** to get the country and letter count of an unguessed answer, or **After the round** to open Search and examples once you finish. Spaces and punctuation don't count toward a clue's letter count. Choose your hint mode before starting a round.
