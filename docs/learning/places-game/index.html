@@ -552,6 +552,8 @@
                     </button>
                 </div>
 
+                <p id="guessStatus" class="filter-feedback" role="status"></p>
+
                 <div class="game-actions">
                     <button id="startBtn" class="btn btn-success" type="button">
                         <i class="fas fa-play" aria-hidden="true"></i> <span id="startLabel">Load places</span>
@@ -594,20 +596,23 @@
         let score = 0;
         let gameActive = false;
         let guessedPlaces = [];
-        let filteredPlaces = [];
-        let setupPool;
-        const roundPlaceGroups = new Map();
+        let setupCount = null;
+        let activeRound;
+        let nextRoundId = 0;
+        let guessQueue = Promise.resolve();
         let wasGameActiveBeforeHidden = false;
         let currentGameMode = 'placeAndCountry';
         let restoringRound = false;
         let readingSavedState = false;
-        let roundRequest = 0;
         let roundLoadState = 'idle';
+        let roundJob;
 
         const catalog = JSON.parse(document.getElementById('countryCatalog').textContent);
         const countryIndexes = new Map(catalog.countries.map((country, index) => [country, index]));
-        const loadedPlaces = new Map();
-        const pendingLoads = new Map();
+        let placesWorker;
+        let nextJobId = 0;
+        const dictionaryStates = new Map();
+        const pendingJobs = new Map();
         const resultRequests = new WeakMap();
 
         const rulesBtn = document.getElementById('rulesBtn');
@@ -622,6 +627,7 @@
         const scoreDisplay = document.getElementById('score');
         const placeInput = document.getElementById('placeInput');
         const enterBtn = document.getElementById('enterBtn');
+        const guessStatus = document.getElementById('guessStatus');
         const startBtn = document.getElementById('startBtn');
         const startLabel = document.getElementById('startLabel');
         const roundLoadStatus = document.getElementById('roundLoadStatus');
@@ -657,50 +663,74 @@
             });
         }
 
-        function expandPlaceDictionary(placesByCountry, runs) {
-            const places = [];
-            const nextCityIndexes = placesByCountry.map(() => 0);
-            for (const [countryIndex, count] of runs) {
-                const countryPlaces = placesByCountry[countryIndex];
-                const first = nextCityIndexes[countryIndex];
-                const end = first + count;
-                for (let cityIndex = first; cityIndex < end; cityIndex++) {
-                    places.push(countryPlaces[cityIndex]);
-                }
-                nextCityIndexes[countryIndex] = end;
-            }
-            return places;
+        function dictionaryReady(country) {
+            return dictionaryStates.get('any') === 'ready' || dictionaryStates.get(country) === 'ready';
         }
 
-        function loadPlaces(country) {
-            if (loadedPlaces.has(country)) return Promise.resolve(loadedPlaces.get(country));
-            if (pendingLoads.has(country)) return pendingLoads.get(country);
+        function getPlacesWorker() {
+            if (placesWorker) return placesWorker;
 
-            const worldwide = country === 'any';
-            const file = worldwide ? 'world.json' : `countries/${countryIndexes.get(country)}.json`;
-            const request = fetch(`places/${file}?v=${catalog.revision}`).then(async response => {
-                if (!response.ok) throw new Error(`Place download failed with HTTP ${response.status}`);
-
-                const data = await response.json();
-                if (worldwide) {
-                    const placesByCountry = data.countries.map(([name, cities]) =>
-                        loadedPlaces.get(name) ?? cities.map(city => ({ city, country_name: name }))
-                    );
-                    const places = expandPlaceDictionary(placesByCountry, data.runs);
-                    data.countries.forEach(([name], index) => loadedPlaces.set(name, placesByCountry[index]));
-                    loadedPlaces.set(country, places);
-                } else {
-                    const [name, cities] = data;
-                    if (name !== country || !Array.isArray(cities)) throw new Error('Unexpected country dictionary');
-                    if (!loadedPlaces.has(country)) {
-                        loadedPlaces.set(country, cities.map(city => ({ city, country_name: country })));
+            const worker = new Worker('places-worker.js?v=1');
+            placesWorker = worker;
+            worker.addEventListener('message', ({ data }) => {
+                if (placesWorker !== worker) return;
+                if (data.dictionary) {
+                    dictionaryStates.set(data.dictionary, data.state);
+                    if (data.state === 'ready' && dictionaryReady(roundFilters().country) &&
+                        setupCount === null && !roundJob && !readingSavedState &&
+                        (restoringRound || timeLeft <= 0)) {
+                        prepareRound();
                     }
+                    return;
                 }
-                return loadedPlaces.get(country);
-            }).finally(() => pendingLoads.delete(country));
 
-            pendingLoads.set(country, request);
-            return request;
+                const job = pendingJobs.get(data.id);
+                if (!job) return;
+                if (data.progress) {
+                    job.onProgress?.(data.progress);
+                    return;
+                }
+
+                pendingJobs.delete(data.id);
+                if (data.error) job.reject(new Error(data.error));
+                else job.resolve(data.result);
+            });
+            worker.addEventListener('error', () => {
+                if (placesWorker !== worker) return;
+                worker.terminate();
+                placesWorker = undefined;
+                dictionaryStates.clear();
+                setupCount = null;
+                if (activeRound) activeRound.index = undefined;
+                for (const job of pendingJobs.values()) job.reject(new Error('Place dictionary worker stopped'));
+                pendingJobs.clear();
+                updateStartButton();
+            });
+            worker.postMessage({ type: 'init', catalog });
+            return worker;
+        }
+
+        function requestPlaces(type, payload, onProgress) {
+            const id = ++nextJobId;
+            const promise = new Promise((resolve, reject) => {
+                try {
+                    const worker = getPlacesWorker();
+                    worker.postMessage({ id, type, ...payload });
+                    pendingJobs.set(id, { resolve, reject, onProgress });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+            return {
+                promise,
+                cancel() {
+                    const job = pendingJobs.get(id);
+                    if (!job) return;
+                    pendingJobs.delete(id);
+                    placesWorker.postMessage({ id, type: 'cancel' });
+                    job.resolve(undefined);
+                }
+            };
         }
 
         function initGame() {
@@ -785,8 +815,7 @@
             [letterSelect, endLetterSelect].forEach(select => {
                 select.addEventListener('change', () => {
                     saveSettings();
-                    clearExamples();
-                    updateStartButton();
+                    refreshSetup();
                 });
             });
             timeSelect.addEventListener('change', saveSettings);
@@ -809,20 +838,30 @@
         }
 
         function clearExamples() {
-            resultRequests.delete(examplePlacesContainer);
+            cancelResults(examplePlacesContainer);
             showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+        }
+
+        function refreshSetup() {
+            clearExamples();
+            readingSavedState = false;
+            roundJob?.cancel();
+            roundJob = undefined;
+            setupCount = null;
+            roundLoadState = 'idle';
+            const { country } = roundFilters();
+            if (country !== 'any' || ['loading', 'ready'].includes(dictionaryStates.get(country))) {
+                prepareRound();
+            } else {
+                updateStartButton();
+            }
         }
 
         function handleCountryChangeAndSaveSettings() {
             currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
             updatePlaceInputPlaceholder();
             saveSettings();
-            clearExamples();
-            roundRequest++;
-            roundLoadState = 'idle';
-            const country = roundCountry();
-            if (!loadedPlaces.has(country) && (country !== 'any' || pendingLoads.has(country))) prepareRound();
-            else updateStartButton();
+            refreshSetup();
         }
 
         function setPanelVisibility(button, panel, isVisible) {
@@ -836,67 +875,33 @@
         });
 
         showSearchBtn.addEventListener('click', function() {
-            setPanelVisibility(showSearchBtn, searchContainer, showSearchBtn.getAttribute('aria-expanded') === 'false');
+            const open = searchContainer.hidden;
+            setPanelVisibility(showSearchBtn, searchContainer, open);
+            if (!open && cancelResults(searchResultsContainer)) {
+                showResultMessage(searchResultsContainer, 'Search results will appear here');
+            }
             saveGameState();
         });
 
 
-        function roundCountry() {
+        function filterLetter(value) {
+            return value === 'any' ? '' : value.toLowerCase();
+        }
+
+        function roundFilters() {
             const selection = countrySelect.value;
-            return selection === 'placeAndCountry' ? 'any' : selection || 'any';
-        }
-
-        function filterPlaces(places, country, startLetter, endLetter) {
-            if (country === 'any' && startLetter === 'any' && endLetter === 'any') return places;
-            const start = startLetter === 'any' ? '' : startLetter.toLowerCase();
-            const end = endLetter === 'any' ? '' : endLetter.toLowerCase();
-            return places.filter(place => {
-                if (country !== 'any' && place.country_name !== country) return false;
-                if (!start && !end) return true;
-                const cityLower = place.city.toLowerCase();
-                return cityLower.startsWith(start) && cityLower.endsWith(end);
-            });
-        }
-
-        function getSetupPlaces() {
-            const country = roundCountry();
-            const dictionary = loadedPlaces.get(country);
-            if (!dictionary) return null;
-
-            const start = letterSelect.value;
-            const end = endLetterSelect.value;
-            if (setupPool?.dictionary !== dictionary || setupPool.country !== country ||
-                setupPool.start !== start || setupPool.end !== end) {
-                setupPool = { dictionary, country, start, end, places: filterPlaces(dictionary, country, start, end) };
-            }
-            return setupPool.places;
-        }
-
-        function setRoundPlaces(places) {
-            filteredPlaces = places;
-            roundPlaceGroups.clear();
-            const needsCountry = currentGameMode === 'placeAndCountry';
-            filteredPlaces.forEach((place, index) => {
-                const country = needsCountry ? place.country_name.toLowerCase() : '';
-                let group = roundPlaceGroups.get(country);
-                if (!group) {
-                    group = { byName: new Map(), byLength: new Map() };
-                    roundPlaceGroups.set(country, group);
-                }
-                const city = place.city.toLowerCase();
-                if (group.byName.has(city)) return;
-
-                group.byName.set(city, index);
-                if (!group.byLength.has(city.length)) group.byLength.set(city.length, []);
-                group.byLength.get(city.length).push(city);
-            });
+            return {
+                country: selection === 'placeAndCountry' ? 'any' : selection || 'any',
+                start: filterLetter(letterSelect.value),
+                end: filterLetter(endLetterSelect.value)
+            };
         }
 
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
             const roundInProgress = timeLeft > 0 && !restoringRound;
-            const setupPlaces = loading || roundInProgress || restoringRound ? null : getSetupPlaces();
-            const empty = setupPlaces?.length === 0;
+            const count = loading || roundInProgress || restoringRound ? null : setupCount;
+            const empty = count === 0;
             startBtn.disabled = roundInProgress || empty;
             startBtn.setAttribute('aria-disabled', String(loading));
             const warning = empty ? 'No places match these filters. Try another country or letter' : '';
@@ -908,29 +913,49 @@
             else if (loading) {
                 label = 'Loading places…';
                 status = label;
-            } else if (setupPlaces) label = 'Start Game';
-            else if (roundLoadState === 'failed') {
+            } else if (roundLoadState === 'failed') {
                 label = 'Retry loading';
                 status = 'Could not load places. Retry loading to try again.';
-            }
+            } else if (count !== null) label = 'Start Game';
             startLabel.textContent = label;
             if (roundLoadStatus.textContent !== status) roundLoadStatus.textContent = status;
         }
 
-        async function prepareRound() {
-            const request = ++roundRequest;
+        function invalidateRound() {
+            activeRound?.index?.cancel();
+            activeRound = undefined;
+            guessQueue = Promise.resolve();
+            placesWorker?.postMessage({ type: 'clearRound' });
+            guessStatus.textContent = '';
+        }
+
+        async function prepareRound(starting = false) {
+            const filters = roundFilters();
             const needsResume = restoringRound;
+            const indexing = starting || needsResume;
+            const round = { id: ++nextRoundId, filters, needsCountry: currentGameMode === 'placeAndCountry' };
+            const minutes = Number(timeSelect.value);
+            if (starting) {
+                invalidateRound();
+                clearExamples();
+                setRoundSettingsDisabled(true);
+            }
+
             roundLoadState = 'loading';
+            const job = indexing ? indexRound(round) : requestPlaces('setup', { filters });
+            roundJob = job;
             updateStartButton();
             try {
-                await loadPlaces(roundCountry());
-                if (request !== roundRequest) return;
+                const count = await job.promise;
+                if (roundJob !== job) return;
                 roundLoadState = 'idle';
-                if (restoringRound) {
-                    const places = getSetupPlaces();
+                roundJob = undefined;
+                setupCount = count;
+                if (indexing && count > 0) activeRound = round;
+
+                if (needsResume) {
                     restoringRound = false;
-                    if (places.length) {
-                        setRoundPlaces(places);
+                    if (count > 0) {
                         pauseBtn.disabled = false;
                     } else {
                         // Older versions could save a running round with no eligible places.
@@ -941,14 +966,30 @@
                         saveGameState();
                     }
                 }
+                if (starting) {
+                    if (count > 0) beginRound(minutes);
+                    else setRoundSettingsDisabled(false);
+                }
             } catch {
-                if (request !== roundRequest) return;
+                if (roundJob !== job) return;
+                roundJob = undefined;
                 roundLoadState = 'failed';
+                setupCount = null;
+                if (starting) setRoundSettingsDisabled(false);
             }
             updateStartButton();
             if (needsResume && !restoringRound && timeLeft > 0) {
                 roundLoadStatus.textContent = 'Places loaded. Resume your round when ready.';
             }
+        }
+
+        function indexRound(round) {
+            round.index ??= requestPlaces('round', {
+                roundId: round.id,
+                filters: round.filters,
+                needsCountry: round.needsCountry
+            });
+            return round.index;
         }
 
         function setRoundSettingsDisabled(disabled) {
@@ -964,18 +1005,12 @@
         }
 
         startBtn.addEventListener('click', function() {
-            if (readingSavedState || roundLoadState === 'loading' || (timeLeft > 0 && !restoringRound)) return;
-            const places = getSetupPlaces();
-            if (restoringRound || !places) {
-                prepareRound();
-                return;
-            }
-            if (places.length === 0) return;
+            if (readingSavedState || roundJob || (timeLeft > 0 && !restoringRound) || setupCount === 0) return;
+            prepareRound(!restoringRound && setupCount !== null);
+        });
 
-            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-            setRoundPlaces(places);
-
-            timeLeft = parseInt(timeSelect.value) * 60;
+        function beginRound(minutes) {
+            timeLeft = minutes * 60;
             score = 0;
             guessedPlaces = [];
 
@@ -986,14 +1021,11 @@
 
             pauseBtn.disabled = false;
             setGuessingEnabled(true);
-            setRoundSettingsDisabled(true);
             gameActive = true;
-            updateStartButton();
-
             placeInput.focus();
             startTimer();
             saveGameState();
-        });
+        }
 
         function pauseRound() {
             clearInterval(timer);
@@ -1024,15 +1056,15 @@
             timeLeft = 0;
             score = 0;
             guessedPlaces = [];
-            filteredPlaces = [];
-            setupPool = undefined;
-            roundPlaceGroups.clear();
+            setupCount = null;
+            invalidateRound();
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
             readingSavedState = false;
-            roundRequest++;
+            roundJob?.cancel();
+            roundJob = undefined;
             roundLoadState = 'idle';
-            resultRequests.delete(searchResultsContainer);
+            cancelResults(searchResultsContainer);
             clearExamples();
 
             updateTimerDisplay();
@@ -1066,7 +1098,8 @@
             showResultMessage(searchResultsContainer, 'Search results will appear here');
             setPanelVisibility(rulesBtn, rulesContainer, false);
             setPanelVisibility(showSearchBtn, searchContainer, false);
-            updateStartButton();
+            if (dictionaryReady('any')) prepareRound();
+            else updateStartButton();
         });
 
         function updatePlaceInputPlaceholder() {
@@ -1078,93 +1111,45 @@
         }
 
         function enterPlace() {
-            if (!gameActive) return;
+            if (!gameActive || !activeRound) return;
 
             const guess = placeInput.value.trim();
             if (!guess) return;
-
-            const foundPlace = findMatchingPlace(guess);
-
-            if (foundPlace) {
-                 const alreadyGuessed = guessedPlaces.some(guessed =>
-                     guessed.city.toLowerCase() === foundPlace.city.toLowerCase() &&
-                     (currentGameMode === 'placeOnly' || (guessed.country && foundPlace.country_name && guessed.country.toLowerCase() === foundPlace.country_name.toLowerCase()))
-                 );
-
-                 if (!alreadyGuessed) {
-                    score++;
-                    guessedPlaces.push({ city: foundPlace.city, country: foundPlace.country_name });
-                    updateScoreDisplay();
-                    updateGuessedPlacesDisplay();
-                    saveGameState();
-                 }
-            }
             placeInput.value = '';
-        }
+            guessStatus.textContent = '';
 
-        function findMatchingPlace(guess) {
-            const lowerGuess = guess.toLowerCase();
-            const needsCountry = currentGameMode === 'placeAndCountry';
-            const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
-            if (needsCountry && parts.length < 2) return null;
+            const round = activeRound;
+            const index = indexRound(round);
+            const lookup = index.promise.then(() => {
+                if (activeRound !== round) return;
+                return requestPlaces('guess', { roundId: round.id, guess }).promise;
+            }).then(place => ({ place }), () => {
+                if (round.index === index) round.index = undefined;
+                return { failed: true };
+            });
 
-            // Either name can contain commas, so try each possible separator.
-            const candidatePairs = needsCountry ? parts.slice(0, -1).map((_, index) => [
-                parts.slice(0, index + 1).join(', '),
-                parts.slice(index + 1).join(', '),
-            ]) : [[lowerGuess, '']];
-
-            // When multiple splits match, keep the first answer in dictionary order.
-            let firstIndex = Infinity;
-            for (const [guessedCity, guessedCountry] of candidatePairs) {
-                const index = roundPlaceGroups.get(guessedCountry)?.byName.get(guessedCity);
-                if (index !== undefined) firstIndex = Math.min(firstIndex, index);
-            }
-            if (firstIndex !== Infinity) return filteredPlaces[firstIndex];
-
-            for (const [guessedCity, guessedCountry] of candidatePairs) {
-                for (const [country, group] of roundPlaceGroups) {
-                    if (country !== guessedCountry && !isCloseMatch(country, guessedCountry)) continue;
-
-                    for (let length = guessedCity.length - 1; length <= guessedCity.length + 1; length++) {
-                        const cities = group.byLength.get(length);
-                        if (!cities) continue;
-                        for (const city of cities) {
-                            if (city === guessedCity || isCloseMatch(city, guessedCity)) {
-                                // Each bucket lists cities in dictionary order.
-                                firstIndex = Math.min(firstIndex, group.byName.get(city));
-                                break;
-                            }
-                        }
-                    }
+            // Apply results in submission order, even if a reply arrives after pausing or expiry.
+            guessQueue = guessQueue.then(async () => {
+                const { place, failed } = await lookup;
+                if (activeRound !== round) return;
+                if (failed) {
+                    guessStatus.textContent = 'Could not check that answer. Try entering it again';
+                    return;
                 }
-            }
-            return firstIndex === Infinity ? null : filteredPlaces[firstIndex];
-        }
+                if (!place) return;
 
-        function isCloseMatch(first, second) {
-            if (Math.abs(first.length - second.length) > 1) return false;
-            if (first.length > second.length) [first, second] = [second, first];
+                const duplicate = guessedPlaces.some(guessed =>
+                    guessed.city.toLowerCase() === place.city.toLowerCase() &&
+                    (!round.needsCountry || guessed.country?.toLowerCase() === place.country_name.toLowerCase())
+                );
+                if (duplicate) return;
 
-            let firstIndex = 0;
-            while (firstIndex < first.length && first[firstIndex] === second[firstIndex]) firstIndex++;
-            if (firstIndex === first.length) return first.length !== second.length;
-
-            // Skip the extra character in the longer string, or consume a substitution or swap.
-            let secondIndex = firstIndex + 1;
-            if (first.length === second.length) {
-                if (first[firstIndex] === second[secondIndex] && first[secondIndex] === second[firstIndex]) {
-                    secondIndex++;
-                }
-                firstIndex = secondIndex;
-            }
-
-            while (firstIndex < first.length) {
-                if (first[firstIndex] !== second[secondIndex]) return false;
-                firstIndex++;
-                secondIndex++;
-            }
-            return true;
+                score++;
+                guessedPlaces.push({ city: place.city, country: place.country_name });
+                updateScoreDisplay();
+                updateGuessedPlacesDisplay();
+                if (timeLeft > 0) saveGameState();
+            });
         }
 
         function showResultMessage(container, message, retry) {
@@ -1183,21 +1168,36 @@
             }
         }
 
-        async function loadResultPlaces(country, container, retry) {
-            const request = Symbol();
-            resultRequests.set(container, request);
-            if (!loadedPlaces.has(country)) showResultMessage(container, 'Loading places…');
+        function cancelResults(container) {
+            const job = resultRequests.get(container);
+            if (!job) return false;
+            resultRequests.delete(container);
+            job.cancel();
+            return true;
+        }
+
+        async function requestResults(container, type, payload, emptyMessage, retry) {
+            cancelResults(container);
+            const country = payload.filters.country;
+            if (!dictionaryReady(country)) showResultMessage(container, 'Loading places…');
+            else if (type === 'search') showResultMessage(container, 'Searching…');
+
+            const job = requestPlaces(type, payload, message => {
+                if (resultRequests.get(container) === job) showResultMessage(container, message);
+            });
+            resultRequests.set(container, job);
             try {
-                const places = await loadPlaces(country);
-                updateStartButton();
-                return resultRequests.get(container) === request ? places : null;
+                const places = await job.promise;
+                if (resultRequests.get(container) !== job) return;
+                if (places.length === 0) showResultMessage(container, emptyMessage);
+                else renderPlaces(container, places);
+                if (type === 'examples') container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch {
-                if (resultRequests.get(container) === request) {
+                if (resultRequests.get(container) === job) {
                     showResultMessage(container, 'Could not load places.', retry);
                 }
-                return null;
             } finally {
-                if (resultRequests.get(container) === request) resultRequests.delete(container);
+                if (resultRequests.get(container) === job) resultRequests.delete(container);
             }
         }
 
@@ -1216,87 +1216,51 @@
 
         function handleSearchFiltersChange() {
             validateSearchLengthRange();
-            if (resultRequests.delete(searchResultsContainer)) {
+            if (cancelResults(searchResultsContainer)) {
                 showResultMessage(searchResultsContainer, 'Search results will appear here');
             }
             saveSearchFilters();
         }
 
-        async function performSearch() {
-            const range = validateSearchLengthRange();
-            if (!range) return;
-            const { minLength, maxLength } = range;
-
-            const includeTerms = searchIncludeInput.value.trim().toLowerCase()
-                .split(',')
-                .map(term => term.trim())
-                .filter(term => term.length > 0);
-            const excludeTerms = searchExcludeInput.value.trim().toLowerCase()
-                .split(',')
-                .map(term => term.trim())
-                .filter(term => term.length > 0);
-
-            const selectedSearchStartLetter = searchStartLetterSelect.value;
-            const selectedSearchEndLetter = searchEndLetterSelect.value;
-            const selectedSearchCountry = searchCountrySelect.value;
-
-            const places = await loadResultPlaces(selectedSearchCountry, searchResultsContainer, performSearch);
-            if (!places) return;
-
-            let matchingPlaces = filterPlaces(places, selectedSearchCountry, selectedSearchStartLetter, selectedSearchEndLetter);
-            if (includeTerms.length || excludeTerms.length || minLength > 0 || maxLength < Infinity) {
-                matchingPlaces = matchingPlaces.filter(place => {
-                    if (place.city.length < minLength || place.city.length > maxLength) return false;
-                    const city = place.city.toLowerCase();
-                    const country = place.country_name.toLowerCase();
-                    const matchesTerm = term => city.includes(term) || country.includes(term);
-                    return includeTerms.every(matchesTerm) && !excludeTerms.some(matchesTerm);
-                });
-            }
-
-            if (matchingPlaces.length === 0) {
-                searchResultsContainer.innerHTML = '<p class="text-muted">No places found matching your criteria</p>';
-                return;
-            }
-
-            const resultsToDisplay = getRandomPlaces(matchingPlaces, 100);
-            let html = '';
-            resultsToDisplay.forEach(place => {
-                 html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
-            });
-            searchResultsContainer.innerHTML = html;
-            searchResultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        function searchTerms(input) {
+            return input.value.toLowerCase().split(',').map(term => term.trim()).filter(Boolean);
         }
 
+        function performSearch() {
+            const range = validateSearchLengthRange();
+            if (!range || searchContainer.hidden) return;
 
-        async function showExamples() {
-            if (timeLeft <= 0 || restoringRound) {
-                const places = await loadResultPlaces(roundCountry(), examplePlacesContainer, showExamples);
-                if (!places) return;
-            }
-            const places = timeLeft > 0 && !restoringRound ? filteredPlaces : getSetupPlaces();
-            displayExamplePlaces(getRandomPlaces(places, 8));
-            examplePlacesContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const filters = {
+                ...range,
+                country: searchCountrySelect.value,
+                start: filterLetter(searchStartLetterSelect.value),
+                end: filterLetter(searchEndLetterSelect.value),
+                includeTerms: searchTerms(searchIncludeInput),
+                excludeTerms: searchTerms(searchExcludeInput)
+            };
+            requestResults(searchResultsContainer, 'search', { filters },
+                'No places found matching your criteria', performSearch);
+        }
+
+        function showExamples() {
+            const round = timeLeft > 0 && !restoringRound ? activeRound : undefined;
+            const filters = round?.filters ?? roundFilters();
+            requestResults(examplePlacesContainer, 'examples', { filters, roundId: round?.id },
+                'No places found matching current game filters', showExamples);
         }
 
         displayBtn.addEventListener('click', showExamples);
 
-        function getRandomPlaces(placesArray, count) {
-            if (!Array.isArray(placesArray) || placesArray.length === 0) return [];
-            const shuffled = [...placesArray].sort(() => 0.5 - Math.random());
-            return shuffled.slice(0, count);
-        }
-
-        function displayExamplePlaces(places) {
-            if (places.length === 0) {
-                examplePlacesContainer.innerHTML = '<p class="text-muted">No places found matching current game filters</p>';
-                return;
-            }
-            let html = '';
-            places.forEach(place => {
-                html += `<div class="place-item"><strong>${place.city}</strong>${place.country_name ? `, ${place.country_name}` : ''}</div>`;
+        function renderPlaces(container, places) {
+            const rows = places.map(place => {
+                const row = document.createElement('div');
+                row.className = 'place-item';
+                const city = document.createElement('strong');
+                city.textContent = place.city;
+                row.append(city, `, ${place.country_name}`);
+                return row;
             });
-            examplePlacesContainer.innerHTML = html;
+            container.replaceChildren(...rows);
         }
 
         function startTimer() {
@@ -1338,7 +1302,7 @@
             }
             let html = '';
             guessedPlaces.forEach(place => {
-                if (currentGameMode === 'placeAndCountry') {
+                if (activeRound?.needsCountry ?? currentGameMode === 'placeAndCountry') {
                     html += `<div class="place-item">${place.city}, ${place.country}</div>`;
                 } else {
                     html += `<div class="place-item">${place.city}</div>`;
@@ -1397,17 +1361,11 @@
                 return;
             }
 
-            const request = roundRequest;
             readingSavedState = true;
             updateStartButton();
             chrome.storage.local.get(['gameState', 'gameSettings', 'searchFilters'], function(result) {
                 if (!readingSavedState) return;
                 readingSavedState = false;
-                if (request !== roundRequest) {
-                    updateStartButton();
-                    return;
-                }
-
                 const settings = result.gameSettings || {};
                 const selection = settings.selectedCountryValue;
                 countrySelect.value = selection === 'any' || countryIndexes.has(selection) ? selection : 'placeAndCountry';
@@ -1445,7 +1403,7 @@
                     pauseBtn.disabled = true;
                     setRoundSettingsDisabled(true);
                     prepareRound();
-                } else if (roundCountry() !== 'any') {
+                } else if (roundFilters().country !== 'any' || dictionaryReady('any')) {
                     prepareRound();
                 } else {
                     updateStartButton();
