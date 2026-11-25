@@ -44,6 +44,7 @@ function createPlacesStorage(countries) {
         const { setup, search, leaveMode, showRules, showSearch, presets } = isObject(value) ? value : {};
         const filters = isObject(search) ? search : {};
         const saved = new Map();
+        // Retain setups saved before the new five-favorite limit.
         for (const preset of Array.isArray(presets) ? presets.slice(0, 12) : []) {
             const name = boundedText(preset?.name, 48).trim();
             const setup = checkedSettings(preset?.setup);

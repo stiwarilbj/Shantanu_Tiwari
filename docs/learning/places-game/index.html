@@ -312,6 +312,12 @@
         .preferences-dialog .input-group .btn {
             white-space: normal;
         }
+        .saved-setup-apply {
+            flex: 1;
+            min-inline-size: 0;
+            overflow-wrap: anywhere;
+            text-align: start;
+        }
         .score-history {
             max-height: 9rem;
             overflow-y: auto;
@@ -570,7 +576,7 @@
 
         <div class="game-content">
             <section class="settings-card" aria-labelledby="settings-heading">
-                <h2 id="settings-heading"><i class="fas fa-cog" aria-hidden="true"></i> Game Settings</h2>
+                <h2 id="settings-heading" tabindex="-1"><i class="fas fa-cog" aria-hidden="true"></i> Game Settings</h2>
                 <div class="row g-2">
                     <div class="col">
                         <label for="letterSelect" class="form-label">Starting Letter</label>
@@ -685,23 +691,18 @@
         </section>
         <section aria-labelledby="savedSetupsTitle">
             <h3 id="savedSetupsTitle">Saved setups</h3>
+            <p id="savedSetupHint" class="small text-muted mb-2">Save up to five favorites. Select a saved name to apply it.</p>
             <form id="saveSetupForm" class="mb-2">
                 <label for="setupName" class="form-label small">Setup name</label>
                 <div class="input-group input-group-sm">
-                    <input id="setupName" class="form-control" type="text" maxlength="48" required>
-                    <button class="btn btn-outline-primary">Save current setup</button>
+                    <input id="setupName" class="form-control" type="text" maxlength="48" aria-describedby="savedSetupHint" required>
+                    <button class="btn btn-outline-primary" type="submit">Save current setup</button>
                 </div>
             </form>
-            <div id="savedSetupControls" hidden>
-                <label for="savedSetup" class="form-label small">Choose a setup</label>
-                <select id="savedSetup" class="form-select form-select-sm mb-2"></select>
-                <div class="d-flex flex-wrap gap-2">
-                    <button id="loadSetupBtn" class="btn btn-outline-primary btn-sm" type="button">Load setup</button>
-                    <button id="deleteSetupBtn" class="btn btn-outline-secondary btn-sm" type="button">Delete setup</button>
-                </div>
-                <p id="loadSetupHint" class="small text-muted mt-2 mb-0" hidden>Finish or reset the current round to load a setup</p>
-            </div>
+            <ul id="savedSetupList" class="list-unstyled d-flex flex-column gap-1 mb-0" role="list" aria-label="Saved setups"></ul>
+            <p id="loadSetupHint" class="small text-muted mt-2 mb-0" hidden>Finish or reset the current round to apply a setup</p>
             <p id="emptySetups" class="small text-muted mb-0">No saved setups yet</p>
+            <p id="setupStatus" class="filter-feedback" role="status"></p>
         </section>
         <section aria-labelledby="scoreHistoryTitle">
             <h3 id="scoreHistoryTitle">Timed scores</h3>
@@ -752,6 +753,7 @@
         const storage = createPlacesStorage(countryIndexes);
         const legacyStorage = window.chrome?.storage?.local;
         const legacyKeys = ['gameState', 'gameSettings', 'searchFilters'];
+        const savedSetupLimit = 5;
         let savedSetups = [];
         const scoreHistories = { history: [], 'practice-history': [] };
         let placesWorker;
@@ -805,8 +807,8 @@
         const leaveMode = document.getElementById('leaveMode');
         const leaveModeHint = document.getElementById('leaveModeHint');
         const setupName = document.getElementById('setupName');
-        const savedSetup = document.getElementById('savedSetup');
-        const loadSetupBtn = document.getElementById('loadSetupBtn');
+        const savedSetupList = document.getElementById('savedSetupList');
+        const setupStatus = document.getElementById('setupStatus');
         const clearDataBtn = document.getElementById('clearDataBtn');
         const clearDataPrompt = document.getElementById('clearDataPrompt');
 
@@ -1198,8 +1200,7 @@
             countrySelect.disabled = disabled;
             timeSelect.disabled = disabled;
             spellingSelect.disabled = disabled;
-            loadSetupBtn.disabled = disabled;
-            document.getElementById('loadSetupHint').hidden = !disabled;
+            updateSavedSetupAvailability();
         }
 
         function setGuessingEnabled(enabled) {
@@ -1765,12 +1766,58 @@
             });
         }
 
-        function renderSavedSetups(selection = savedSetup.value) {
-            const options = savedSetups.map(({ name }) => new Option(name, name.toLowerCase()));
-            savedSetup.replaceChildren(...options);
-            if (savedSetups.some(({ name }) => name.toLowerCase() === selection)) savedSetup.value = selection;
-            document.getElementById('savedSetupControls').hidden = !savedSetups.length;
+        function updateSavedSetupAvailability() {
+            const locked = countrySelect.disabled;
+            for (const button of savedSetupList.querySelectorAll('.saved-setup-apply')) button.disabled = locked;
+            document.getElementById('loadSetupHint').hidden = !locked || !savedSetups.length;
+        }
+
+        function renderSavedSetups() {
+            savedSetupList.replaceChildren(...savedSetups.map((preset, index) => {
+                const item = document.createElement('li');
+                item.className = 'd-flex gap-2';
+
+                const apply = document.createElement('button');
+                apply.type = 'button';
+                apply.className = 'btn btn-outline-primary btn-sm saved-setup-apply';
+                apply.textContent = preset.name;
+                apply.setAttribute('aria-label', `Apply ${preset.name}`);
+                apply.addEventListener('click', () => {
+                    if (countrySelect.disabled) return;
+                    applySettings(preset.setup);
+                    refreshSetup();
+                    savePreferences();
+                    preferencesDialog.close();
+                    document.getElementById('settings-heading').focus();
+                });
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-outline-secondary btn-sm';
+                remove.textContent = 'Delete';
+                remove.setAttribute('aria-label', `Delete ${preset.name}`);
+                remove.addEventListener('click', () => {
+                    savedSetups.splice(index, 1);
+                    const saved = savePreferences();
+                    showSetupStatus(saved, saved ? `Deleted ${preset.name}` : storageWarning);
+                    renderSavedSetups();
+                    const nextRow = savedSetupList.children[index] ?? savedSetupList.lastElementChild;
+                    (nextRow?.querySelector('button:last-child') ?? setupName).focus();
+                });
+
+                item.append(apply, remove);
+                return item;
+            }));
             document.getElementById('emptySetups').hidden = Boolean(savedSetups.length);
+            document.getElementById('savedSetupHint').textContent = savedSetups.length > savedSetupLimit
+                ? 'Your earlier setups are still here. To save a new one, bring the list below five or use a saved name.'
+                : 'Save up to five favorites. Select a saved name to apply it.';
+            updateSavedSetupAvailability();
+        }
+
+        function showSetupStatus(success, message) {
+            setupStatus.classList.toggle('text-muted', success);
+            setupStatus.textContent = message;
         }
 
         function renderScores() {
@@ -1820,6 +1867,7 @@
 
         preferencesBtn.addEventListener('click', () => {
             renderSavedSetups();
+            setupStatus.textContent = '';
             if (storage.available) loadScoreHistories();
             renderScores();
             setClearPrompt(false);
@@ -1831,39 +1879,25 @@
             event.preventDefault();
             const name = setupName.value.trim();
             if (!name) {
-                preferencesStatus.textContent = 'Enter a name for this setup';
+                showSetupStatus(false, 'Enter a name for this setup');
                 setupName.focus();
                 return;
             }
 
             const key = name.toLowerCase();
             const index = savedSetups.findIndex(preset => preset.name.toLowerCase() === key);
-            if (index === -1 && savedSetups.length >= 12) {
-                preferencesStatus.textContent = 'Delete a setup before saving another';
+            if (index === -1 && savedSetups.length >= savedSetupLimit) {
+                showSetupStatus(false, 'Make room for a new setup or reuse a saved name');
                 return;
             }
 
             const setup = { name, setup: currentSettings() };
             if (index === -1) savedSetups.push(setup);
             else savedSetups[index] = setup;
-            preferencesStatus.textContent = savePreferences() ? `Saved ${name}` : storageWarning;
+            const saved = savePreferences();
+            showSetupStatus(saved, saved ? `Saved ${name}` : storageWarning);
             setupName.value = '';
-            renderSavedSetups(key);
-        });
-
-        loadSetupBtn.addEventListener('click', () => {
-            const preset = savedSetups.find(({ name }) => name.toLowerCase() === savedSetup.value);
-            if (!preset || loadSetupBtn.disabled) return;
-            applySettings(preset.setup);
-            refreshSetup();
-            preferencesStatus.textContent = savePreferences() ? `Loaded ${preset.name}` : storageWarning;
-        });
-
-        document.getElementById('deleteSetupBtn').addEventListener('click', () => {
-            savedSetups = savedSetups.filter(({ name }) => name.toLowerCase() !== savedSetup.value);
-            preferencesStatus.textContent = savePreferences() ? 'Setup deleted' : storageWarning;
             renderSavedSetups();
-            if (!savedSetups.length) setupName.focus();
         });
 
         clearDataBtn.addEventListener('click', () => {
@@ -1886,6 +1920,7 @@
             const cleared = records.map(record => storage.remove(record)).every(Boolean);
             for (const record of Object.keys(scoreHistories)) scoreHistories[record] = [];
             setupName.value = '';
+            setupStatus.textContent = '';
             renderSavedSetups();
             renderScores();
             setClearPrompt(false);
