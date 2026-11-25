@@ -72,9 +72,11 @@ async function runRequest(type, payload, id, cancelled) {
             const result = round.spelling === 'standard' ? checkGuess(round, guess) : checkSpellingGuess(round, guess);
             return includeFeedback ? result : result.place ?? null;
         }
-        case 'examples': {
+        case 'examples':
+        case 'clue': {
             const places = round && round.id === roundId ? round.places : await getSetupPlaces(filters);
             if (cancelled()) return;
+            if (type === 'clue') return findClue(places, payload);
             return samplePlaces(places, 8);
         }
         case 'search': {
@@ -86,6 +88,21 @@ async function runRequest(type, payload, id, cancelled) {
         default:
             throw new Error('Unknown place dictionary request');
     }
+}
+
+function findClue(places, { needsCountry, guessed }) {
+    const excluded = new Set(guessed);
+    const first = Math.floor(Math.random() * places.length);
+    for (let offset = 0; offset < places.length; offset++) {
+        const { city, country_name: country } = places[(first + offset) % places.length];
+        // Use the same identity as scoring, including shared names in Place and Country mode.
+        const name = city.toLowerCase();
+        const answerKey = needsCountry ? JSON.stringify([name, country.toLowerCase()]) : name;
+        if (!excluded.has(answerKey)) {
+            return [{ answerKey, country, letters: city.match(/\p{L}/gu)?.length ?? 0 }];
+        }
+    }
+    return [];
 }
 
 async function visitInBatches(items, visit, cancelled = () => false) {

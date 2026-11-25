@@ -519,7 +519,8 @@
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
                     <li>Each correct answer earns one point. <strong>Standard</strong> allows one typo or swapped neighboring letters per name. <strong>Strict</strong> requires exact spelling, with any capitalization. <strong>Relaxed</strong> also accepts missing accents and familiar country names like USA, UK, and Czechia. If more than one place matches, try the exact spelling or add the country.</li>
                     <li><strong>Search</strong> by first or last letter, country, or name length. Separate terms with commas. <strong>Include</strong> checks for every term in the place or country, and <strong>Don't Include</strong> skips any match.</li>
-                    <li><strong>Display Places</strong> shows eight random examples using your filters. To take a break, select <strong>Pause</strong>, then <strong>Resume Game</strong> when you're ready. Use Preferences to choose what happens when you switch away.</li>
+                    <li><strong>Display Places</strong> shows up to eight examples using your filters. In Preferences, switch to <strong>Clues only</strong> for a hint without the name, or <strong>After the round</strong> to unlock Search and examples when you finish.</li>
+                    <li>To take a break, select <strong>Pause</strong>, then <strong>Resume Game</strong> when you're ready. Use Preferences to choose what happens when you switch away.</li>
                 </ul>
             </div>
 
@@ -650,7 +651,7 @@
                         <i class="fas fa-redo"></i> Reset Game
                     </button>
                     <button id="displayBtn" class="btn btn-info" type="button" aria-controls="examplePlaces">
-                        <i class="fas fa-list"></i> Display Places
+                        <i id="displayIcon" class="fas fa-list" aria-hidden="true"></i> <span id="displayLabel">Display Places</span>
                     </button>
                 </div>
 
@@ -663,8 +664,8 @@
                         </div>
                     </div>
                     <div class="col">
-                        <h2><i class="fas fa-lightbulb" aria-hidden="true"></i> Example Places</h2>
-                        <div id="examplePlaces" class="places-list-container">
+                        <h2><i class="fas fa-lightbulb" aria-hidden="true"></i> <span id="exampleLabel">Example Places</span></h2>
+                        <div id="examplePlaces" class="places-list-container" aria-live="polite">
                             <p class="text-muted">Click "Display Places" to see examples</p>
                         </div>
                     </div>
@@ -688,6 +689,15 @@
                 <option value="save">Pause and save my round</option>
             </select>
             <p id="leaveModeHint" class="small text-muted mt-2 mb-0" aria-live="polite">Timed rounds keep counting in the background. Refreshing starts fresh.</p>
+        </section>
+        <section>
+            <label for="hintMode" class="form-label fw-semibold mb-1">Hints</label>
+            <select id="hintMode" class="form-select form-select-sm" aria-describedby="hintModeHelp">
+                <option value="examples">Examples</option>
+                <option value="clues">Clues only</option>
+                <option value="after">After the round</option>
+            </select>
+            <p id="hintModeHelp" class="small text-muted mt-2 mb-0"></p>
         </section>
         <section aria-labelledby="savedSetupsTitle">
             <h3 id="savedSetupsTitle">Saved setups</h3>
@@ -728,7 +738,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=4"></script>
+    <script src="places-storage.js?v=5"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -737,6 +747,7 @@
         let score = 0;
         const guessedPlaces = [];
         const acceptedAnswers = new Set();
+        let shownClueKey;
         let latestGuess;
         let guessEditVersion = 0;
         let setupCount = null;
@@ -788,6 +799,9 @@
         const pauseIcon = document.getElementById('pauseIcon');
         const resetBtn = document.getElementById('resetBtn');
         const displayBtn = document.getElementById('displayBtn');
+        const displayLabel = document.getElementById('displayLabel');
+        const displayIcon = document.getElementById('displayIcon');
+        const exampleLabel = document.getElementById('exampleLabel');
         const guessedPlacesContainer = document.getElementById('guessedPlaces');
         const examplePlacesContainer = document.getElementById('examplePlaces');
 
@@ -806,6 +820,8 @@
         const preferencesStatus = document.getElementById('preferencesStatus');
         const leaveMode = document.getElementById('leaveMode');
         const leaveModeHint = document.getElementById('leaveModeHint');
+        const hintMode = document.getElementById('hintMode');
+        const hintModeHelp = document.getElementById('hintModeHelp');
         const setupName = document.getElementById('setupName');
         const savedSetupList = document.getElementById('savedSetupList');
         const setupStatus = document.getElementById('setupStatus');
@@ -833,7 +849,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=5');
+            const worker = new Worker('places-worker.js?v=6');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -1005,8 +1021,37 @@
         }
 
         function clearExamples() {
+            shownClueKey = undefined;
             cancelResults(examplePlacesContainer);
-            showResultMessage(examplePlacesContainer, 'Click "Display Places" to see examples');
+            let message = 'Click "Display Places" to see examples';
+            if (studyToolsLocked()) message = 'Search and examples unlock after the round';
+            else if (hintMode.value === 'clues') message = restoringRound ? 'Loading saved round…' : 'Choose "Get a clue" for a hint';
+            showResultMessage(examplePlacesContainer, message);
+        }
+
+        function studyToolsLocked() {
+            return hintMode.value === 'after' && !activeRound?.finishedAt;
+        }
+
+        function updateStudyTools() {
+            const clues = hintMode.value === 'clues';
+            const locked = studyToolsLocked();
+            displayLabel.textContent = clues ? 'Get a clue' : 'Display Places';
+            displayIcon.className = clues ? 'fas fa-lightbulb' : 'fas fa-list';
+            exampleLabel.textContent = clues ? 'Clue' : 'Example Places';
+            displayBtn.disabled = locked || (clues && Boolean(restoringRound));
+            showSearchBtn.disabled = locked;
+            if (locked) {
+                setPanelVisibility(showSearchBtn, searchContainer, false);
+                cancelResults(searchResultsContainer);
+                showResultMessage(searchResultsContainer, 'Search results will appear here');
+            }
+            const help = {
+                examples: 'See up to eight place names that match your filters.',
+                clues: 'Get a matching place’s country and letter count.',
+                after: 'Search and examples unlock when the timer ends or you finish practice.'
+            };
+            hintModeHelp.textContent = hintMode.disabled ? 'Finish or reset the round to change this setting.' : help[hintMode.value];
         }
 
         function refreshSetup() {
@@ -1040,6 +1085,7 @@
         });
 
         showSearchBtn.addEventListener('click', function() {
+            if (studyToolsLocked()) return;
             const open = searchContainer.hidden;
             setPanelVisibility(showSearchBtn, searchContainer, open);
             if (!open && cancelResults(searchResultsContainer)) {
@@ -1156,6 +1202,10 @@
 
                 if (needsResume) {
                     restoringRound = undefined;
+                    if (hintMode.value === 'clues') {
+                        updateStudyTools();
+                        clearExamples();
+                    }
                     if (count > 0) {
                         for (const place of result.guesses) appendGuessedPlace(place, round.needsCountry);
                         score = guessedPlaces.length;
@@ -1200,6 +1250,9 @@
             countrySelect.disabled = disabled;
             timeSelect.disabled = disabled;
             spellingSelect.disabled = disabled;
+            hintMode.disabled = disabled;
+            updateStudyTools();
+            if (hintMode.value === 'after') clearExamples();
             updateSavedSetupAvailability();
         }
 
@@ -1406,22 +1459,23 @@
             return true;
         }
 
-        async function requestResults(container, type, payload, emptyMessage, retry) {
+        async function requestResults(container, type, payload, emptyMessage, retry, render = renderPlaces) {
             cancelResults(container);
             const country = payload.filters.country;
             if (!dictionaryReady(country)) showResultMessage(container, 'Loading places…');
             else if (type === 'search') showResultMessage(container, 'Searching…');
+            else if (type === 'clue') showResultMessage(container, 'Looking for a clue…');
 
             const job = requestPlaces(type, payload, message => {
                 if (resultRequests.get(container) === job) showResultMessage(container, message);
             });
             resultRequests.set(container, job);
             try {
-                const places = await job.promise;
+                const results = await job.promise;
                 if (resultRequests.get(container) !== job) return;
-                if (places.length === 0) showResultMessage(container, emptyMessage);
-                else renderPlaces(container, places);
-                if (type === 'examples') container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (results.length === 0) showResultMessage(container, emptyMessage);
+                else render(container, results);
+                if (type !== 'search') container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch {
                 if (resultRequests.get(container) === job) {
                     showResultMessage(container, 'Could not load places.', retry);
@@ -1458,7 +1512,7 @@
 
         function performSearch() {
             const range = validateSearchLengthRange();
-            if (!range || searchContainer.hidden) return;
+            if (!range || searchContainer.hidden || studyToolsLocked()) return;
 
             const filters = {
                 ...range,
@@ -1473,10 +1527,35 @@
         }
 
         function showExamples() {
+            if (displayBtn.disabled) return;
             const round = roundIsOpen() ? activeRound : undefined;
             const filters = round?.filters ?? roundFilters();
-            requestResults(examplePlacesContainer, 'examples', { filters, roundId: round?.id },
+            const payload = { filters, roundId: round?.id };
+            if (hintMode.value === 'clues') {
+                showClue(payload);
+                return;
+            }
+            requestResults(examplePlacesContainer, 'examples', payload,
                 'No places found matching current game filters', showExamples);
+        }
+
+        function showClue(payload) {
+            const needsCountry = countrySelect.value === 'placeAndCountry';
+            const usesRoundGuesses = activeRound?.needsCountry === needsCountry &&
+                Object.entries(payload.filters).every(([key, value]) => activeRound.filters[key] === value);
+            const guessed = usesRoundGuesses ? [...acceptedAnswers] : [];
+            shownClueKey = undefined;
+            requestResults(examplePlacesContainer, 'clue', { ...payload, needsCountry, guessed },
+                'No unguessed places match these filters', showExamples, (container, [clue]) => {
+                    // An answer can score while the worker is choosing a clue.
+                    if (usesRoundGuesses && acceptedAnswers.has(clue.answerKey)) {
+                        showExamples();
+                        return;
+                    }
+                    shownClueKey = clue.answerKey;
+                    const letters = clue.letters === 1 ? 'letter' : 'letters';
+                    showResultMessage(container, `A place in ${clue.country} with ${clue.letters} ${letters}`);
+                });
         }
 
         displayBtn.addEventListener('click', showExamples);
@@ -1590,6 +1669,7 @@
             if (acceptedAnswers.has(key)) return false;
 
             acceptedAnswers.add(key);
+            if (shownClueKey === key) clearExamples();
             if (guessedPlaces.length === 0) guessedPlacesContainer.firstElementChild?.remove();
             guessedPlaces.push(place);
 
@@ -1606,7 +1686,8 @@
                 start: letterSelect.value,
                 end: endLetterSelect.value,
                 minutes: timeSelect.value,
-                spelling: spellingSelect.value
+                spelling: spellingSelect.value,
+                hints: hintMode.value
             };
         }
 
@@ -1616,8 +1697,11 @@
             endLetterSelect.value = setup.end;
             timeSelect.value = setup.minutes;
             spellingSelect.value = setup.spelling;
+            hintMode.value = setup.hints;
             updatePlaceInputPlaceholder();
             updateTimerDisplay();
+            updateStudyTools();
+            clearExamples();
         }
 
         function savePreferences() {
@@ -1653,7 +1737,7 @@
             searchMaxLengthInput.value = search.max;
             validateSearchLengthRange();
             setPanelVisibility(rulesBtn, rulesContainer, showRules);
-            setPanelVisibility(showSearchBtn, searchContainer, showSearch);
+            setPanelVisibility(showSearchBtn, searchContainer, showSearch && !studyToolsLocked());
             savedSetups = presets;
         }
 
@@ -1699,9 +1783,9 @@
                 return;
             }
 
+            restoringRound = savedRound;
             applySettings(savedRound.setup);
             pausedMs = savedRound.remainingMs ?? 0;
-            restoringRound = savedRound;
             updateTimerDisplay();
             setGuessingEnabled(false);
             setRoundSettingsDisabled(true);
@@ -1863,6 +1947,12 @@
             if (leaveMode.value === 'save') saveRound();
             else discardSavedRound(activeRound?.attemptId ?? restoringRound?.id);
             preferencesStatus.textContent = savePreferences() && storage.available ? '' : storageWarning;
+        });
+
+        hintMode.addEventListener('change', () => {
+            updateStudyTools();
+            clearExamples();
+            preferencesStatus.textContent = savePreferences() ? '' : storageWarning;
         });
 
         preferencesBtn.addEventListener('click', () => {
