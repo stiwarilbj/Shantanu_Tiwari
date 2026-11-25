@@ -670,7 +670,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=1');
+            const worker = new Worker('places-worker.js?v=2');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;

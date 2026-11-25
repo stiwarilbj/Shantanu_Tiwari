@@ -41,7 +41,7 @@ async function runRequest(type, { filters, roundId, needsCountry, guess }, id, c
             const places = await getSetupPlaces(filters);
             if (cancelled()) return;
             const groups = await indexRound(places, needsCountry, cancelled);
-            if (!cancelled()) round = { id: roundId, places, groups, needsCountry };
+            if (!cancelled()) round = { id: roundId, key: poolKey(filters), places, groups, needsCountry };
             return places.length;
         }
         case 'guess':
@@ -50,13 +50,7 @@ async function runRequest(type, { filters, roundId, needsCountry, guess }, id, c
         case 'examples': {
             const places = round && round.id === roundId ? round.places : await getSetupPlaces(filters);
             if (cancelled()) return;
-            // Floyd sampling selects up to eight distinct indexes without scanning the pool.
-            const indexes = new Set();
-            for (let index = Math.max(0, places.length - 8); index < places.length; index++) {
-                const picked = Math.floor(Math.random() * (index + 1));
-                indexes.add(indexes.has(picked) ? index : picked);
-            }
-            return shuffle([...indexes].map(index => places[index]));
+            return samplePlaces(places, 8);
         }
         case 'search': {
             const places = await loadPlaces(filters.country);
@@ -153,12 +147,17 @@ function matchesFilters(place, country, start, end) {
     return city.startsWith(start) && city.endsWith(end);
 }
 
-function getSetupPlaces({ country, start, end }) {
-    const key = JSON.stringify([country, start, end]);
+function poolKey({ country, start, end }) {
+    return JSON.stringify([country, start, end]);
+}
+
+function getSetupPlaces(filters) {
+    const { country, start, end } = filters;
+    const key = poolKey(filters);
     if (setupPool?.key === key) return setupPool.promise;
 
     const promise = loadPlaces(country).then(async dictionary => {
-        if (country === 'any' && !start && !end) return dictionary;
+        if (!start && !end) return dictionary;
         const places = [];
         await visitInBatches(dictionary, place => {
             if (matchesFilters(place, country, start, end)) places.push(place);
@@ -191,14 +190,27 @@ async function indexRound(places, needsCountry, cancelled) {
     return groups;
 }
 
-async function searchPlaces(places, filters, cancelled) {
+async function searchPlaces(dictionary, filters, cancelled) {
     const { country, start, end, minLength, maxLength, includeTerms, excludeTerms } = filters;
+    const limit = 100;
+    const hasTerms = includeTerms.length > 0 || excludeTerms.length > 0;
+    const key = poolKey(filters);
+    let knownPool = null;
+    if (!start && !end) knownPool = dictionary;
+    else if (round?.key === key) knownPool = round.places;
+    else if (setupPool?.key === key) knownPool = await setupPool.promise;
+
+    if (cancelled()) return;
+    if (knownPool && !hasTerms && minLength === 0 && maxLength === Infinity) {
+        return samplePlaces(knownPool, limit);
+    }
+
     const results = [];
     let matches = 0;
-    await visitInBatches(places, place => {
-        if (!matchesFilters(place, country, start, end)) return;
+    await visitInBatches(knownPool ?? dictionary, place => {
+        if (!knownPool && !matchesFilters(place, country, start, end)) return;
         if (place.city.length < minLength || place.city.length > maxLength) return;
-        if (includeTerms.length || excludeTerms.length) {
+        if (hasTerms) {
             const city = place.city.toLowerCase();
             const name = place.country_name.toLowerCase();
             const matchesTerm = term => city.includes(term) || name.includes(term);
@@ -207,13 +219,23 @@ async function searchPlaces(places, filters, cancelled) {
 
         // Each match has the same chance of appearing in the bounded sample.
         matches++;
-        if (results.length < 100) results.push(place);
+        if (results.length < limit) results.push(place);
         else {
             const slot = Math.floor(Math.random() * matches);
             if (slot < results.length) results[slot] = place;
         }
     }, cancelled);
     return shuffle(results);
+}
+
+function samplePlaces(places, limit) {
+    // Floyd sampling draws distinct indexes with one lookup per result.
+    const indexes = new Set();
+    for (let index = Math.max(0, places.length - limit); index < places.length; index++) {
+        const picked = Math.floor(Math.random() * (index + 1));
+        indexes.add(indexes.has(picked) ? index : picked);
+    }
+    return shuffle([...indexes].map(index => places[index]));
 }
 
 function shuffle(places) {
