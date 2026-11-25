@@ -275,6 +275,44 @@
         #rulesBtn, #showSearchBtn, #searchBtn, #startBtn, #pauseBtn, #resetBtn, #displayBtn, #enterBtn {
             cursor: grab;
         }
+        .preferences-dialog {
+            width: min(29rem, calc(100% - 1.5rem));
+            max-height: calc(100dvh - 1.5rem);
+            padding: clamp(0.875rem, 4vw, 1.5rem);
+            border: 1px solid #bdd9eb;
+            border-radius: 1rem;
+            color: #24384a;
+            box-shadow: 0 16px 48px rgb(24 61 87 / 24%);
+        }
+        .preferences-dialog::backdrop {
+            background: rgb(22 53 79 / 38%);
+        }
+        .preferences-dialog h2 {
+            font-size: 1.375rem;
+            margin: 0;
+        }
+        .preferences-dialog h3 {
+            font-size: 1rem;
+            margin: 0 0 0.5rem;
+        }
+        .preferences-dialog section {
+            border-top: 1px solid #dbe9f3;
+            padding-block: 0.875rem;
+        }
+        .preferences-dialog form {
+            margin: 0;
+        }
+        .preferences-dialog .input-group .btn {
+            white-space: normal;
+        }
+        #savedScores {
+            max-height: 9rem;
+            overflow-y: auto;
+            padding-left: 1.25rem;
+        }
+        #preferencesStatus:empty {
+            margin: 0;
+        }
         #startBtn[aria-disabled="true"] {
             cursor: wait;
             opacity: 0.65;
@@ -435,6 +473,9 @@
                 <i class="fas fa-search" aria-hidden="true"></i>
                 <span class="panel-toggle-label"><span>Show Search</span><span>Hide Search</span></span>
             </button>
+            <button id="preferencesBtn" type="button" class="btn btn-outline-secondary" aria-haspopup="dialog">
+                <i class="fas fa-cog" aria-hidden="true"></i> Preferences
+            </button>
         </div>
 
 
@@ -474,11 +515,11 @@
                     </div>
                     <div class="col-6 search-detail">
                         <label for="searchIncludeInput" class="form-label">Include</label>
-                        <input type="text" id="searchIncludeInput" class="form-control" placeholder="e.g., new, park">
+                        <input type="text" id="searchIncludeInput" class="form-control" maxlength="256" placeholder="e.g., new, park">
                     </div>
                     <div class="col-6 search-detail">
                         <label for="searchExcludeInput" class="form-label">Don't Include</label>
-                        <input type="text" id="searchExcludeInput" class="form-control" placeholder="e.g., old, city">
+                        <input type="text" id="searchExcludeInput" class="form-control" maxlength="256" placeholder="e.g., old, city">
                     </div>
                     <div class="col-6 search-detail">
                         <label for="searchMinLengthInput" class="form-label">Min. characters</label>
@@ -592,7 +633,54 @@
         </div>
     </main>
 
+    <dialog id="preferencesDialog" class="preferences-dialog" aria-labelledby="preferencesTitle">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+            <h2 id="preferencesTitle">Preferences</h2>
+            <form method="dialog">
+                <button class="btn-close" aria-label="Close Preferences" autofocus></button>
+            </form>
+        </div>
+        <p class="small mb-3">Your filters and round progress are saved in this browser. Save a setup to use it again later.</p>
+        <section aria-labelledby="savedSetupsTitle">
+            <h3 id="savedSetupsTitle">Saved setups</h3>
+            <form id="saveSetupForm" class="mb-2">
+                <label for="setupName" class="form-label small">Setup name</label>
+                <div class="input-group input-group-sm">
+                    <input id="setupName" class="form-control" type="text" maxlength="48" required>
+                    <button class="btn btn-outline-primary">Save current setup</button>
+                </div>
+            </form>
+            <div id="savedSetupControls" hidden>
+                <label for="savedSetup" class="form-label small">Choose a setup</label>
+                <select id="savedSetup" class="form-select form-select-sm mb-2"></select>
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="loadSetupBtn" class="btn btn-outline-primary btn-sm" type="button">Load setup</button>
+                    <button id="deleteSetupBtn" class="btn btn-outline-secondary btn-sm" type="button">Delete setup</button>
+                </div>
+                <p id="loadSetupHint" class="small text-muted mt-2 mb-0" hidden>Finish or reset the current round to load a setup</p>
+            </div>
+            <p id="emptySetups" class="small text-muted mb-0">No saved setups yet</p>
+        </section>
+        <section aria-labelledby="scoreHistoryTitle">
+            <h3 id="scoreHistoryTitle">Recent scores</h3>
+            <p id="emptyScores" class="small text-muted mb-0">No completed rounds yet</p>
+            <ol id="savedScores" class="small mb-0" hidden></ol>
+        </section>
+        <section class="pb-0">
+            <button id="clearDataBtn" type="button" class="btn btn-outline-danger btn-sm" aria-controls="clearDataPrompt">Clear saved data</button>
+            <div id="clearDataPrompt" hidden>
+                <p class="small mb-2">Delete this game's preferences, saved setups, scores, and current round from this browser?</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button id="confirmClearDataBtn" class="btn btn-danger btn-sm" type="button">Delete saved data</button>
+                    <button id="cancelClearDataBtn" class="btn btn-outline-secondary btn-sm" type="button">Cancel</button>
+                </div>
+            </div>
+            <p id="preferencesStatus" class="small mt-2 mb-0" role="status"></p>
+        </section>
+    </dialog>
+
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
+    <script src="places-storage.js?v=1"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -608,14 +696,18 @@
         let nextRoundId = 0;
         let guessQueue = Promise.resolve();
         let wasGameActiveBeforeHidden = false;
-        let currentGameMode = 'placeAndCountry';
-        let restoringRound = false;
+        let restoringRound;
         let readingSavedState = false;
         let roundLoadState = 'idle';
         let roundJob;
 
         const catalog = JSON.parse(document.getElementById('countryCatalog').textContent);
         const countryIndexes = new Map(catalog.countries.map((country, index) => [country, index]));
+        const storage = createPlacesStorage(countryIndexes);
+        const legacyStorage = window.chrome?.storage?.local;
+        const legacyKeys = ['gameState', 'gameSettings', 'searchFilters'];
+        let savedSetups = [];
+        let scoreHistory = [];
         let placesWorker;
         let nextJobId = 0;
         const dictionaryStates = new Map();
@@ -655,6 +747,14 @@
         const searchStartLetterSelect = document.getElementById('searchStartLetterSelect');
         const searchEndLetterSelect = document.getElementById('searchEndLetterSelect');
         const searchCountrySelect = document.getElementById('searchCountrySelect');
+        const preferencesBtn = document.getElementById('preferencesBtn');
+        const preferencesDialog = document.getElementById('preferencesDialog');
+        const preferencesStatus = document.getElementById('preferencesStatus');
+        const setupName = document.getElementById('setupName');
+        const savedSetup = document.getElementById('savedSetup');
+        const loadSetupBtn = document.getElementById('loadSetupBtn');
+        const clearDataBtn = document.getElementById('clearDataBtn');
+        const clearDataPrompt = document.getElementById('clearDataPrompt');
 
         function setupIntegerInputValidation(inputElement) {
             inputElement.addEventListener('input', function() {
@@ -677,7 +777,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=3');
+            const worker = new Worker('places-worker.js?v=4');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -821,11 +921,11 @@
             countrySelect.addEventListener('change', handleCountryChangeAndSaveSettings);
             [letterSelect, endLetterSelect].forEach(select => {
                 select.addEventListener('change', () => {
-                    saveSettings();
+                    savePreferences();
                     refreshSetup();
                 });
             });
-            timeSelect.addEventListener('change', saveSettings);
+            timeSelect.addEventListener('change', savePreferences);
 
             searchBtn.addEventListener('click', performSearch);
             [searchIncludeInput, searchExcludeInput, searchMinLengthInput, searchMaxLengthInput].forEach(input => {
@@ -851,7 +951,6 @@
 
         function refreshSetup() {
             clearExamples();
-            readingSavedState = false;
             roundJob?.cancel();
             roundJob = undefined;
             setupCount = null;
@@ -865,9 +964,8 @@
         }
 
         function handleCountryChangeAndSaveSettings() {
-            currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
             updatePlaceInputPlaceholder();
-            saveSettings();
+            savePreferences();
             refreshSetup();
         }
 
@@ -878,7 +976,7 @@
 
         rulesBtn.addEventListener('click', function() {
             setPanelVisibility(rulesBtn, rulesContainer, rulesBtn.getAttribute('aria-expanded') === 'false');
-            saveGameState();
+            savePreferences();
         });
 
         showSearchBtn.addEventListener('click', function() {
@@ -887,7 +985,7 @@
             if (!open && cancelResults(searchResultsContainer)) {
                 showResultMessage(searchResultsContainer, 'Search results will appear here');
             }
-            saveGameState();
+            savePreferences();
         });
 
 
@@ -940,14 +1038,20 @@
             showGuessFeedback('');
         }
 
+        function newAttemptId() {
+            return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+
         async function prepareRound(starting = false) {
             const filters = roundFilters();
             const needsResume = restoringRound;
             const indexing = starting || needsResume;
             const round = {
                 id: ++nextRoundId,
+                attemptId: needsResume?.id ?? newAttemptId(),
+                setup: currentSettings(),
                 filters,
-                needsCountry: currentGameMode === 'placeAndCountry',
+                needsCountry: countrySelect.value === 'placeAndCountry',
                 guesses: new Set()
             };
             const minutes = Number(timeSelect.value);
@@ -958,28 +1062,33 @@
             }
 
             roundLoadState = 'loading';
-            const job = indexing ? indexRound(round) : requestPlaces('setup', { filters });
+            const job = indexing ? indexRound(round, needsResume?.guesses) : requestPlaces('setup', { filters });
             roundJob = job;
             updateStartButton();
             try {
-                const count = await job.promise;
+                const result = await job.promise;
                 if (roundJob !== job) return;
+                const count = needsResume ? result.count : result;
                 roundLoadState = 'idle';
                 roundJob = undefined;
                 setupCount = count;
                 if (indexing && count > 0) activeRound = round;
 
                 if (needsResume) {
-                    restoringRound = false;
+                    restoringRound = undefined;
                     if (count > 0) {
+                        for (const place of result.guesses) appendGuessedPlace(place, round.needsCountry);
+                        score = guessedPlaces.length;
+                        updateScoreDisplay();
                         pauseBtn.disabled = false;
+                        saveRound();
                     } else {
-                        // Older versions could save a running round with no eligible places.
+                        // A dictionary update can leave a restored setup with no eligible places.
                         pausedMs = 0;
                         updateTimerDisplay();
                         pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
                         setRoundSettingsDisabled(false);
-                        saveGameState();
+                        storage.remove('round');
                     }
                 }
                 if (starting) {
@@ -999,11 +1108,12 @@
             }
         }
 
-        function indexRound(round) {
+        function indexRound(round, savedGuesses) {
             round.index ??= requestPlaces('round', {
                 roundId: round.id,
                 filters: round.filters,
-                needsCountry: round.needsCountry
+                needsCountry: round.needsCountry,
+                savedGuesses
             });
             return round.index;
         }
@@ -1013,6 +1123,8 @@
             endLetterSelect.disabled = disabled;
             countrySelect.disabled = disabled;
             timeSelect.disabled = disabled;
+            loadSetupBtn.disabled = disabled;
+            document.getElementById('loadSetupHint').hidden = !disabled;
         }
 
         function setGuessingEnabled(enabled) {
@@ -1054,7 +1166,7 @@
             pausedMs = remainingMs;
             showPausedControls();
             updateTimerDisplay(remainingMs);
-            saveGameState();
+            saveRound();
         }
 
         function resumeRound() {
@@ -1068,7 +1180,7 @@
             pausedMs = 0;
             nextSaveAt = now + 5000;
             refreshTimer();
-            if (roundDeadline !== null) saveGameState();
+            if (roundDeadline !== null) saveRound();
         }
 
         pauseBtn.addEventListener('click', function() {
@@ -1077,20 +1189,15 @@
             else if (pausedMs > 0) resumeRound();
         });
 
-        resetBtn.addEventListener('click', function() {
+        function resetAttempt() {
+            if (readingSavedState) legacyStorage?.remove(['gameState']);
             stopTimer();
-            roundJob?.cancel();
-            roundJob = undefined;
             invalidateRound();
             score = 0;
             clearGuessedPlaces();
-            setupCount = null;
             wasGameActiveBeforeHidden = false;
-            restoringRound = false;
+            restoringRound = undefined;
             readingSavedState = false;
-            roundLoadState = 'idle';
-            cancelResults(searchResultsContainer);
-            clearExamples();
 
             updateTimerDisplay();
             updateScoreDisplay();
@@ -1101,33 +1208,15 @@
             pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
             placeInput.value = '';
 
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                chrome.storage.local.remove(['gameState', 'gameSettings', 'searchFilters']);
-            }
-            letterSelect.value = 'any';
-            endLetterSelect.value = 'any';
-            countrySelect.value = 'placeAndCountry';
-            timeSelect.value = '1';
-            currentGameMode = 'placeAndCountry';
-            updatePlaceInputPlaceholder();
+            const cleared = storage.remove('round');
+            refreshSetup();
+            return cleared;
+        }
 
-            searchStartLetterSelect.value = 'any';
-            searchEndLetterSelect.value = 'any';
-            searchCountrySelect.value = 'any';
-            searchIncludeInput.value = '';
-            searchExcludeInput.value = '';
-            searchMinLengthInput.value = '';
-            searchMaxLengthInput.value = '';
-            validateSearchLengthRange();
-            showResultMessage(searchResultsContainer, 'Search results will appear here');
-            setPanelVisibility(rulesBtn, rulesContainer, false);
-            setPanelVisibility(showSearchBtn, searchContainer, false);
-            if (dictionaryReady('any')) prepareRound();
-            else updateStartButton();
-        });
+        resetBtn.addEventListener('click', resetAttempt);
 
         function updatePlaceInputPlaceholder() {
-            if (currentGameMode === 'placeAndCountry') {
+            if (countrySelect.value === 'placeAndCountry') {
                 placeInput.placeholder = 'e.g., Paris, France';
             } else {
                 placeInput.placeholder = 'Enter a place name';
@@ -1199,7 +1288,8 @@
                 score++;
                 updateScoreDisplay();
                 reportGuess(submission, 'Counted', true);
-                if (getRemainingMs() > 0) saveGameState();
+                if (getRemainingMs() > 0) saveRound();
+                else if (round.finishedAt) recordScore(round);
             });
         }
 
@@ -1270,7 +1360,7 @@
             if (cancelResults(searchResultsContainer)) {
                 showResultMessage(searchResultsContainer, 'Search results will appear here');
             }
-            saveSearchFilters();
+            savePreferences();
         }
 
         function searchTerms(input) {
@@ -1333,8 +1423,10 @@
             pauseBtn.disabled = true;
             setRoundSettingsDisabled(false);
             updateStartButton();
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                chrome.storage.local.remove(['gameState']);
+            storage.remove('round');
+            if (activeRound && !activeRound.finishedAt) {
+                activeRound.finishedAt = Date.now();
+                recordScore(activeRound);
             }
         }
 
@@ -1350,7 +1442,7 @@
 
             updateTimerDisplay(remainingMs);
             if (now >= nextSaveAt) {
-                saveGameState(remainingMs);
+                saveRound(remainingMs);
                 nextSaveAt = now + 5000;
             }
 
@@ -1394,112 +1486,257 @@
             return true;
         }
 
-        function saveGameState(remainingMs = getRemainingMs()) {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                if (roundDeadline !== null && remainingMs === 0) {
-                    finishRound();
-                    return;
-                }
-                const gameState = {
-                    remainingMs,
-                    timeLeft: Math.ceil(remainingMs / 1000),
-                    score: score,
-                    guessedPlaces: guessedPlaces,
-                    gameActive: roundDeadline !== null,
-                    wasGameActiveBeforeHidden: wasGameActiveBeforeHidden,
-                    isRulesVisible: !rulesContainer.hidden,
-                    isSearchVisible: !searchContainer.hidden
-                };
-                chrome.storage.local.set({ gameState: gameState });
-            }
+        function currentSettings() {
+            return {
+                country: countrySelect.value,
+                start: letterSelect.value,
+                end: endLetterSelect.value,
+                minutes: timeSelect.value
+            };
         }
 
-        function saveSettings() {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                const gameSettings = {
-                    selectedCountryValue: countrySelect.value,
-                    letter: letterSelect.value,
-                    endLetter: endLetterSelect.value,
-                    timeLimit: timeSelect.value
-                };
-                chrome.storage.local.set({ gameSettings: gameSettings });
-            }
+        function applySettings(setup) {
+            countrySelect.value = setup.country;
+            letterSelect.value = setup.start;
+            endLetterSelect.value = setup.end;
+            timeSelect.value = setup.minutes;
+            updatePlaceInputPlaceholder();
         }
 
-         function saveSearchFilters() {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                const searchFilters = {
-                    startLetter: searchStartLetterSelect.value,
-                    endLetter: searchEndLetterSelect.value,
+        function savePreferences() {
+            return storage.write('preferences', {
+                setup: currentSettings(),
+                search: {
                     country: searchCountrySelect.value,
-                    includeTerm: searchIncludeInput.value,
-                    excludeTerm: searchExcludeInput.value,
-                    minLength: searchMinLengthInput.value,
-                    maxLength: searchMaxLengthInput.value
-                };
-                chrome.storage.local.set({ searchFilters: searchFilters });
-            }
+                    start: searchStartLetterSelect.value,
+                    end: searchEndLetterSelect.value,
+                    include: searchIncludeInput.value,
+                    exclude: searchExcludeInput.value,
+                    min: searchMinLengthInput.value,
+                    max: searchMaxLengthInput.value
+                },
+                showRules: !rulesContainer.hidden,
+                showSearch: !searchContainer.hidden,
+                presets: savedSetups
+            });
         }
 
+        function applyPreferences(preferences) {
+            const { setup, search, showRules, showSearch, presets } = preferences;
+            applySettings(setup);
+            searchCountrySelect.value = search.country;
+            searchStartLetterSelect.value = search.start;
+            searchEndLetterSelect.value = search.end;
+            searchIncludeInput.value = search.include;
+            searchExcludeInput.value = search.exclude;
+            searchMinLengthInput.value = search.min;
+            searchMaxLengthInput.value = search.max;
+            validateSearchLengthRange();
+            setPanelVisibility(rulesBtn, rulesContainer, showRules);
+            setPanelVisibility(showSearchBtn, searchContainer, showSearch);
+            savedSetups = presets;
+        }
+
+        function saveRound(remainingMs = getRemainingMs()) {
+            if (!activeRound) return;
+            if (remainingMs === 0) {
+                if (roundDeadline !== null) finishRound();
+                return;
+            }
+            storage.write('round', {
+                id: activeRound.attemptId,
+                setup: activeRound.setup,
+                remainingMs,
+                guesses: guessedPlaces
+            });
+        }
+
+        function recordScore(round) {
+            const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score };
+            const recent = storage.available ? storage.read('history') ?? scoreHistory : scoreHistory;
+            scoreHistory = [entry, ...recent.filter(item => item.id !== entry.id)]
+                .sort((a, b) => b.finishedAt - a.finishedAt).slice(0, 20);
+            storage.write('history', scoreHistory);
+            if (preferencesDialog.open) renderScores();
+        }
+
+        function restoreGame(preferences, savedRound) {
+            applyPreferences(preferences ?? storage.normalize.preferences());
+            if (!savedRound) {
+                refreshSetup();
+                return;
+            }
+
+            applySettings(savedRound.setup);
+            pausedMs = savedRound.remainingMs;
+            restoringRound = savedRound;
+            updateTimerDisplay();
+            showPausedControls();
+            pauseBtn.disabled = true;
+            setRoundSettingsDisabled(true);
+            prepareRound();
+        }
 
         function loadGameState() {
-            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-                updatePlaceInputPlaceholder();
-                updateStartButton();
+            const preferences = storage.read('preferences');
+            scoreHistory = storage.read('history') ?? [];
+            const savedRound = storage.read('round');
+            if (!legacyStorage || (preferences && savedRound)) {
+                restoreGame(preferences, savedRound);
                 return;
             }
 
             readingSavedState = true;
             updateStartButton();
-            chrome.storage.local.get(['gameState', 'gameSettings', 'searchFilters'], function(result) {
+            legacyStorage.get(legacyKeys, (result = {}) => {
                 if (!readingSavedState) return;
                 readingSavedState = false;
-                const settings = result.gameSettings || {};
-                const selection = settings.selectedCountryValue;
-                countrySelect.value = selection === 'any' || countryIndexes.has(selection) ? selection : 'placeAndCountry';
-                letterSelect.value = settings.letter || 'any';
-                endLetterSelect.value = settings.endLetter || 'any';
-                timeSelect.value = settings.timeLimit || '1';
-                currentGameMode = countrySelect.value === 'placeAndCountry' ? 'placeAndCountry' : 'placeOnly';
-                updatePlaceInputPlaceholder();
+                const round = result.gameState;
+                const setup = result.gameSettings;
+                const filters = result.searchFilters;
+                const current = storage.read('preferences');
+                let imported = current ?? preferences;
+                let resumable = savedRound;
+                const migrated = [];
 
-                const search = result.searchFilters || {};
-                searchStartLetterSelect.value = search.startLetter || 'any';
-                searchEndLetterSelect.value = search.endLetter || 'any';
-                searchCountrySelect.value = countryIndexes.has(search.country) ? search.country : 'any';
-                searchIncludeInput.value = search.includeTerm || '';
-                searchExcludeInput.value = search.excludeTerm || '';
-                searchMinLengthInput.value = search.minLength || '';
-                searchMaxLengthInput.value = search.maxLength || '';
-                validateSearchLengthRange();
-
-                if (result.gameState) {
-                    const saved = result.gameState;
-                    const savedMs = saved.remainingMs ?? (saved.timeLeft || 0) * 1000;
-                    pausedMs = Number.isFinite(savedMs) ? Math.max(0, savedMs) : 0;
-                    score = saved.score || 0;
-                    for (const place of saved.guessedPlaces || []) {
-                        appendGuessedPlace(place, currentGameMode === 'placeAndCountry');
-                    }
-                    setPanelVisibility(rulesBtn, rulesContainer, saved.isRulesVisible);
-                    setPanelVisibility(showSearchBtn, searchContainer, saved.isSearchVisible);
-                    updateTimerDisplay();
-                    updateScoreDisplay();
+                if (!imported && (setup || filters || round)) {
+                    imported = storage.normalize.preferences({
+                        setup: {
+                            country: setup?.selectedCountryValue,
+                            start: setup?.letter,
+                            end: setup?.endLetter,
+                            minutes: setup?.timeLimit
+                        },
+                        search: {
+                            country: filters?.country,
+                            start: filters?.startLetter,
+                            end: filters?.endLetter,
+                            include: filters?.includeTerm,
+                            exclude: filters?.excludeTerm,
+                            min: filters?.minLength,
+                            max: filters?.maxLength
+                        },
+                        showRules: round?.isRulesVisible,
+                        showSearch: round?.isSearchVisible
+                    });
+                    if (storage.write('preferences', imported)) migrated.push('gameSettings', 'searchFilters');
                 }
-
-                if (pausedMs > 0) {
-                    restoringRound = true;
-                    showPausedControls();
-                    pauseBtn.disabled = true;
-                    setRoundSettingsDisabled(true);
-                    prepareRound();
-                } else if (roundFilters().country !== 'any' || dictionaryReady('any')) {
-                    prepareRound();
-                } else {
-                    updateStartButton();
+                if (!resumable && round) {
+                    resumable = storage.normalize.round({
+                        id: newAttemptId(),
+                        setup: imported?.setup,
+                        remainingMs: round.remainingMs ?? Number(round.timeLeft) * 1000,
+                        guesses: round.guessedPlaces ?? []
+                    });
+                    if (resumable && storage.write('round', resumable)) migrated.push('gameState');
                 }
+                if (migrated.length) legacyStorage.remove(migrated);
+                restoreGame(imported, resumable);
             });
         }
+
+        function renderSavedSetups(selection = savedSetup.value) {
+            const options = savedSetups.map(({ name }) => new Option(name, name.toLowerCase()));
+            savedSetup.replaceChildren(...options);
+            if (savedSetups.some(({ name }) => name.toLowerCase() === selection)) savedSetup.value = selection;
+            document.getElementById('savedSetupControls').hidden = !savedSetups.length;
+            document.getElementById('emptySetups').hidden = Boolean(savedSetups.length);
+        }
+
+        function renderScores() {
+            const savedScores = document.getElementById('savedScores');
+            const dates = new Intl.DateTimeFormat(undefined, { dateStyle: 'short' });
+            savedScores.replaceChildren(...scoreHistory.map(({ score, setup, finishedAt }) => {
+                const item = document.createElement('li');
+                const country = { placeAndCountry: 'Place and Country', any: 'Any Country' }[setup.country] ?? setup.country;
+                const letters = [setup.start === 'any' ? '–' : setup.start, setup.end === 'any' ? '–' : setup.end];
+                const filter = letters.every(letter => letter === '–') ? '' : ` · ${letters.join(' → ')}`;
+                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country} · ${setup.minutes} min${filter} · ${dates.format(finishedAt)}`;
+                return item;
+            }));
+            savedScores.hidden = !scoreHistory.length;
+            document.getElementById('emptyScores').hidden = Boolean(scoreHistory.length);
+        }
+
+        function setClearPrompt(visible) {
+            clearDataPrompt.hidden = !visible;
+            clearDataBtn.hidden = visible;
+        }
+
+        const storageWarning = 'This browser is blocking game storage. Changes may be lost when you leave';
+
+        preferencesBtn.addEventListener('click', () => {
+            renderSavedSetups();
+            if (storage.available) scoreHistory = storage.read('history') ?? scoreHistory;
+            renderScores();
+            setClearPrompt(false);
+            preferencesStatus.textContent = storage.available ? '' : storageWarning;
+            preferencesDialog.showModal();
+        });
+
+        document.getElementById('saveSetupForm').addEventListener('submit', event => {
+            event.preventDefault();
+            const name = setupName.value.trim();
+            if (!name) {
+                preferencesStatus.textContent = 'Enter a name for this setup';
+                setupName.focus();
+                return;
+            }
+
+            const key = name.toLowerCase();
+            const index = savedSetups.findIndex(preset => preset.name.toLowerCase() === key);
+            if (index === -1 && savedSetups.length >= 12) {
+                preferencesStatus.textContent = 'Delete a setup before saving another';
+                return;
+            }
+
+            const setup = { name, setup: currentSettings() };
+            if (index === -1) savedSetups.push(setup);
+            else savedSetups[index] = setup;
+            preferencesStatus.textContent = savePreferences() ? `Saved ${name}` : storageWarning;
+            setupName.value = '';
+            renderSavedSetups(key);
+        });
+
+        loadSetupBtn.addEventListener('click', () => {
+            const preset = savedSetups.find(({ name }) => name.toLowerCase() === savedSetup.value);
+            if (!preset || loadSetupBtn.disabled) return;
+            applySettings(preset.setup);
+            refreshSetup();
+            preferencesStatus.textContent = savePreferences() ? `Loaded ${preset.name}` : storageWarning;
+        });
+
+        document.getElementById('deleteSetupBtn').addEventListener('click', () => {
+            savedSetups = savedSetups.filter(({ name }) => name.toLowerCase() !== savedSetup.value);
+            preferencesStatus.textContent = savePreferences() ? 'Setup deleted' : storageWarning;
+            renderSavedSetups();
+            if (!savedSetups.length) setupName.focus();
+        });
+
+        clearDataBtn.addEventListener('click', () => {
+            setClearPrompt(true);
+            document.getElementById('cancelClearDataBtn').focus();
+        });
+
+        document.getElementById('cancelClearDataBtn').addEventListener('click', () => {
+            setClearPrompt(false);
+            clearDataBtn.focus();
+        });
+
+        document.getElementById('confirmClearDataBtn').addEventListener('click', () => {
+            legacyStorage?.remove(legacyKeys);
+            scoreHistory = [];
+            applyPreferences(storage.normalize.preferences());
+            cancelResults(searchResultsContainer);
+            showResultMessage(searchResultsContainer, 'Search results will appear here');
+            const cleared = [resetAttempt(), storage.remove('preferences'), storage.remove('history')].every(Boolean);
+            setupName.value = '';
+            renderSavedSetups();
+            renderScores();
+            setClearPrompt(false);
+            clearDataBtn.focus();
+            preferencesStatus.textContent = cleared ? 'Saved game data cleared' : 'This browser blocked access to saved data';
+        });
 
         enterBtn.addEventListener('click', enterPlace);
         placeInput.addEventListener('input', () => {
@@ -1520,11 +1757,15 @@
                     clearTimeout(timer);
                     refreshTimer();
                 }
-            } else if (roundDeadline !== null && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            } else if (roundDeadline !== null && legacyStorage) {
                 wasGameActiveBeforeHidden = true;
                 pauseRound();
+            } else if (document.hidden) {
+                saveRound();
             }
         });
+
+        window.addEventListener('pagehide', () => saveRound());
 
         initGame();
     </script>

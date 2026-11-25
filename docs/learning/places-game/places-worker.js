@@ -33,7 +33,7 @@ self.addEventListener('message', async ({ data: { id, type, ...payload } }) => {
     }
 });
 
-async function runRequest(type, { filters, roundId, needsCountry, guess, includeFeedback }, id, cancelled) {
+async function runRequest(type, { filters, roundId, needsCountry, guess, includeFeedback, savedGuesses }, id, cancelled) {
     switch (type) {
         case 'setup':
             return (await getSetupPlaces(filters)).length;
@@ -41,7 +41,16 @@ async function runRequest(type, { filters, roundId, needsCountry, guess, include
             const places = await getSetupPlaces(filters);
             if (cancelled()) return;
             const groups = await indexRound(places, needsCountry, cancelled);
-            if (!cancelled()) round = { id: roundId, key: poolKey(filters), places, groups, needsCountry };
+            if (cancelled()) return;
+            round = { id: roundId, key: poolKey(filters), places, groups, needsCountry };
+            if (savedGuesses) {
+                const guesses = savedGuesses.flatMap(({ city, country }) => {
+                    const group = groups.get(needsCountry ? country.toLowerCase() : '');
+                    const place = places[group?.byName.get(city.toLowerCase())];
+                    return place ? [{ city: place.city, country: place.country_name }] : [];
+                });
+                return { count: places.length, guesses };
+            }
             return places.length;
         }
         case 'guess': {
