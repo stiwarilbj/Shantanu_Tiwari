@@ -12,7 +12,7 @@ Watch blobs hunt, gather food, and pass on traits like size and speed. Build a s
 
 ### [Place Naming Game](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/places-game/)
 
-Race the clock or practice at your own pace by naming places with or without their countries. Pick your filters, spelling rules, and hints, then save up to five favorite setups in Preferences. Open Round review to see what scored, find out why a place missed your filters, or try the same setup again.
+Race the clock or practice at your own pace by naming places with or without their countries. Pick your filters and spelling rules, then save your favorite setups in Preferences. Check the scorebook for your personal bests or open Round review to see what scored.
 
 ## [Games](https://stiwarilbj.github.io/Shantanu_Tiwari/games/)
 

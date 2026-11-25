@@ -6,6 +6,8 @@ Choose **Untimed practice** under **Time Limit** to play with the same filters a
 
 After a timed round or practice session, open **Round review** to see which guesses scored as typed, which needed a spelling correction, and which were already counted. If the game recognizes a place ruled out by your country or letter filters, it explains why. Choose **Retry same setup** to start a fresh round with the same rules.
 
+Open **Scorebook** in Preferences to see your best scores and five recent attempts for each challenge. A challenge uses the same timer, country or answer mode, letter filters, and spelling rules. Rounds where you revealed a clue, examples, or Search results have a separate best score. Older rounds without a hint record still appear with **Hint use unknown**. Beat a known best and **Round review** shows the improvement.
+
 In Preferences, choose **Examples** to see place names, **Clues only** to get the country and letter count of an unguessed answer, or **After the round** to open Search and examples once you finish. Spaces and punctuation don't count toward a clue's letter count. Choose your hint mode before starting a round.
 
 In Preferences, name your settings and select **Save current setup** to keep up to five favorites. Select a saved name to fill in the country or mode, letters, time limit, spelling, and hints before you start. To update a favorite, save again under the same name.

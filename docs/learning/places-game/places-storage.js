@@ -28,7 +28,9 @@ function createPlacesStorage(countries) {
     function checkedSettings(value) {
         if (!isObject(value)) return null;
         const valid = settings(value);
-        return ['country', 'start', 'end', 'minutes'].every(key => valid[key] === value[key]) ? valid : null;
+        const validRequired = ['country', 'start', 'end', 'minutes'].every(key => valid[key] === value[key]);
+        const validSpelling = value.spelling === undefined || valid.spelling === value.spelling;
+        return validRequired && validSpelling ? valid : null;
     }
 
     function boundedText(value, limit) {
@@ -72,17 +74,54 @@ function createPlacesStorage(countries) {
         return typeof id === 'string' && /^[a-z\d-]{1,64}$/i.test(id);
     }
 
+    function checkedAssists(value) {
+        if (!Array.isArray(value) || value.some(aid => !['clue', 'examples', 'search'].includes(aid))) return null;
+        return [...new Set(value)];
+    }
+
+    function challengeKey({ country, start, end, minutes, spelling }) {
+        return JSON.stringify([country, start, end, minutes, spelling]);
+    }
+
+    function scoreCategory(assists) {
+        return assists === null ? 'unknown' : assists.length ? 'assisted' : 'unassisted';
+    }
+
+    function groupScores(entries) {
+        const groups = new Map();
+        for (const entry of entries) {
+            const key = challengeKey(entry.setup);
+            let group = groups.get(key);
+            if (!group) {
+                group = { setup: entry.setup, recent: [], best: {} };
+                groups.set(key, group);
+            }
+            if (group.recent.length < 5) group.recent.push(entry);
+            const category = scoreCategory(entry.assists);
+            if (entry.score > (group.best[category]?.score ?? -1)) group.best[category] = entry;
+        }
+        return groups;
+    }
+
     function history(value, practice = false) {
         if (!Array.isArray(value)) return [];
-        return value.slice(0, 50).flatMap(entry => {
+        const knownIds = new Set();
+        const entries = value.flatMap(entry => {
             const setup = checkedSettings(entry?.setup);
-            if (!setup || (setup.minutes === 'practice') !== practice || !validID(entry.id) ||
+            if (!setup || (setup.minutes === 'practice') !== practice || !validID(entry.id) || knownIds.has(entry.id) ||
                 !Number.isSafeInteger(entry.score) || entry.score < 0 || entry.score > 150_000 ||
                 !Number.isSafeInteger(entry.finishedAt) || entry.finishedAt <= 0 || entry.finishedAt > 8.64e15) {
                 return [];
             }
-            return [{ id: entry.id, score: entry.score, finishedAt: entry.finishedAt, setup }];
-        }).slice(0, 20);
+            knownIds.add(entry.id);
+            return [{ id: entry.id, score: entry.score, finishedAt: entry.finishedAt, setup, assists: checkedAssists(entry.assists) }];
+        }).sort((a, b) => b.finishedAt - a.finishedAt);
+        // Keep the recent history, five attempts per challenge, and older personal bests.
+        const retained = new Set(entries.slice(0, 20));
+        for (const { recent, best } of groupScores(entries).values()) {
+            for (const entry of [...recent, ...Object.values(best)]) retained.add(entry);
+        }
+        return entries.filter(entry => retained.has(entry));
     }
 
     function round(value) {
@@ -103,7 +142,8 @@ function createPlacesStorage(countries) {
                     !countries.has(place.country)) return [];
                 return [{ city: place.city, country: place.country }];
             }),
-            attempts: checkedAttempts(value.attempts)
+            attempts: checkedAttempts(value.attempts),
+            assists: checkedAssists(value.assists)
         };
     }
 
@@ -119,6 +159,9 @@ function createPlacesStorage(countries) {
 
     return {
         normalize: { preferences, history, 'practice-history': value => history(value, true), round },
+        challengeKey,
+        groupScores,
+        scoreCategory,
         available: true,
 
         read(record) {

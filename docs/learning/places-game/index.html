@@ -335,9 +335,11 @@
             text-align: start;
         }
         .score-history {
-            max-height: 9rem;
+            padding-inline-start: 1.25rem;
+        }
+        .all-score-history .score-history {
+            max-block-size: 9rem;
             overflow-y: auto;
-            padding-left: 1.25rem;
         }
         #preferencesStatus:empty {
             margin: 0;
@@ -689,6 +691,7 @@
                 <details id="roundReview" class="round-review" hidden>
                     <summary>Round review</summary>
                     <div class="mt-2 small">
+                        <p id="reviewBest" class="text-success fw-semibold mb-2" hidden></p>
                         <p id="reviewNote" class="text-muted mb-2" role="status"></p>
                         <ol id="reviewAttempts" class="round-review-list list-group list-group-numbered mb-2"
                             aria-label="Submitted guesses" tabindex="0" hidden></ol>
@@ -740,15 +743,26 @@
             <p id="emptySetups" class="small text-muted mb-0">No saved setups yet</p>
             <p id="setupStatus" class="filter-feedback" role="status"></p>
         </section>
-        <section aria-labelledby="scoreHistoryTitle">
-            <h3 id="scoreHistoryTitle">Timed scores</h3>
-            <p id="emptyScores" class="small text-muted mb-0">No completed timed rounds yet</p>
-            <ol id="savedScores" class="score-history small mb-0" hidden></ol>
-        </section>
-        <section aria-labelledby="practiceHistoryTitle">
-            <h3 id="practiceHistoryTitle">Practice scores</h3>
-            <p id="emptyPracticeScores" class="small text-muted mb-0">No completed practice rounds yet</p>
-            <ol id="savedPracticeScores" class="score-history small mb-0" hidden></ol>
+        <section aria-labelledby="scorebookTitle">
+            <h3 id="scorebookTitle">Scorebook</h3>
+            <p class="small text-muted mb-2">Personal bests and the last five attempts for each challenge</p>
+            <label for="scorebookSetup" class="form-label small mb-1">Challenge</label>
+            <select id="scorebookSetup" class="form-select form-select-sm mb-2"></select>
+            <div id="scorebookSummary" aria-live="polite">
+                <p id="scorebookEmpty" class="small text-muted mb-0">No completed rounds for this challenge yet</p>
+                <ul id="scorebookBests" class="list-unstyled small mb-2" hidden></ul>
+            </div>
+            <h4 id="scorebookRecentTitle" class="small fw-semibold mb-1" hidden>Recent attempts</h4>
+            <ol id="scorebookRecent" class="score-history small mb-0" aria-labelledby="scorebookRecentTitle" hidden></ol>
+            <details class="all-score-history small mt-2">
+                <summary>All recent scores</summary>
+                <h4 class="small fw-semibold mt-2 mb-1">Timed scores</h4>
+                <p id="emptyScores" class="text-muted mb-2">No completed timed rounds yet</p>
+                <ol id="savedScores" class="score-history mb-2" hidden></ol>
+                <h4 class="small fw-semibold mb-1">Practice scores</h4>
+                <p id="emptyPracticeScores" class="text-muted mb-0">No completed practice rounds yet</p>
+                <ol id="savedPracticeScores" class="score-history mb-0" hidden></ol>
+            </details>
         </section>
         <section class="pb-0">
             <button id="clearDataBtn" type="button" class="btn btn-outline-danger btn-sm" aria-controls="clearDataPrompt">Clear saved data</button>
@@ -764,7 +778,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=6"></script>
+    <script src="places-storage.js?v=7"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -831,6 +845,8 @@
         const guessedPlacesContainer = document.getElementById('guessedPlaces');
         const examplePlacesContainer = document.getElementById('examplePlaces');
         const roundReview = document.getElementById('roundReview');
+        const reviewBest = document.getElementById('reviewBest');
+        const scorebookSetup = document.getElementById('scorebookSetup');
         const reviewNote = document.getElementById('reviewNote');
         const reviewAttempts = document.getElementById('reviewAttempts');
         const reviewFilters = document.getElementById('reviewFilters');
@@ -1122,6 +1138,7 @@
             if (!open && cancelResults(searchResultsContainer)) {
                 showResultMessage(searchResultsContainer, 'Search results will appear here');
             }
+            if (open && searchResultsContainer.querySelector('.place-item')) markRoundAid('search');
             savePreferences();
         });
 
@@ -1216,6 +1233,7 @@
                 needsCountry: countrySelect.value === 'placeAndCountry',
                 guesses: new Set(),
                 attempts: needsResume?.attempts ?? [],
+                assists: needsResume ? needsResume.assists : [],
                 playing: false
             };
             if (starting) {
@@ -1319,6 +1337,7 @@
             updatePlaceInputPlaceholder();
 
             resumeRound();
+            if (!searchContainer.hidden && searchResultsContainer.querySelector('.place-item')) markRoundAid('search');
         }
 
         function pauseRound() {
@@ -1520,7 +1539,10 @@
                 const results = await job.promise;
                 if (resultRequests.get(container) !== job) return;
                 if (results.length === 0) showResultMessage(container, emptyMessage);
-                else render(container, results);
+                else {
+                    render(container, results);
+                    if (type !== 'clue') markRoundAid(type);
+                }
                 if (type !== 'search') container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch {
                 if (resultRequests.get(container) === job) {
@@ -1572,6 +1594,13 @@
                 'No places found matching your criteria', performSearch);
         }
 
+        function markRoundAid(aid) {
+            if (!roundIsOpen() || activeRound.finishing || activeRound.assists?.includes(aid) ||
+                (roundDeadline !== null && getRemainingMs() === 0)) return;
+            (activeRound.assists ??= []).push(aid);
+            saveRound();
+        }
+
         function showExamples() {
             if (displayBtn.disabled) return;
             const round = roundIsOpen() ? activeRound : undefined;
@@ -1599,6 +1628,7 @@
                         return;
                     }
                     shownClueKey = clue.answerKey;
+                    markRoundAid('clue');
                     const letters = clue.letters === 1 ? 'letter' : 'letters';
                     showResultMessage(container, `A place in ${clue.country} with ${clue.letters} ${letters}`);
                 });
@@ -1660,6 +1690,7 @@
             updateStartButton();
             discardSavedRound(activeRound?.attemptId);
             recordScore(activeRound);
+            reviewBest.hidden = true;
             reviewNote.hidden = false;
             reviewNote.textContent = 'Checking your last guesses…';
             reviewAttempts.hidden = true;
@@ -1711,6 +1742,11 @@
             reviewNote.textContent = reviewedPoints < score ? 'Earlier guesses are listed under Guessed Places.'
                 : round.attempts.length ? '' : 'No guesses were submitted this round.';
             reviewNote.hidden = !reviewNote.textContent;
+            if (Number.isInteger(round.previousBest) && score > round.previousBest) {
+                const category = round.assists.length ? 'with hints' : 'without hints';
+                reviewBest.textContent = `New personal best ${category} · ${pointsLabel(score)}, up from ${round.previousBest}`;
+                reviewBest.hidden = false;
+            }
             retryRoundBtn.disabled = false;
             const { country, start, end } = round.filters;
             if (misses.size && (country !== 'any' || start || end)) explainReviewMisses(round, misses);
@@ -1893,7 +1929,8 @@
                 setup: activeRound.setup,
                 remainingMs: practice ? null : remainingMs,
                 guesses: guessedPlaces,
-                attempts: activeRound.attempts
+                attempts: activeRound.attempts,
+                assists: activeRound.assists
             });
         }
 
@@ -1902,13 +1939,19 @@
         }
 
         function recordScore(round) {
-            const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score };
+            const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score, assists: round.assists };
             const record = round.setup.minutes === 'practice' ? 'practice-history' : 'history';
-            const recent = (storage.available ? storage.read(record) : null) ?? scoreHistories[record];
-            scoreHistories[record] = [entry, ...recent.filter(item => item.id !== entry.id)]
-                .sort((a, b) => b.finishedAt - a.finishedAt).slice(0, 20);
+            const history = (storage.available ? storage.read(record) : null) ?? scoreHistories[record];
+            const earlier = history.filter(item => item.id !== entry.id);
+            if (round.previousBest === undefined) {
+                const category = storage.scoreCategory(entry.assists);
+                const key = storage.challengeKey(entry.setup);
+                const best = storage.groupScores(earlier).get(key)?.best[category];
+                round.previousBest = category === 'unknown' ? null : best?.score ?? null;
+            }
+            scoreHistories[record] = storage.normalize[record]([entry, ...earlier]);
             storage.write(record, scoreHistories[record]);
-            if (preferencesDialog.open) renderScores();
+            if (preferencesDialog.open) renderScorebook(scorebookSetup.value);
         }
 
         function loadScoreHistories() {
@@ -2045,27 +2088,80 @@
             setupStatus.textContent = message;
         }
 
-        function renderScores() {
+        const scoreDates = new Intl.DateTimeFormat(undefined, { dateStyle: 'short' });
+        const aidLabels = { clue: 'Clues', examples: 'Examples', search: 'Search' };
+
+        function challengeLabel(setup) {
+            const country = { placeAndCountry: 'Place and Country', any: 'Any Country' }[setup.country] ?? setup.country;
+            const time = setup.minutes === 'practice' ? 'Untimed practice' : `${setup.minutes} min`;
+            const spelling = spellingSelect.querySelector(`[value="${setup.spelling}"]`).textContent;
+            const letters = setup.start === 'any' && setup.end === 'any' ? '' :
+                ` · ${setup.start === 'any' ? 'Any' : setup.start} → ${setup.end === 'any' ? 'Any' : setup.end}`;
+            return `${country}${letters} · ${spelling} · ${time}`;
+        }
+
+        function renderScorebook(preferred) {
+            const current = currentSettings();
+            const currentKey = storage.challengeKey(current);
+            const groups = storage.groupScores(Object.values(scoreHistories).flat());
+            const options = [new Option(`Current setup · ${challengeLabel(current)}`, currentKey)];
+            for (const [key, group] of groups) {
+                if (key !== currentKey) options.push(new Option(challengeLabel(group.setup), key));
+            }
+            scorebookSetup.replaceChildren(...options);
+            scorebookSetup.value = groups.has(preferred) ? preferred : currentKey;
+            renderScorebookChallenge(groups.get(scorebookSetup.value));
             renderScoreHistory('savedScores', 'emptyScores', scoreHistories.history);
             renderScoreHistory('savedPracticeScores', 'emptyPracticeScores', scoreHistories['practice-history']);
         }
 
+        function renderScorebookChallenge(group) {
+            document.getElementById('scorebookEmpty').hidden = Boolean(group);
+            const bests = document.getElementById('scorebookBests');
+            const recent = document.getElementById('scorebookRecent');
+            bests.hidden = recent.hidden = document.getElementById('scorebookRecentTitle').hidden = !group;
+            const bestLabels = { unassisted: 'Best without hints', assisted: 'Best with hints', unknown: 'Best with hint use unknown' };
+            const bestRows = group ? Object.entries(bestLabels).flatMap(([category, label]) => {
+                const best = group.best[category];
+                if (!best) return [];
+                const row = document.createElement('li');
+                const heading = document.createElement('strong');
+                heading.textContent = label;
+                row.append(heading, ` · ${pointsLabel(best.score)}`);
+                return [row];
+            }) : [];
+            bests.replaceChildren(...bestRows);
+            recent.replaceChildren(...(group?.recent ?? []).map(entry => {
+                const row = document.createElement('li');
+                row.textContent = `${pointsLabel(entry.score)} · ${assistsLabel(entry.assists)} · ${scoreDates.format(entry.finishedAt)}`;
+                return row;
+            }));
+        }
+
+        function pointsLabel(score) {
+            return `${score} ${score === 1 ? 'point' : 'points'}`;
+        }
+
+        function assistsLabel(assists) {
+            if (assists === null) return 'Hint use unknown';
+            return assists.length ? assists.map(aid => aidLabels[aid]).join(', ') : 'No hints';
+        }
+
         function renderScoreHistory(listId, emptyId, entries) {
             const list = document.getElementById(listId);
-            const dates = new Intl.DateTimeFormat(undefined, { dateStyle: 'short' });
-            list.replaceChildren(...entries.map(({ score, setup, finishedAt }) => {
-                const item = document.createElement('li');
-                const country = { placeAndCountry: 'Place and Country', any: 'Any Country' }[setup.country] ?? setup.country;
-                const letters = [setup.start === 'any' ? '–' : setup.start, setup.end === 'any' ? '–' : setup.end];
-                const filter = letters.every(letter => letter === '–') ? '' : ` · ${letters.join(' → ')}`;
-                const spelling = spellingSelect.querySelector(`[value="${setup.spelling}"]`).textContent;
-                const time = setup.minutes === 'practice' ? '' : ` · ${setup.minutes} min`;
-                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country}${time}${filter} · ${spelling} · ${dates.format(finishedAt)}`;
-                return item;
+            list.replaceChildren(...entries.slice(0, 20).map(entry => {
+                const row = document.createElement('li');
+                row.textContent = `${pointsLabel(entry.score)} · ${challengeLabel(entry.setup)} · ${assistsLabel(entry.assists)} · ${scoreDates.format(entry.finishedAt)}`;
+                return row;
             }));
             list.hidden = !entries.length;
             document.getElementById(emptyId).hidden = Boolean(entries.length);
         }
+
+        scorebookSetup.addEventListener('change', () => {
+            const group = storage.groupScores(Object.values(scoreHistories).flat()).get(scorebookSetup.value);
+            renderScorebookChallenge(group);
+        });
 
         function setClearPrompt(visible) {
             clearDataPrompt.hidden = !visible;
@@ -2100,7 +2196,7 @@
             renderSavedSetups();
             setupStatus.textContent = '';
             if (storage.available) loadScoreHistories();
-            renderScores();
+            renderScorebook();
             setClearPrompt(false);
             preferencesStatus.textContent = storage.available ? '' : storageWarning;
             preferencesDialog.showModal();
@@ -2153,7 +2249,7 @@
             setupName.value = '';
             setupStatus.textContent = '';
             renderSavedSetups();
-            renderScores();
+            renderScorebook();
             setClearPrompt(false);
             clearDataBtn.focus();
             preferencesStatus.textContent = cleared ? 'Saved game data cleared' : 'This browser blocked access to saved data';
