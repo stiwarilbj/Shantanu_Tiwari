@@ -41,7 +41,7 @@ function createPlacesStorage(countries) {
     }
 
     function preferences(value) {
-        const { setup, search, showRules, showSearch, presets } = isObject(value) ? value : {};
+        const { setup, search, leaveMode, showRules, showSearch, presets } = isObject(value) ? value : {};
         const filters = isObject(search) ? search : {};
         const saved = new Map();
         for (const preset of Array.isArray(presets) ? presets.slice(0, 12) : []) {
@@ -51,6 +51,7 @@ function createPlacesStorage(countries) {
         }
         return {
             setup: settings(setup),
+            leaveMode: ['pause', 'save'].includes(leaveMode) ? leaveMode : 'count',
             search: {
                 country: countries.has(filters.country) ? filters.country : 'any',
                 start: letter(filters.start),
