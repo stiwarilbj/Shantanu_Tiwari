@@ -238,6 +238,7 @@
             align-items: flex-end;
         }
         .settings-card .col {
+            flex: 0 0 auto;
             width: calc(100% / 3);
         }
         .settings-card .setting-mode {
@@ -311,7 +312,7 @@
         .preferences-dialog .input-group .btn {
             white-space: normal;
         }
-        #savedScores {
+        .score-history {
             max-height: 9rem;
             overflow-y: auto;
             padding-left: 1.25rem;
@@ -339,10 +340,26 @@
         .form-select {
             cursor: pointer;
         }
+        @container (width < 30rem) {
+            .settings-card .col {
+                width: 50%;
+            }
+            .settings-card .col:has(> #timeSelect) {
+                width: 55%;
+            }
+            .settings-card .col:has(> #spellingSelect) {
+                width: 45%;
+            }
+            .settings-card .setting-mode {
+                width: 100%;
+            }
+        }
         @container (width < 22rem) {
             .settings-card .row {
                 --bs-gutter-x: 0.375rem;
             }
+        }
+        @container (width < 40rem) {
             .settings-card .form-select {
                 padding-inline: 0.375rem 1rem;
                 background-position: right 0.3125rem center;
@@ -382,6 +399,11 @@
                 padding-inline: 0.375rem;
             }
         }
+        @media (width < 23rem) {
+            .game-actions .btn {
+                --bs-btn-padding-x: 0.375rem;
+            }
+        }
         @media (width < 28rem) and (height <= 40rem) {
             .game-container {
                 row-gap: clamp(0.4375rem, calc(1.5dvh - 0.0625rem), 0.6875rem);
@@ -396,21 +418,21 @@
             }
         }
         @media (height <= 38rem) {
-            @container (width >= 36rem) {
+            @container (width >= 40rem) {
                 .settings-card .row {
                     --bs-gutter-x: 0.375rem;
                 }
                 .settings-card .col {
-                    width: 18%;
+                    width: 17%;
                 }
                 .settings-card .col:has(> #timeSelect) {
-                    width: 14%;
+                    width: 23%;
                 }
                 .settings-card .setting-mode {
-                    width: 30%;
+                    width: 27%;
                 }
                 .settings-card .col:has(> #spellingSelect) {
-                    width: 20%;
+                    width: 16%;
                 }
                 .settings-card .form-select {
                     padding-inline: 0.375rem 1rem;
@@ -486,7 +508,7 @@
             <div id="rulesContainer" class="game-panel rules-container" hidden>
                 <h2>Game Rules</h2>
                 <ul>
-                    <li>Pick a 1–5 minute time limit and any letter or country filters. Select <strong>Load places</strong> if prompted, then select <strong>Start Game</strong>.</li>
+                    <li>Pick a 1–5 minute time limit or <strong>Untimed practice</strong>, then set any letter or country filters. Select <strong>Load places</strong> if prompted, then select <strong>Start Game</strong>. In practice, select <strong>Finish Practice</strong> when you're ready to review your guesses.</li>
                     <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
                     <li>Each correct answer earns one point. <strong>Standard</strong> allows one typo or swapped neighboring letters per name. <strong>Strict</strong> requires exact spelling, with any capitalization. <strong>Relaxed</strong> also accepts missing accents and familiar country names like USA, UK, and Czechia. If more than one place matches, try the exact spelling or add the country.</li>
@@ -569,12 +591,7 @@
                             <option value="2">2 Minutes</option>
                             <option value="3">3 Minutes</option>
                             <option value="5">5 Minutes</option>
-                        </select>
-                    </div>
-                    <div class="col setting-mode">
-                        <label for="countrySelect" class="form-label">Country / Mode</label>
-                        <select id="countrySelect" class="form-select" aria-describedby="roundFilterWarning">
-                            <option value="placeAndCountry" selected>Place and Country</option>
+                            <option value="practice">Untimed practice</option>
                         </select>
                     </div>
                     <div class="col">
@@ -585,6 +602,12 @@
                             <option value="relaxed">Relaxed</option>
                         </select>
                     </div>
+                    <div class="col setting-mode">
+                        <label for="countrySelect" class="form-label">Country / Mode</label>
+                        <select id="countrySelect" class="form-select" aria-describedby="roundFilterWarning">
+                            <option value="placeAndCountry" selected>Place and Country</option>
+                        </select>
+                    </div>
                 </div>
                 <p id="roundFilterWarning" class="filter-feedback" role="status"></p>
             </section>
@@ -592,7 +615,7 @@
             <div class="game-play">
                 <div class="d-flex align-items-center justify-content-between">
                     <div class="timer-display">
-                        <i class="fas fa-clock"></i> Time: <span id="timer">00:00</span>
+                        <i id="timerIcon" class="fas fa-clock" aria-hidden="true"></i> <span id="timerCaption">Time: </span><span id="timer">00:00</span>
                     </div>
                     <div class="score-display">
                         <i class="fas fa-star"></i> Score: <span id="score">0</span>
@@ -611,11 +634,11 @@
 
                 <div class="game-actions">
                     <button id="startBtn" class="btn btn-success" type="button">
-                        <i class="fas fa-play" aria-hidden="true"></i> <span id="startLabel">Load places</span>
+                        <i id="startIcon" class="fas fa-play" aria-hidden="true"></i> <span id="startLabel">Load places</span>
                     </button>
                     <span id="roundLoadStatus" class="visually-hidden" role="status"></span>
                     <button id="pauseBtn" class="btn btn-warning" disabled>
-                        <i class="fas fa-pause"></i> Pause
+                        <i id="pauseIcon" class="fas fa-pause" aria-hidden="true"></i> <span id="pauseLabel">Pause</span>
                     </button>
                     <button id="resetBtn" class="btn btn-danger">
                         <i class="fas fa-redo"></i> Reset Game
@@ -628,8 +651,8 @@
 
                 <div class="row row-cols-2 gx-2">
                     <div class="col">
-                        <h2><i class="fas fa-check-circle" aria-hidden="true"></i> Guessed Places</h2>
-                        <div id="guessedPlaces" class="places-list-container">
+                        <h2 id="guessedPlacesTitle" tabindex="-1"><i class="fas fa-check-circle" aria-hidden="true"></i> Guessed Places</h2>
+                        <div id="guessedPlaces" class="places-list-container" role="region" aria-labelledby="guessedPlacesTitle" tabindex="0">
                             <p class="text-muted">No places guessed yet</p>
                         </div>
                     </div>
@@ -658,7 +681,7 @@
                 <option value="pause">Pause when I switch away</option>
                 <option value="save">Pause and save my round</option>
             </select>
-            <p id="leaveModeHint" class="small text-muted mt-2 mb-0" aria-live="polite">The timer runs while the tab is in the background. Refreshing starts fresh.</p>
+            <p id="leaveModeHint" class="small text-muted mt-2 mb-0" aria-live="polite">Timed rounds keep counting in the background. Refreshing starts fresh.</p>
         </section>
         <section aria-labelledby="savedSetupsTitle">
             <h3 id="savedSetupsTitle">Saved setups</h3>
@@ -681,9 +704,14 @@
             <p id="emptySetups" class="small text-muted mb-0">No saved setups yet</p>
         </section>
         <section aria-labelledby="scoreHistoryTitle">
-            <h3 id="scoreHistoryTitle">Recent scores</h3>
-            <p id="emptyScores" class="small text-muted mb-0">No completed rounds yet</p>
-            <ol id="savedScores" class="small mb-0" hidden></ol>
+            <h3 id="scoreHistoryTitle">Timed scores</h3>
+            <p id="emptyScores" class="small text-muted mb-0">No completed timed rounds yet</p>
+            <ol id="savedScores" class="score-history small mb-0" hidden></ol>
+        </section>
+        <section aria-labelledby="practiceHistoryTitle">
+            <h3 id="practiceHistoryTitle">Practice scores</h3>
+            <p id="emptyPracticeScores" class="small text-muted mb-0">No completed practice rounds yet</p>
+            <ol id="savedPracticeScores" class="score-history small mb-0" hidden></ol>
         </section>
         <section class="pb-0">
             <button id="clearDataBtn" type="button" class="btn btn-outline-danger btn-sm" aria-controls="clearDataPrompt">Clear saved data</button>
@@ -699,7 +727,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=3"></script>
+    <script src="places-storage.js?v=4"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -725,7 +753,7 @@
         const legacyStorage = window.chrome?.storage?.local;
         const legacyKeys = ['gameState', 'gameSettings', 'searchFilters'];
         let savedSetups = [];
-        let scoreHistory = [];
+        const scoreHistories = { history: [], 'practice-history': [] };
         let placesWorker;
         let nextJobId = 0;
         const dictionaryStates = new Map();
@@ -742,15 +770,20 @@
         const timeSelect = document.getElementById('timeSelect');
         const spellingSelect = document.getElementById('spellingSelect');
         const timerDisplay = document.getElementById('timer');
+        const timerIcon = document.getElementById('timerIcon');
+        const timerCaption = document.getElementById('timerCaption');
         const scoreDisplay = document.getElementById('score');
         const placeInput = document.getElementById('placeInput');
         const enterBtn = document.getElementById('enterBtn');
         const guessStatus = document.getElementById('guessStatus');
         const startBtn = document.getElementById('startBtn');
         const startLabel = document.getElementById('startLabel');
+        const startIcon = document.getElementById('startIcon');
         const roundLoadStatus = document.getElementById('roundLoadStatus');
         const roundFilterWarning = document.getElementById('roundFilterWarning');
         const pauseBtn = document.getElementById('pauseBtn');
+        const pauseLabel = document.getElementById('pauseLabel');
+        const pauseIcon = document.getElementById('pauseIcon');
         const resetBtn = document.getElementById('resetBtn');
         const displayBtn = document.getElementById('displayBtn');
         const guessedPlacesContainer = document.getElementById('guessedPlaces');
@@ -946,7 +979,10 @@
                     refreshSetup();
                 });
             });
-            timeSelect.addEventListener('change', savePreferences);
+            timeSelect.addEventListener('change', () => {
+                updateTimerDisplay();
+                savePreferences();
+            });
             spellingSelect.addEventListener('change', savePreferences);
 
             searchBtn.addEventListener('click', performSearch);
@@ -1024,14 +1060,22 @@
             };
         }
 
+        function roundIsOpen(round = activeRound) {
+            return Boolean(round && !round.finishedAt);
+        }
+
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
-            const running = roundDeadline !== null;
-            const canResume = !restoringRound && pausedMs > 0;
-            const count = loading || running || canResume || restoringRound ? null : setupCount;
+            const running = Boolean(activeRound?.playing);
+            const finishing = Boolean(activeRound?.finishing);
+            const canResume = roundIsOpen() && !running && !finishing;
+            const canFinish = roundIsOpen() && activeRound.setup.minutes === 'practice' && !finishing;
+            const finishInStartSlot = canFinish && running;
+            const finishInPauseSlot = canFinish && canResume;
+            const count = loading || roundIsOpen() || restoringRound ? null : setupCount;
             const empty = count === 0;
-            startBtn.disabled = running || empty;
-            pauseBtn.disabled = !running;
+            startBtn.disabled = (running && !finishInStartSlot) || empty || finishing;
+            pauseBtn.disabled = !running && !finishInPauseSlot;
             if (loading) startBtn.setAttribute('aria-disabled', 'true');
             else startBtn.removeAttribute('aria-disabled');
             const warning = empty ? 'No places match these filters. Try another country or letter' : '';
@@ -1039,7 +1083,10 @@
 
             let label = 'Load places';
             let status = '';
-            if (running) label = 'Start Game';
+            if (finishing) {
+                label = 'Finishing…';
+                status = label;
+            } else if (running) label = finishInStartSlot ? 'Finish Practice' : 'Start Game';
             else if (loading) {
                 label = 'Loading places…';
                 status = label;
@@ -1051,6 +1098,9 @@
                 status = 'Round paused. Select Resume Game when ready.';
             } else if (count !== null) label = 'Start Game';
             startLabel.textContent = label;
+            startIcon.className = finishInStartSlot || finishing ? 'fas fa-flag-checkered' : 'fas fa-play';
+            pauseLabel.textContent = finishInPauseSlot ? 'Finish Practice' : 'Pause';
+            pauseIcon.className = finishInPauseSlot ? 'fas fa-flag-checkered' : 'fas fa-pause';
             if (roundLoadStatus.textContent !== status) roundLoadStatus.textContent = status;
         }
 
@@ -1080,9 +1130,9 @@
                 setup: currentSettings(),
                 filters,
                 needsCountry: countrySelect.value === 'placeAndCountry',
-                guesses: new Set()
+                guesses: new Set(),
+                playing: false
             };
-            const minutes = Number(timeSelect.value);
             if (starting) {
                 invalidateRound();
                 clearExamples();
@@ -1118,7 +1168,7 @@
                     }
                 }
                 if (starting) {
-                    if (count > 0) beginRound(minutes);
+                    if (count > 0) beginRound();
                     else setRoundSettingsDisabled(false);
                 }
             } catch {
@@ -1158,16 +1208,18 @@
         }
 
         startBtn.addEventListener('click', function() {
-            if (roundDeadline !== null || readingSavedState || roundJob || setupCount === 0) return;
-            if (pausedMs > 0 && !restoringRound) {
-                resumeRound();
+            if (readingSavedState || roundJob || setupCount === 0 || activeRound?.finishing) return;
+            if (roundIsOpen()) {
+                if (!activeRound.playing) resumeRound();
+                else if (activeRound.setup.minutes === 'practice') finishPractice();
                 return;
             }
             prepareRound(!restoringRound && setupCount !== null);
         });
 
-        function beginRound(minutes) {
-            pausedMs = minutes * 60_000;
+        function beginRound() {
+            const { minutes } = activeRound.setup;
+            pausedMs = minutes === 'practice' ? 0 : Number(minutes) * 60_000;
             score = 0;
             placeInput.value = '';
             clearGuessedPlaces();
@@ -1180,11 +1232,12 @@
 
         function pauseRound() {
             const remainingMs = getRemainingMs();
-            if (remainingMs === 0) {
+            if (roundDeadline !== null && remainingMs === 0) {
                 finishRound();
                 return;
             }
             const moveFocus = !document.hidden && document.activeElement === pauseBtn;
+            activeRound.playing = false;
             stopTimer();
             pausedMs = remainingMs;
             setGuessingEnabled(false);
@@ -1204,10 +1257,12 @@
             }
 
             const now = performance.now();
-            roundDeadline = now + pausedMs;
+            roundDeadline = activeRound.setup.minutes === 'practice' ? null : now + pausedMs;
+            activeRound.playing = true;
             pausedMs = 0;
             nextSaveAt = now + 5000;
             setGuessingEnabled(true);
+            updateTimerDisplay();
             updateStartButton();
             if (!document.hidden) placeInput.focus();
             refreshTimer();
@@ -1216,7 +1271,8 @@
         }
 
         pauseBtn.addEventListener('click', function() {
-            if (roundDeadline !== null) pauseRound();
+            if (activeRound?.playing) pauseRound();
+            else if (roundIsOpen() && activeRound.setup.minutes === 'practice' && !activeRound.finishing) finishPractice();
         });
 
         function resetAttempt() {
@@ -1258,15 +1314,17 @@
         function reportGuess(submission, message, correct = false) {
             if (latestGuess !== submission) return;
             // Keep new typing intact if the worker answered after the player moved on.
-            if (!correct && getRemainingMs() > 0 && guessEditVersion === submission.editVersion && !placeInput.value) {
+            if (!correct && !activeRound?.finishing && roundIsOpen() &&
+                (activeRound.setup.minutes === 'practice' || getRemainingMs() > 0) &&
+                guessEditVersion === submission.editVersion && !placeInput.value) {
                 placeInput.value = submission.text;
             }
             showGuessFeedback(message, correct);
         }
 
         function enterPlace() {
-            if (roundDeadline === null || !activeRound) return;
-            if (getRemainingMs() === 0) {
+            if (!activeRound?.playing) return;
+            if (roundDeadline !== null && getRemainingMs() === 0) {
                 finishRound();
                 return;
             }
@@ -1318,7 +1376,7 @@
                 score++;
                 updateScoreDisplay();
                 reportGuess(submission, 'Counted', true);
-                if (getRemainingMs() > 0) saveRound();
+                if (roundIsOpen(round)) saveRound();
                 else if (round.finishedAt) recordScore(round);
             });
         }
@@ -1414,7 +1472,7 @@
         }
 
         function showExamples() {
-            const round = getRemainingMs() > 0 && !restoringRound ? activeRound : undefined;
+            const round = roundIsOpen() ? activeRound : undefined;
             const filters = round?.filters ?? roundFilters();
             requestResults(examplePlacesContainer, 'examples', { filters, roundId: round?.id },
                 'No places found matching current game filters', showExamples);
@@ -1445,17 +1503,37 @@
             pausedMs = 0;
         }
 
+        async function finishPractice() {
+            const round = activeRound;
+            const finishButton = round.playing ? startBtn : pauseBtn;
+            const moveFocus = document.activeElement === finishButton;
+            round.playing = false;
+            round.finishing = true;
+            setGuessingEnabled(false);
+            updateStartButton();
+            // Count guesses submitted before Finish Practice, even if the worker is still checking them.
+            await guessQueue;
+            if (activeRound !== round) return;
+            round.finishing = false;
+            finishRound();
+            showGuessFeedback('Practice complete. Review your guessed places below.', true);
+            if (moveFocus && !document.hidden &&
+                (document.activeElement === document.body || document.activeElement === finishButton)) {
+                document.getElementById('guessedPlacesTitle').focus();
+            }
+        }
+
         function finishRound() {
+            if (!roundIsOpen()) return;
+            activeRound.finishedAt = Date.now();
+            activeRound.playing = false;
             stopTimer();
             updateTimerDisplay(0);
             setGuessingEnabled(false);
             setRoundSettingsDisabled(false);
             updateStartButton();
             discardSavedRound(activeRound?.attemptId);
-            if (activeRound && !activeRound.finishedAt) {
-                activeRound.finishedAt = Date.now();
-                recordScore(activeRound);
-            }
+            recordScore(activeRound);
         }
 
         function refreshTimer() {
@@ -1479,6 +1557,13 @@
         }
 
         function updateTimerDisplay(remainingMs = getRemainingMs()) {
+            const practice = timeSelect.value === 'practice';
+            timerCaption.hidden = practice;
+            timerIcon.className = practice ? 'fas fa-book' : 'fas fa-clock';
+            if (practice) {
+                timerDisplay.textContent = 'Practice';
+                return;
+            }
             const totalSeconds = Math.ceil(remainingMs / 1000);
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = totalSeconds % 60;
@@ -1531,6 +1616,7 @@
             timeSelect.value = setup.minutes;
             spellingSelect.value = setup.spelling;
             updatePlaceInputPlaceholder();
+            updateTimerDisplay();
         }
 
         function savePreferences() {
@@ -1571,15 +1657,16 @@
         }
 
         function saveRound(remainingMs = getRemainingMs()) {
-            if (leaveMode.value !== 'save' || !activeRound) return;
-            if (remainingMs === 0) {
+            if (leaveMode.value !== 'save' || !roundIsOpen()) return;
+            const practice = activeRound.setup.minutes === 'practice';
+            if (!practice && remainingMs === 0) {
                 if (roundDeadline !== null) finishRound();
                 return;
             }
             storage.write('round', {
                 id: activeRound.attemptId,
                 setup: activeRound.setup,
-                remainingMs,
+                remainingMs: practice ? null : remainingMs,
                 guesses: guessedPlaces
             });
         }
@@ -1590,11 +1677,18 @@
 
         function recordScore(round) {
             const entry = { id: round.attemptId, setup: round.setup, finishedAt: round.finishedAt, score };
-            const recent = storage.available ? storage.read('history') ?? scoreHistory : scoreHistory;
-            scoreHistory = [entry, ...recent.filter(item => item.id !== entry.id)]
+            const record = round.setup.minutes === 'practice' ? 'practice-history' : 'history';
+            const recent = (storage.available ? storage.read(record) : null) ?? scoreHistories[record];
+            scoreHistories[record] = [entry, ...recent.filter(item => item.id !== entry.id)]
                 .sort((a, b) => b.finishedAt - a.finishedAt).slice(0, 20);
-            storage.write('history', scoreHistory);
+            storage.write(record, scoreHistories[record]);
             if (preferencesDialog.open) renderScores();
+        }
+
+        function loadScoreHistories() {
+            for (const record of Object.keys(scoreHistories)) {
+                scoreHistories[record] = storage.read(record) ?? scoreHistories[record];
+            }
         }
 
         function restoreGame(preferences, savedRound) {
@@ -1605,7 +1699,7 @@
             }
 
             applySettings(savedRound.setup);
-            pausedMs = savedRound.remainingMs;
+            pausedMs = savedRound.remainingMs ?? 0;
             restoringRound = savedRound;
             updateTimerDisplay();
             setGuessingEnabled(false);
@@ -1615,7 +1709,7 @@
 
         function loadGameState() {
             const preferences = storage.read('preferences');
-            scoreHistory = storage.read('history') ?? [];
+            loadScoreHistories();
             const savedRound = storage.read('round');
             if (!legacyStorage || (preferences && savedRound)) {
                 restoreGame(preferences, savedRound);
@@ -1680,19 +1774,25 @@
         }
 
         function renderScores() {
-            const savedScores = document.getElementById('savedScores');
+            renderScoreHistory('savedScores', 'emptyScores', scoreHistories.history);
+            renderScoreHistory('savedPracticeScores', 'emptyPracticeScores', scoreHistories['practice-history']);
+        }
+
+        function renderScoreHistory(listId, emptyId, entries) {
+            const list = document.getElementById(listId);
             const dates = new Intl.DateTimeFormat(undefined, { dateStyle: 'short' });
-            savedScores.replaceChildren(...scoreHistory.map(({ score, setup, finishedAt }) => {
+            list.replaceChildren(...entries.map(({ score, setup, finishedAt }) => {
                 const item = document.createElement('li');
                 const country = { placeAndCountry: 'Place and Country', any: 'Any Country' }[setup.country] ?? setup.country;
                 const letters = [setup.start === 'any' ? '–' : setup.start, setup.end === 'any' ? '–' : setup.end];
                 const filter = letters.every(letter => letter === '–') ? '' : ` · ${letters.join(' → ')}`;
                 const spelling = spellingSelect.querySelector(`[value="${setup.spelling}"]`).textContent;
-                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country} · ${setup.minutes} min${filter} · ${spelling} · ${dates.format(finishedAt)}`;
+                const time = setup.minutes === 'practice' ? '' : ` · ${setup.minutes} min`;
+                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country}${time}${filter} · ${spelling} · ${dates.format(finishedAt)}`;
                 return item;
             }));
-            savedScores.hidden = !scoreHistory.length;
-            document.getElementById('emptyScores').hidden = Boolean(scoreHistory.length);
+            list.hidden = !entries.length;
+            document.getElementById(emptyId).hidden = Boolean(entries.length);
         }
 
         function setClearPrompt(visible) {
@@ -1702,9 +1802,9 @@
 
         const storageWarning = 'This browser is blocking game storage. Changes may be lost when you leave';
         const leaveModeHints = {
-            count: 'The timer runs while the tab is in the background. Refreshing starts fresh.',
-            pause: 'The timer pauses in the background. Resume in this tab when you return. Refreshing starts fresh.',
-            save: 'The timer pauses when you leave. This browser saves your time, guesses, and rules so you can resume after refreshing.'
+            count: 'Timed rounds keep counting in the background. Refreshing starts fresh.',
+            pause: 'The round pauses in the background. Resume in this tab when you return. Refreshing starts fresh.',
+            save: 'The round pauses when you leave. This browser saves your progress so you can resume after refreshing.'
         };
 
         function updateLeaveModeHint() {
@@ -1720,7 +1820,7 @@
 
         preferencesBtn.addEventListener('click', () => {
             renderSavedSetups();
-            if (storage.available) scoreHistory = storage.read('history') ?? scoreHistory;
+            if (storage.available) loadScoreHistories();
             renderScores();
             setClearPrompt(false);
             preferencesStatus.textContent = storage.available ? '' : storageWarning;
@@ -1778,12 +1878,13 @@
 
         document.getElementById('confirmClearDataBtn').addEventListener('click', () => {
             legacyStorage?.remove(legacyKeys);
-            scoreHistory = [];
             applyPreferences(storage.normalize.preferences());
             cancelResults(searchResultsContainer);
             showResultMessage(searchResultsContainer, 'Search results will appear here');
             resetAttempt();
-            const cleared = ['round', 'preferences', 'history'].map(record => storage.remove(record)).every(Boolean);
+            const records = ['round', 'preferences', ...Object.keys(scoreHistories)];
+            const cleared = records.map(record => storage.remove(record)).every(Boolean);
+            for (const record of Object.keys(scoreHistories)) scoreHistories[record] = [];
             setupName.value = '';
             renderSavedSetups();
             renderScores();
@@ -1804,9 +1905,9 @@
         });
 
         function handleLeaving() {
-            if (roundDeadline === null) return;
+            if (!activeRound?.playing) return;
             if (leaveMode.value !== 'count') pauseRound();
-            else if (getRemainingMs() === 0) finishRound();
+            else if (roundDeadline !== null && getRemainingMs() === 0) finishRound();
         }
 
         function catchUpTimer() {

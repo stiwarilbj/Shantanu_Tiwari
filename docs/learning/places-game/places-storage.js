@@ -19,7 +19,7 @@ function createPlacesStorage(countries) {
             country: country === 'any' || countries.has(country) ? country : 'placeAndCountry',
             start: letter(start),
             end: letter(end),
-            minutes: ['1', '2', '3', '5'].includes(minutes) ? minutes : '1',
+            minutes: ['1', '2', '3', '5', 'practice'].includes(minutes) ? minutes : '1',
             spelling: ['strict', 'relaxed'].includes(spelling) ? spelling : 'standard'
         };
     }
@@ -71,11 +71,11 @@ function createPlacesStorage(countries) {
         return typeof id === 'string' && /^[a-z\d-]{1,64}$/i.test(id);
     }
 
-    function history(value) {
+    function history(value, practice = false) {
         if (!Array.isArray(value)) return [];
         return value.slice(0, 50).flatMap(entry => {
             const setup = checkedSettings(entry?.setup);
-            if (!setup || !validID(entry.id) ||
+            if (!setup || (setup.minutes === 'practice') !== practice || !validID(entry.id) ||
                 !Number.isSafeInteger(entry.score) || entry.score < 0 || entry.score > 150_000 ||
                 !Number.isSafeInteger(entry.finishedAt) || entry.finishedAt <= 0 || entry.finishedAt > 8.64e15) {
                 return [];
@@ -87,14 +87,17 @@ function createPlacesStorage(countries) {
     function round(value) {
         const setup = checkedSettings(value?.setup);
         const { id, remainingMs, guesses } = isObject(value) ? value : {};
-        if (!setup || !validID(id) || !Number.isFinite(remainingMs) || remainingMs <= 0 ||
-            remainingMs > Number(setup.minutes) * 60_000 || !Array.isArray(guesses)) return null;
+        if (!setup || !validID(id) || !Array.isArray(guesses)) return null;
+        const practice = setup.minutes === 'practice';
+        const validTime = practice ? remainingMs === null :
+            Number.isFinite(remainingMs) && remainingMs > 0 && remainingMs <= Number(setup.minutes) * 60_000;
+        if (!validTime) return null;
 
         return {
             id,
             setup,
             remainingMs,
-            guesses: guesses.slice(0, 4096).flatMap(place => {
+            guesses: (practice ? guesses : guesses.slice(0, 4096)).flatMap(place => {
                 if (typeof place?.city !== 'string' || !place.city.trim() || place.city.length > 256 ||
                     !countries.has(place.country)) return [];
                 return [{ city: place.city, country: place.country }];
@@ -103,7 +106,7 @@ function createPlacesStorage(countries) {
     }
 
     return {
-        normalize: { preferences, history, round },
+        normalize: { preferences, history, 'practice-history': value => history(value, true), round },
         available: true,
 
         read(record) {
