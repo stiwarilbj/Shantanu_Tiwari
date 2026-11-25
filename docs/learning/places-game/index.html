@@ -237,6 +237,12 @@
             --bs-gutter-y: clamp(0.5rem, 1.6dvh, 0.875rem);
             align-items: flex-end;
         }
+        .settings-card .col {
+            width: calc(100% / 3);
+        }
+        .settings-card .setting-mode {
+            width: calc(200% / 3);
+        }
         .game-container h2 {
             font-size: 1rem;
             margin-bottom: 0.375rem;
@@ -337,12 +343,6 @@
             .settings-card .row {
                 --bs-gutter-x: 0.375rem;
             }
-            .settings-card .col {
-                width: calc(100% / 3);
-            }
-            .settings-card .setting-mode {
-                width: 100%;
-            }
             .settings-card .form-select {
                 padding-inline: 0.375rem 1rem;
                 background-position: right 0.3125rem center;
@@ -396,18 +396,21 @@
             }
         }
         @media (height <= 38rem) {
-            @container (width >= 28rem) {
+            @container (width >= 36rem) {
                 .settings-card .row {
                     --bs-gutter-x: 0.375rem;
                 }
                 .settings-card .col {
-                    width: 21.5%;
+                    width: 18%;
                 }
                 .settings-card .col:has(> #timeSelect) {
-                    width: 17%;
+                    width: 14%;
                 }
                 .settings-card .setting-mode {
-                    width: 40%;
+                    width: 30%;
+                }
+                .settings-card .col:has(> #spellingSelect) {
+                    width: 20%;
                 }
                 .settings-card .form-select {
                     padding-inline: 0.375rem 1rem;
@@ -486,7 +489,7 @@
                     <li>Pick a 1–5 minute time limit and any letter or country filters. Select <strong>Load places</strong> if prompted, then select <strong>Start Game</strong>.</li>
                     <li>In the default <strong>Place and Country</strong> mode, enter both names with a comma, like “Paris, France”. Spaces around the comma are fine.</li>
                     <li>In <strong>Place Only</strong> mode, enter a place name that matches your filters.</li>
-                    <li>Each correct answer gets one point. A name can be one letter off or have two neighboring letters swapped.</li>
+                    <li>Each correct answer earns one point. <strong>Standard</strong> allows one typo or swapped neighboring letters per name. <strong>Strict</strong> requires exact spelling, with any capitalization. <strong>Relaxed</strong> also accepts missing accents and familiar country names like USA, UK, and Czechia. If more than one place matches, try the exact spelling or add the country.</li>
                     <li><strong>Search</strong> by first or last letter, country, or name length. Separate terms with commas. <strong>Include</strong> checks for every term in the place or country, and <strong>Don't Include</strong> skips any match.</li>
                     <li><strong>Display Places</strong> shows eight random examples using your filters. Select <strong>Pause</strong> to take a break.</li>
                 </ul>
@@ -546,7 +549,7 @@
         <div class="game-content">
             <section class="settings-card" aria-labelledby="settings-heading">
                 <h2 id="settings-heading"><i class="fas fa-cog" aria-hidden="true"></i> Game Settings</h2>
-                <div class="row row-cols-2 g-2">
+                <div class="row g-2">
                     <div class="col">
                         <label for="letterSelect" class="form-label">Starting Letter</label>
                         <select id="letterSelect" class="form-select" aria-describedby="roundFilterWarning">
@@ -569,9 +572,17 @@
                         </select>
                     </div>
                     <div class="col setting-mode">
-                        <label for="countrySelect" class="form-label">Country / Game Mode</label>
+                        <label for="countrySelect" class="form-label">Country / Mode</label>
                         <select id="countrySelect" class="form-select" aria-describedby="roundFilterWarning">
-                            <option value="placeAndCountry" selected>Place and Country Mode</option>
+                            <option value="placeAndCountry" selected>Place and Country</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label for="spellingSelect" class="form-label">Spelling</label>
+                        <select id="spellingSelect" class="form-select">
+                            <option value="standard" selected>Standard</option>
+                            <option value="strict">Strict</option>
+                            <option value="relaxed">Relaxed</option>
                         </select>
                     </div>
                 </div>
@@ -680,7 +691,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
-    <script src="places-storage.js?v=1"></script>
+    <script src="places-storage.js?v=2"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -722,6 +733,7 @@
         const endLetterSelect = document.getElementById('endLetterSelect');
         const countrySelect = document.getElementById('countrySelect');
         const timeSelect = document.getElementById('timeSelect');
+        const spellingSelect = document.getElementById('spellingSelect');
         const timerDisplay = document.getElementById('timer');
         const scoreDisplay = document.getElementById('score');
         const placeInput = document.getElementById('placeInput');
@@ -777,7 +789,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=4');
+            const worker = new Worker('places-worker.js?v=5');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
@@ -891,7 +903,7 @@
             const gameCountryOptionsFragment = document.createDocumentFragment();
             const placeAndCountryModeOption = document.createElement('option');
             placeAndCountryModeOption.value = 'placeAndCountry';
-            placeAndCountryModeOption.textContent = 'Place and Country Mode';
+            placeAndCountryModeOption.textContent = 'Place and Country';
             gameCountryOptionsFragment.appendChild(placeAndCountryModeOption);
 
             const anyCountryOptionForGame = document.createElement('option');
@@ -926,6 +938,7 @@
                 });
             });
             timeSelect.addEventListener('change', savePreferences);
+            spellingSelect.addEventListener('change', savePreferences);
 
             searchBtn.addEventListener('click', performSearch);
             [searchIncludeInput, searchExcludeInput, searchMinLengthInput, searchMaxLengthInput].forEach(input => {
@@ -1113,6 +1126,7 @@
                 roundId: round.id,
                 filters: round.filters,
                 needsCountry: round.needsCountry,
+                spelling: round.setup.spelling,
                 savedGuesses
             });
             return round.index;
@@ -1123,6 +1137,7 @@
             endLetterSelect.disabled = disabled;
             countrySelect.disabled = disabled;
             timeSelect.disabled = disabled;
+            spellingSelect.disabled = disabled;
             loadSetupBtn.disabled = disabled;
             document.getElementById('loadSetupHint').hidden = !disabled;
         }
@@ -1274,6 +1289,9 @@
                 if (!result?.place) {
                     let message = 'Place not found for this round';
                     if (result?.reason === 'country') message = 'Check the country';
+                    else if (result?.reason === 'ambiguous') message = round.needsCountry
+                        ? 'More than one place matches. Try the exact place and country names'
+                        : 'More than one place matches. Try the exact spelling or add the country';
                     else if (result?.reason === 'unavailable') message = 'Could not check that answer. Try entering it again';
                     reportGuess(submission, message);
                     return;
@@ -1491,7 +1509,8 @@
                 country: countrySelect.value,
                 start: letterSelect.value,
                 end: endLetterSelect.value,
-                minutes: timeSelect.value
+                minutes: timeSelect.value,
+                spelling: spellingSelect.value
             };
         }
 
@@ -1500,6 +1519,7 @@
             letterSelect.value = setup.start;
             endLetterSelect.value = setup.end;
             timeSelect.value = setup.minutes;
+            spellingSelect.value = setup.spelling;
             updatePlaceInputPlaceholder();
         }
 
@@ -1651,7 +1671,8 @@
                 const country = { placeAndCountry: 'Place and Country', any: 'Any Country' }[setup.country] ?? setup.country;
                 const letters = [setup.start === 'any' ? '–' : setup.start, setup.end === 'any' ? '–' : setup.end];
                 const filter = letters.every(letter => letter === '–') ? '' : ` · ${letters.join(' → ')}`;
-                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country} · ${setup.minutes} min${filter} · ${dates.format(finishedAt)}`;
+                const spelling = spellingSelect.querySelector(`[value="${setup.spelling}"]`).textContent;
+                item.textContent = `${score} ${score === 1 ? 'point' : 'points'} · ${country} · ${setup.minutes} min${filter} · ${spelling} · ${dates.format(finishedAt)}`;
                 return item;
             }));
             savedScores.hidden = !scoreHistory.length;

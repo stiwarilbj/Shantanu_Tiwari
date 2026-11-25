@@ -5,6 +5,18 @@ let round;
 const loadedPlaces = new Map();
 const pendingLoads = new Map();
 const activeRequests = new Set();
+const countryAliases = new Map([
+    ['us', 'united states'], ['usa', 'united states'],
+    ['u.s.', 'united states'], ['u.s.a.', 'united states'],
+    ['united states of america', 'united states'],
+    ['uk', 'united kingdom'], ['u.k.', 'united kingdom'],
+    ['uae', 'united arab emirates'], ['u.a.e.', 'united arab emirates'],
+    ['czechia', 'czech republic'], ['turkiye', 'turkey'],
+    ['brasil', 'brazil'], ['bahamas', 'the bahamas'],
+    ['ivory coast', "cote d'ivoire (ivory coast)"],
+    ["cote d'ivoire", "cote d'ivoire (ivory coast)"],
+    ['cote d’ivoire', "cote d'ivoire (ivory coast)"]
+]);
 
 self.addEventListener('message', async ({ data: { id, type, ...payload } }) => {
     if (type === 'init') {
@@ -33,20 +45,22 @@ self.addEventListener('message', async ({ data: { id, type, ...payload } }) => {
     }
 });
 
-async function runRequest(type, { filters, roundId, needsCountry, guess, includeFeedback, savedGuesses }, id, cancelled) {
+async function runRequest(type, payload, id, cancelled) {
+    const { filters, roundId, needsCountry, guess, includeFeedback, savedGuesses, spelling = 'standard' } = payload;
     switch (type) {
         case 'setup':
             return (await getSetupPlaces(filters)).length;
         case 'round': {
             const places = await getSetupPlaces(filters);
             if (cancelled()) return;
-            const groups = await indexRound(places, needsCountry, cancelled);
+            const index = await indexRound(places, needsCountry, spelling, cancelled);
             if (cancelled()) return;
-            round = { id: roundId, key: poolKey(filters), places, groups, needsCountry };
+            round = { id: roundId, key: poolKey(filters), places, needsCountry, spelling, ...index };
             if (savedGuesses) {
                 const guesses = savedGuesses.flatMap(({ city, country }) => {
-                    const group = groups.get(needsCountry ? country.toLowerCase() : '');
-                    const place = places[group?.byName.get(city.toLowerCase())];
+                    const countryKey = needsCountry || spelling === 'relaxed' ? nameKey(country, spelling) : '';
+                    const group = index.groups.get(countryKey);
+                    const place = places[group?.byName.get(nameKey(city, spelling))];
                     return place ? [{ city: place.city, country: place.country_name }] : [];
                 });
                 return { count: places.length, guesses };
@@ -55,7 +69,7 @@ async function runRequest(type, { filters, roundId, needsCountry, guess, include
         }
         case 'guess': {
             if (round?.id !== roundId) throw new Error('Round index is unavailable');
-            const result = checkGuess(round, guess);
+            const result = round.spelling === 'standard' ? checkGuess(round, guess) : checkSpellingGuess(round, guess);
             return includeFeedback ? result : result.place ?? null;
         }
         case 'examples': {
@@ -182,23 +196,43 @@ function getSetupPlaces(filters) {
     return promise;
 }
 
-async function indexRound(places, needsCountry, cancelled) {
+function nameKey(name, spelling) {
+    const lower = name.toLowerCase();
+    return spelling === 'standard' ? lower : lower.normalize();
+}
+
+function foldName(name) {
+    return name.normalize('NFD').replace(/\p{M}/gu, '');
+}
+
+async function indexRound(places, needsCountry, spelling, cancelled) {
     const groups = new Map();
+    const relaxed = spelling === 'relaxed';
+    const foldedNames = relaxed ? new Map() : null;
     await visitInBatches(places, (place, index) => {
-        const country = needsCountry ? place.country_name.toLowerCase() : '';
+        const country = needsCountry || relaxed ? nameKey(place.country_name, spelling) : '';
         let group = groups.get(country);
         if (!group) {
             group = { byName: new Map(), byLength: new Map() };
             groups.set(country, group);
         }
-        const city = place.city.toLowerCase();
+        const city = nameKey(place.city, spelling);
         if (group.byName.has(city)) return;
 
         group.byName.set(city, index);
-        if (!group.byLength.has(city.length)) group.byLength.set(city.length, []);
-        group.byLength.get(city.length).push(city);
+        if (spelling !== 'strict') {
+            if (!group.byLength.has(city.length)) group.byLength.set(city.length, []);
+            group.byLength.get(city.length).push(city);
+        }
+        if (relaxed) {
+            const key = foldName(city);
+            const existing = foldedNames.get(key);
+            if (existing === undefined) foldedNames.set(key, index);
+            else if (Array.isArray(existing)) existing.push(index);
+            else foldedNames.set(key, [existing, index]);
+        }
     }, cancelled);
-    return groups;
+    return { groups, foldedNames };
 }
 
 async function searchPlaces(dictionary, filters, cancelled) {
@@ -300,6 +334,108 @@ function checkGuess({ places, groups, needsCountry }, guess) {
         // An exact city in a different country is a useful hint after both matching passes fail.
         for (const group of groups.values()) {
             if (candidatePairs.some(([city]) => group.byName.has(city))) return { reason: 'country' };
+        }
+    }
+    return { reason: 'not-found' };
+}
+
+function splitNames(guess) {
+    const pairs = [];
+    for (let comma = guess.indexOf(','); comma !== -1; comma = guess.indexOf(',', comma + 1)) {
+        const city = guess.slice(0, comma).trim();
+        const country = guess.slice(comma + 1).trim();
+        if (city && country) pairs.push([city, country]);
+    }
+    return pairs;
+}
+
+function foldedMatches(foldedNames, foldedCity) {
+    const match = foldedNames.get(foldedCity);
+    return Array.isArray(match) ? match : match === undefined ? [] : [match];
+}
+
+function keepsTypedAccents(typed, canonical, folded) {
+    if (typed === folded) return true;
+    const groups = /\P{M}\p{M}*/gu;
+    const typedLetters = typed.normalize('NFD').match(groups);
+    const canonicalLetters = canonical.normalize('NFD').match(groups);
+    // Folding has already matched the base letters. Respect accents the player included.
+    return typedLetters.every((letter, i) =>
+        (letter.match(/\p{M}/gu) ?? []).every(mark => canonicalLetters[i].includes(mark)));
+}
+
+function findRelaxedAnswer({ groups, places, foldedNames }, attempts) {
+    let match;
+    for (const [city, country] of attempts) {
+        const foldedCity = foldName(city);
+        const foldedCountry = foldName(country);
+        const alias = countryAliases.get(foldedCountry);
+        for (const index of foldedMatches(foldedNames, foldedCity)) {
+            const place = places[index];
+            const name = nameKey(place.city);
+            const countryName = nameKey(place.country_name);
+            if (country && (alias ? countryName !== alias : foldName(countryName) !== foldedCountry ||
+                !keepsTypedAccents(country, countryName, foldedCountry))) continue;
+            if (!keepsTypedAccents(city, name, foldedCity)) continue;
+            if (match !== undefined && match !== index) return { reason: 'ambiguous' };
+            match = index;
+        }
+    }
+    if (match !== undefined) return { place: places[match] };
+
+    // Keep Standard's one-edit allowance, but count it only when it identifies one place.
+    for (const [city, country] of attempts) {
+        const alias = countryAliases.get(foldName(country));
+        for (const [countryName, group] of groups) {
+            if (country && (alias ? countryName !== alias :
+                countryName !== country && !isCloseMatch(countryName, country))) continue;
+            for (let length = city.length - 1; length <= city.length + 1; length++) {
+                for (const key of group.byLength.get(length) ?? []) {
+                    if (key !== city && !isCloseMatch(key, city)) continue;
+                    const index = group.byName.get(key);
+                    if (match !== undefined && match !== index) return { reason: 'ambiguous' };
+                    match = index;
+                }
+            }
+        }
+    }
+    if (match !== undefined) return { place: places[match] };
+    return null;
+}
+
+function checkSpellingGuess(round, guess) {
+    const { groups, places, foldedNames, needsCountry, spelling } = round;
+    const city = nameKey(guess.trim(), spelling);
+    const pairs = splitNames(city);
+    if (needsCountry && !pairs.length) return { reason: 'country' };
+
+    if (!needsCountry) {
+        const exactCity = spelling === 'strict' ? groups.get('')?.byName.get(city) :
+            foldedMatches(foldedNames, foldName(city)).find(index => nameKey(places[index].city) === city);
+        if (exactCity !== undefined) return { place: places[exactCity] };
+    }
+
+    if (needsCountry || spelling === 'relaxed') {
+        let exactPair = Infinity;
+        for (const [city, country] of pairs) {
+            const index = groups.get(country)?.byName.get(city);
+            if (index !== undefined) exactPair = Math.min(exactPair, index);
+        }
+        if (exactPair !== Infinity) return { place: places[exactPair] };
+    }
+
+    if (spelling === 'relaxed') {
+        const attempts = needsCountry ? pairs : [[city, ''], ...pairs];
+        const result = findRelaxedAnswer(round, attempts);
+        if (result) return result;
+    }
+
+    if (needsCountry) {
+        for (const [city] of pairs) {
+            if (foldedNames?.has(foldName(city))) return { reason: 'country' };
+            for (const group of groups.values()) {
+                if (group.byName.has(city)) return { reason: 'country' };
+            }
         }
     }
     return { reason: 'not-found' };

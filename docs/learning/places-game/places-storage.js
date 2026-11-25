@@ -14,19 +14,21 @@ function createPlacesStorage(countries) {
     }
 
     function settings(value) {
-        const { country, start, end, minutes } = isObject(value) ? value : {};
+        const { country, start, end, minutes, spelling } = isObject(value) ? value : {};
         return {
             country: country === 'any' || countries.has(country) ? country : 'placeAndCountry',
             start: letter(start),
             end: letter(end),
-            minutes: ['1', '2', '3', '5'].includes(minutes) ? minutes : '1'
+            minutes: ['1', '2', '3', '5'].includes(minutes) ? minutes : '1',
+            spelling: ['strict', 'relaxed'].includes(spelling) ? spelling : 'standard'
         };
     }
 
     function checkedSettings(value) {
         if (!isObject(value)) return null;
         const valid = settings(value);
-        return Object.keys(valid).every(key => valid[key] === value[key]) ? valid : null;
+        // Older saved setups and rounds used Standard before this field existed.
+        return Object.keys(valid).every(key => key === 'spelling' || valid[key] === value[key]) ? valid : null;
     }
 
     function boundedText(value, limit) {
