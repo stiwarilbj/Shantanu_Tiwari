@@ -43,7 +43,7 @@ function createPlacesStorage(countries) {
     }
 
     function preferences(value) {
-        const { setup, search, leaveMode, showRules, showSearch, presets } = isObject(value) ? value : {};
+        const { setup, search, leaveMode, soundMode, showRules, showSearch, presets } = isObject(value) ? value : {};
         const filters = isObject(search) ? search : {};
         const saved = new Map();
         // Retain setups saved before the new five-favorite limit.
@@ -55,6 +55,7 @@ function createPlacesStorage(countries) {
         return {
             setup: settings(setup),
             leaveMode: ['pause', 'save'].includes(leaveMode) ? leaveMode : 'count',
+            soundMode: ['time-up', 'all'].includes(soundMode) ? soundMode : 'off',
             search: {
                 country: countries.has(filters.country) ? filters.country : 'any',
                 start: letter(filters.start),

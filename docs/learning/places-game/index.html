@@ -740,6 +740,14 @@
             </select>
             <p id="hintModeHelp" class="small text-muted mt-2 mb-0"></p>
         </section>
+        <section>
+            <label for="soundMode" class="form-label fw-semibold mb-1">Sound</label>
+            <select id="soundMode" class="form-select form-select-sm">
+                <option value="off" selected>Off</option>
+                <option value="time-up">Time up only</option>
+                <option value="all">Correct answers and time up</option>
+            </select>
+        </section>
         <section aria-labelledby="savedSetupsTitle">
             <h3 id="savedSetupsTitle">Saved setups</h3>
             <p id="savedSetupHint" class="small text-muted mb-2">Save up to five favorites. Select a saved name to apply it.</p>
@@ -795,7 +803,7 @@
     </dialog>
 
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"],"dailyStarts":{"worldwide":"ABCDEFGHIJKLMNOPQRSTUVWXYZ","regions":[[7,"CDLSV"],[8,"A"],[9,"ABCDEFGHKLMNOPRSTW"],[10,"ABEFGHKLMNOPRSTW"],[16,"B"],[21,"P"],[25,"ABCDEFGIJLMNOPRSTUV"],[27,"O"],[30,"S"],[32,"BCLMPS"],[36,"C"],[37,"BCDHJLSXYZ"],[38,"ACLMPST"],[43,"G"],[46,"BDHKLMOPSV"],[48,"S"],[61,"K"],[62,"ABCDEFGHJLMNOPRSTVW"],[66,"ABCDEFGHIKLMNOPRSTUVWZ"],[68,"AKMNPS"],[70,"MS"],[75,"LS"],[77,"BKMNPST"],[79,"ABCDGHJKLMNPRSTUV"],[80,"KS"],[81,"ABDGHKMNQRST"],[83,"C"],[85,"ABCDFGILMNOPRSTVZ"],[86,"BCMS"],[87,"AHIKMNSTY"],[113,"ABCDEFGHIJLMNOPRSTVXZ"],[124,"ABDGHKLMNOSVW"],[132,"S"],[134,"K"],[137,"CDL"],[140,"P"],[141,"ABCDGIKLMNPST"],[142,"BCDGJKLMNOPRSTWZ"],[143,"ACFMPSV"],[146,"ABCDFGHILMNOPRSTV"],[147,"ABCDGIKLMNOPRSTUVYZ"],[155,"A"],[161,"O"],[168,"ABCDEFGHIJLMNOPRSTUVZ"],[173,"BHS"],[174,"ABCGLMRSW"],[178,"M"],[179,"AB"],[185,"ABGKS"],[189,"BCDKLMNPRSTVZ"],[191,"ABCDEFGHKLMNPRSTW"],[192,"ABCDEFGHIJKLMNOPRSTUVWY"],[198,"H"],[200,"A"]]}}</script>
-    <script src="places-storage.js?v=8"></script>
+    <script src="places-storage.js?v=9"></script>
     <script>
         let timer;
         let roundDeadline = null;
@@ -816,6 +824,7 @@
         let readingSavedState = false;
         let roundLoadState = 'idle';
         let roundJob;
+        let audioContext;
 
         const catalog = JSON.parse(document.getElementById('countryCatalog').textContent);
         const countryIndexes = new Map(catalog.countries.map((country, index) => [country, index]));
@@ -892,6 +901,7 @@
         const leaveModeHint = document.getElementById('leaveModeHint');
         const hintMode = document.getElementById('hintMode');
         const hintModeHelp = document.getElementById('hintModeHelp');
+        const soundMode = document.getElementById('soundMode');
         const setupName = document.getElementById('setupName');
         const savedSetupList = document.getElementById('savedSetupList');
         const setupStatus = document.getElementById('setupStatus');
@@ -1362,8 +1372,45 @@
             enterBtn.disabled = !enabled;
         }
 
+        function prepareSound() {
+            if (soundMode.value === 'off') return;
+            try {
+                const AudioContext = window.AudioContext ?? window.webkitAudioContext;
+                if (!AudioContext) return;
+                audioContext ??= new AudioContext();
+                if (audioContext.state !== 'running') audioContext.resume().catch(() => {});
+            } catch {
+                // The browser can block audio while the game continues.
+            }
+        }
+
+        function playSound(cue) {
+            const correct = cue === 'correct';
+            if (soundMode.value === 'off' || (correct && soundMode.value !== 'all') ||
+                audioContext?.state !== 'running') return;
+
+            const now = audioContext.currentTime;
+            const end = now + (correct ? 0.12 : 0.32);
+            const tone = audioContext.createOscillator();
+            const envelope = audioContext.createGain();
+            tone.frequency.setValueAtTime(correct ? 660 : 520, now);
+            tone.frequency.exponentialRampToValueAtTime(correct ? 880 : 330, end - 0.04);
+            envelope.gain.setValueAtTime(0, now);
+            envelope.gain.linearRampToValueAtTime(correct ? 0.05 : 0.07, now + 0.02);
+            envelope.gain.exponentialRampToValueAtTime(0.001, end);
+            tone.connect(envelope);
+            envelope.connect(audioContext.destination);
+            tone.addEventListener('ended', () => {
+                tone.disconnect();
+                envelope.disconnect();
+            }, { once: true });
+            tone.start(now);
+            tone.stop(end);
+        }
+
         startBtn.addEventListener('click', function() {
             if (readingSavedState || roundJob || setupCount === 0 || activeRound?.finishing || sharedSetupIssues.size) return;
+            prepareSound();
             if (roundIsOpen()) {
                 if (!activeRound.playing) resumeRound();
                 else if (activeRound.setup.minutes === 'practice') finishPractice();
@@ -1500,6 +1547,7 @@
             showGuessFeedback('');
             placeInput.focus({ preventScroll: true });
             if (!guess) return;
+            prepareSound();
 
             const submission = { text, editVersion: guessEditVersion };
             latestGuess = submission;
@@ -1533,6 +1581,7 @@
                         score++;
                         updateScoreDisplay();
                         reportGuess(submission, 'Counted', true);
+                        playSound('correct');
                         attempt.outcome = result.match;
                     } else {
                         reportGuess(submission, 'Already counted');
@@ -1728,6 +1777,7 @@
 
         function finishRound() {
             if (!roundIsOpen()) return;
+            const timeIsUp = roundDeadline !== null;
             activeRound.finishedAt = Date.now();
             activeRound.playing = false;
             stopTimer();
@@ -1743,6 +1793,7 @@
             reviewAttempts.hidden = true;
             retryRoundBtn.disabled = true;
             roundReview.hidden = false;
+            if (timeIsUp) playSound('time-up');
         }
 
         roundReview.addEventListener('toggle', async () => {
@@ -1832,6 +1883,7 @@
 
         retryRoundBtn.addEventListener('click', () => {
             if (!activeRound?.finishedAt || !activeRound.reviewRendered) return;
+            prepareSound();
             applySettings(activeRound.setup, activeRound.daily);
             savePreferences();
             roundJob?.cancel();
@@ -2045,6 +2097,7 @@
             return storage.write('preferences', {
                 setup,
                 leaveMode: leaveMode.value,
+                soundMode: soundMode.value,
                 search: {
                     country: searchCountrySelect.value,
                     start: searchStartLetterSelect.value,
@@ -2064,6 +2117,7 @@
             const { setup, search, showRules, showSearch, presets } = preferences;
             applySettings(setup);
             leaveMode.value = preferences.leaveMode;
+            soundMode.value = preferences.soundMode;
             updateLeaveModeHint();
             searchCountrySelect.value = search.country;
             searchStartLetterSelect.value = search.start;
@@ -2364,6 +2418,12 @@
             else discardSavedRound(activeRound?.attemptId ?? restoringRound?.id);
             preferencesStatus.textContent = savePreferences() && storage.available ? '' : storageWarning;
         });
+
+        soundMode.addEventListener('change', () => {
+            prepareSound();
+            preferencesStatus.textContent = savePreferences() ? '' : storageWarning;
+        });
+        preferencesDialog.querySelector('form[method="dialog"]').addEventListener('submit', prepareSound);
 
         copyCurrentSetupBtn.addEventListener('click', () => {
             if (!sharedSetupIssues.size) copySetupLink(currentSettings());
