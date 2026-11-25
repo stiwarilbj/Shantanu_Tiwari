@@ -592,9 +592,10 @@
     <script type="application/json" id="countryCatalog">{"revision":"7531f7586da7d2d8","countries":["Morocco","Afghanistan","Albania","Algeria","Andorra","Angola","Antigua And Barbuda","Argentina","Armenia","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Brazil","Brunei","Bulgaria","Burkina Faso","Burundi","Cambodia","Cameroon","Canada","Cape Verde","Central African Republic","Chad","Chile","China","Colombia","Comoros","Congo","Costa Rica","Cote D'Ivoire (Ivory Coast)","Croatia","Cuba","Cyprus","Czech Republic","Democratic Republic of the Congo","Denmark","Djibouti","Dominica","Dominican Republic","East Timor","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Ethiopia","Fiji Islands","Finland","France","Gabon","Gambia The","Georgia","Germany","Ghana","Greece","Grenada","Guatemala","Guinea","Guinea-Bissau","Guyana","Haiti","Honduras","Hong Kong S.A.R.","Hungary","Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Jamaica","Japan","Jordan","Kazakhstan","Kenya","Kiribati","Kosovo","Kuwait","Kyrgyzstan","Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia","Moldova","Monaco","Mongolia","Montenegro","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","North Korea","North Macedonia","Norway","Oman","Pakistan","Palau","Palestinian Territory Occupied","Panama","Papua new Guinea","Paraguay","Peru","Philippines","Poland","Portugal","Puerto Rico","Qatar","Romania","Russia","Rwanda","Saint Kitts And Nevis","Saint Lucia","Saint Vincent And The Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Swaziland","Sweden","Switzerland","Syria","Taiwan","Tajikistan","Tanzania","Thailand","The Bahamas","Togo","Tonga","Trinidad And Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela","Vietnam","Virgin Islands (US)","Yemen","Zambia","Zimbabwe"]}</script>
     <script>
         let timer;
-        let timeLeft = 0;
+        let roundDeadline = null;
+        let pausedMs = 0;
+        let nextSaveAt;
         let score = 0;
-        let gameActive = false;
         let guessedPlaces = [];
         let setupCount = null;
         let activeRound;
@@ -678,7 +679,7 @@
                     dictionaryStates.set(data.dictionary, data.state);
                     if (data.state === 'ready' && dictionaryReady(roundFilters().country) &&
                         setupCount === null && !roundJob && !readingSavedState &&
-                        (restoringRound || timeLeft <= 0)) {
+                        (restoringRound || getRemainingMs() === 0)) {
                         prepareRound();
                     }
                     return;
@@ -899,7 +900,7 @@
 
         function updateStartButton() {
             const loading = readingSavedState || roundLoadState === 'loading';
-            const roundInProgress = timeLeft > 0 && !restoringRound;
+            const roundInProgress = !restoringRound && (roundDeadline !== null || pausedMs > 0);
             const count = loading || roundInProgress || restoringRound ? null : setupCount;
             const empty = count === 0;
             startBtn.disabled = roundInProgress || empty;
@@ -922,8 +923,11 @@
         }
 
         function invalidateRound() {
-            activeRound?.index?.cancel();
-            activeRound = undefined;
+            if (activeRound) {
+                activeRound.index?.cancel();
+                for (const job of activeRound.guesses) job.cancel();
+                activeRound = undefined;
+            }
             guessQueue = Promise.resolve();
             placesWorker?.postMessage({ type: 'clearRound' });
             guessStatus.textContent = '';
@@ -933,7 +937,12 @@
             const filters = roundFilters();
             const needsResume = restoringRound;
             const indexing = starting || needsResume;
-            const round = { id: ++nextRoundId, filters, needsCountry: currentGameMode === 'placeAndCountry' };
+            const round = {
+                id: ++nextRoundId,
+                filters,
+                needsCountry: currentGameMode === 'placeAndCountry',
+                guesses: new Set()
+            };
             const minutes = Number(timeSelect.value);
             if (starting) {
                 invalidateRound();
@@ -959,7 +968,7 @@
                         pauseBtn.disabled = false;
                     } else {
                         // Older versions could save a running round with no eligible places.
-                        timeLeft = 0;
+                        pausedMs = 0;
                         updateTimerDisplay();
                         pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
                         setRoundSettingsDisabled(false);
@@ -978,7 +987,7 @@
                 if (starting) setRoundSettingsDisabled(false);
             }
             updateStartButton();
-            if (needsResume && !restoringRound && timeLeft > 0) {
+            if (needsResume && !restoringRound && pausedMs > 0) {
                 roundLoadStatus.textContent = 'Places loaded. Resume your round when ready.';
             }
         }
@@ -1005,64 +1014,73 @@
         }
 
         startBtn.addEventListener('click', function() {
-            if (readingSavedState || roundJob || (timeLeft > 0 && !restoringRound) || setupCount === 0) return;
+            if (roundDeadline !== null || readingSavedState || roundJob || setupCount === 0 ||
+                (pausedMs > 0 && !restoringRound)) return;
             prepareRound(!restoringRound && setupCount !== null);
         });
 
         function beginRound(minutes) {
-            timeLeft = minutes * 60;
+            pausedMs = minutes * 60_000;
             score = 0;
             guessedPlaces = [];
 
-            updateTimerDisplay();
             updateScoreDisplay();
             updateGuessedPlacesDisplay();
             updatePlaceInputPlaceholder();
 
             pauseBtn.disabled = false;
-            setGuessingEnabled(true);
-            gameActive = true;
-            placeInput.focus();
-            startTimer();
-            saveGameState();
+            resumeRound();
         }
 
-        function pauseRound() {
-            clearInterval(timer);
-            gameActive = false;
+        function showPausedControls() {
             pauseBtn.innerHTML = '<i class="fas fa-play"></i> Resume';
             setGuessingEnabled(false);
         }
 
+        function pauseRound() {
+            const remainingMs = getRemainingMs();
+            if (remainingMs === 0) {
+                finishRound();
+                return;
+            }
+            stopTimer();
+            pausedMs = remainingMs;
+            showPausedControls();
+            updateTimerDisplay(remainingMs);
+            saveGameState();
+        }
+
         function resumeRound() {
             wasGameActiveBeforeHidden = false;
-            gameActive = true;
             pauseBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
             setGuessingEnabled(true);
             placeInput.focus();
-            startTimer();
+
+            const now = performance.now();
+            roundDeadline = now + pausedMs;
+            pausedMs = 0;
+            nextSaveAt = now + 5000;
+            refreshTimer();
+            if (roundDeadline !== null) saveGameState();
         }
 
         pauseBtn.addEventListener('click', function() {
-            if (restoringRound || timeLeft <= 0) return;
-            if (gameActive) pauseRound();
-            else resumeRound();
-            saveGameState();
+            if (restoringRound || !activeRound) return;
+            if (roundDeadline !== null) pauseRound();
+            else if (pausedMs > 0) resumeRound();
         });
 
         resetBtn.addEventListener('click', function() {
-            clearInterval(timer);
-            gameActive = false;
-            timeLeft = 0;
+            stopTimer();
+            roundJob?.cancel();
+            roundJob = undefined;
+            invalidateRound();
             score = 0;
             guessedPlaces = [];
             setupCount = null;
-            invalidateRound();
             wasGameActiveBeforeHidden = false;
             restoringRound = false;
             readingSavedState = false;
-            roundJob?.cancel();
-            roundJob = undefined;
             roundLoadState = 'idle';
             cancelResults(searchResultsContainer);
             clearExamples();
@@ -1111,7 +1129,11 @@
         }
 
         function enterPlace() {
-            if (!gameActive || !activeRound) return;
+            if (roundDeadline === null || !activeRound) return;
+            if (getRemainingMs() === 0) {
+                finishRound();
+                return;
+            }
 
             const guess = placeInput.value.trim();
             if (!guess) return;
@@ -1122,7 +1144,9 @@
             const index = indexRound(round);
             const lookup = index.promise.then(() => {
                 if (activeRound !== round) return;
-                return requestPlaces('guess', { roundId: round.id, guess }).promise;
+                const job = requestPlaces('guess', { roundId: round.id, guess });
+                round.guesses.add(job);
+                return job.promise.finally(() => round.guesses.delete(job));
             }).then(place => ({ place }), () => {
                 if (round.index === index) round.index = undefined;
                 return { failed: true };
@@ -1148,7 +1172,7 @@
                 guessedPlaces.push({ city: place.city, country: place.country_name });
                 updateScoreDisplay();
                 updateGuessedPlacesDisplay();
-                if (timeLeft > 0) saveGameState();
+                if (getRemainingMs() > 0) saveGameState();
             });
         }
 
@@ -1243,7 +1267,7 @@
         }
 
         function showExamples() {
-            const round = timeLeft > 0 && !restoringRound ? activeRound : undefined;
+            const round = getRemainingMs() > 0 && !restoringRound ? activeRound : undefined;
             const filters = round?.filters ?? roundFilters();
             requestResults(examplePlacesContainer, 'examples', { filters, roundId: round?.id },
                 'No places found matching current game filters', showExamples);
@@ -1263,31 +1287,54 @@
             container.replaceChildren(...rows);
         }
 
-        function startTimer() {
-            clearInterval(timer);
-            timer = setInterval(function() {
-                timeLeft = Math.max(0, timeLeft - 1);
-                updateTimerDisplay();
-
-                if (timeLeft === 0) {
-                    clearInterval(timer);
-                    gameActive = false;
-                    setGuessingEnabled(false);
-                    pauseBtn.disabled = true;
-                    setRoundSettingsDisabled(false);
-                    updateStartButton();
-                    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                        chrome.storage.local.remove(['gameState']);
-                    }
-                } else if (timeLeft % 5 === 0) {
-                    saveGameState();
-                }
-            }, 1000);
+        function getRemainingMs(now = performance.now()) {
+            return roundDeadline === null ? pausedMs : Math.max(0, roundDeadline - now);
         }
 
-        function updateTimerDisplay() {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
+        function stopTimer() {
+            clearTimeout(timer);
+            timer = undefined;
+            roundDeadline = null;
+            pausedMs = 0;
+        }
+
+        function finishRound() {
+            stopTimer();
+            wasGameActiveBeforeHidden = false;
+            updateTimerDisplay(0);
+            setGuessingEnabled(false);
+            pauseBtn.disabled = true;
+            setRoundSettingsDisabled(false);
+            updateStartButton();
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.remove(['gameState']);
+            }
+        }
+
+        function refreshTimer() {
+            if (roundDeadline === null) return;
+
+            const now = performance.now();
+            const remainingMs = getRemainingMs(now);
+            if (remainingMs === 0) {
+                finishRound();
+                return;
+            }
+
+            updateTimerDisplay(remainingMs);
+            if (now >= nextSaveAt) {
+                saveGameState(remainingMs);
+                nextSaveAt = now + 5000;
+            }
+
+            // Wake at the next displayed second, including a fractional last second after resume.
+            timer = setTimeout(refreshTimer, Math.ceil(remainingMs % 1000 || 1000));
+        }
+
+        function updateTimerDisplay(remainingMs = getRemainingMs()) {
+            const totalSeconds = Math.ceil(remainingMs / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
             timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
@@ -1311,13 +1358,18 @@
             guessedPlacesContainer.innerHTML = html;
         }
 
-        function saveGameState() {
+        function saveGameState(remainingMs = getRemainingMs()) {
             if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                if (roundDeadline !== null && remainingMs === 0) {
+                    finishRound();
+                    return;
+                }
                 const gameState = {
-                    timeLeft: timeLeft,
+                    remainingMs,
+                    timeLeft: Math.ceil(remainingMs / 1000),
                     score: score,
                     guessedPlaces: guessedPlaces,
-                    gameActive: gameActive,
+                    gameActive: roundDeadline !== null,
                     wasGameActiveBeforeHidden: wasGameActiveBeforeHidden,
                     isRulesVisible: !rulesContainer.hidden,
                     isSearchVisible: !searchContainer.hidden
@@ -1387,7 +1439,8 @@
 
                 if (result.gameState) {
                     const saved = result.gameState;
-                    timeLeft = saved.timeLeft || 0;
+                    const savedMs = saved.remainingMs ?? (saved.timeLeft || 0) * 1000;
+                    pausedMs = Number.isFinite(savedMs) ? Math.max(0, savedMs) : 0;
                     score = saved.score || 0;
                     guessedPlaces = saved.guessedPlaces || [];
                     setPanelVisibility(rulesBtn, rulesContainer, saved.isRulesVisible);
@@ -1397,9 +1450,9 @@
                     updateGuessedPlacesDisplay();
                 }
 
-                if (timeLeft > 0) {
+                if (pausedMs > 0) {
                     restoringRound = true;
-                    pauseRound();
+                    showPausedControls();
                     pauseBtn.disabled = true;
                     setRoundSettingsDisabled(true);
                     prepareRound();
@@ -1419,15 +1472,16 @@
         });
 
         document.addEventListener('visibilitychange', function() {
-            if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return;
-
-            if (document.hidden && gameActive) {
+            if (!document.hidden) {
+                if (wasGameActiveBeforeHidden && pausedMs > 0) {
+                    resumeRound();
+                } else if (roundDeadline !== null) {
+                    clearTimeout(timer);
+                    refreshTimer();
+                }
+            } else if (roundDeadline !== null && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                 wasGameActiveBeforeHidden = true;
                 pauseRound();
-                saveGameState();
-            } else if (!document.hidden && wasGameActiveBeforeHidden && timeLeft > 0) {
-                resumeRound();
-                saveGameState();
             }
         });
 
