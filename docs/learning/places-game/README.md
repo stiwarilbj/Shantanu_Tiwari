@@ -14,6 +14,8 @@ In Preferences, choose **Examples** to see place names, **Clues only** to get th
 
 In Preferences, name your settings and select **Save current setup** to keep up to five favorites. Select a saved name to fill in the country or mode, letters, time limit, spelling, and hints before you start. To update a favorite, save again under the same name.
 
+In **Preferences → Saved setups**, choose **Copy setup link** for your current setup or one of your favorites. The link fills in the country or answer mode, letters, time limit, spelling, and hints. The timer starts when your friend selects **Start Game**. If an option has changed, the game points out what to choose again.
+
 The game stores preferences, timed scores, practice scores, and a saved round in this browser. In Preferences, **Keep counting** runs the clock in the background, **Pause when I switch away** pauses the current tab, and **Pause and save my round** lets you pick up after refreshing. Select **Resume Game** to continue a paused round. **Reset Game** discards the current attempt, and **Clear saved data** deletes this game's saved data.
 
 Choose Standard for the usual one-typo allowance or Strict for exact spelling, with any capitalization. Relaxed also accepts missing accents and familiar country names like USA, UK, UAE, Czechia, and Türkiye. Exact answers come first, and if a looser match could mean several places, the game asks for the exact spelling or country.

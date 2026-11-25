@@ -281,7 +281,8 @@
         #guessStatus.guess-correct {
             color: #166534;
         }
-        .search-container .form-control[aria-invalid="true"] {
+        .search-container .form-control[aria-invalid="true"],
+        .form-select[aria-invalid="true"] {
             border-color: #a52330;
         }
 
@@ -329,10 +330,13 @@
             white-space: normal;
         }
         .saved-setup-apply {
-            flex: 1;
+            flex: 1 1 7rem;
             min-inline-size: 0;
             overflow-wrap: anywhere;
             text-align: start;
+        }
+        #sharedSetupStatus {
+            overflow-wrap: anywhere;
         }
         .score-history {
             padding-inline-start: 1.25rem;
@@ -634,6 +638,7 @@
                         </select>
                     </div>
                 </div>
+                <p id="sharedSetupStatus" class="filter-feedback" role="status"></p>
                 <p id="dailyRoundLabel" class="small text-muted mt-2 mb-0" role="status" hidden></p>
                 <p id="roundFilterWarning" class="filter-feedback" role="status"></p>
             </section>
@@ -742,13 +747,18 @@
                 <label for="setupName" class="form-label small">Setup name</label>
                 <div class="input-group input-group-sm">
                     <input id="setupName" class="form-control" type="text" maxlength="48" aria-describedby="savedSetupHint" required>
-                    <button class="btn btn-outline-primary" type="submit">Save current setup</button>
+                    <button id="saveCurrentSetupBtn" class="btn btn-outline-primary" type="submit">Save current setup</button>
                 </div>
             </form>
+            <button id="copyCurrentSetupBtn" class="btn btn-outline-secondary btn-sm mb-2" type="button">Copy setup link</button>
             <ul id="savedSetupList" class="list-unstyled d-flex flex-column gap-1 mb-0" role="list" aria-label="Saved setups"></ul>
             <p id="loadSetupHint" class="small text-muted mt-2 mb-0" hidden>Finish or reset the current round to apply a setup</p>
             <p id="emptySetups" class="small text-muted mb-0">No saved setups yet</p>
             <p id="setupStatus" class="filter-feedback" role="status"></p>
+            <div id="setupLinkFallback" class="mt-2" hidden>
+                <label for="setupLinkText" class="form-label small mb-1">Setup link</label>
+                <input id="setupLinkText" type="text" class="form-control form-control-sm" readonly>
+            </div>
         </section>
         <section aria-labelledby="scorebookTitle">
             <h3 id="scorebookTitle">Scorebook</h3>
@@ -842,6 +852,7 @@
         const startIcon = document.getElementById('startIcon');
         const roundLoadStatus = document.getElementById('roundLoadStatus');
         const roundFilterWarning = document.getElementById('roundFilterWarning');
+        const sharedSetupStatus = document.getElementById('sharedSetupStatus');
         const pauseBtn = document.getElementById('pauseBtn');
         const pauseLabel = document.getElementById('pauseLabel');
         const pauseIcon = document.getElementById('pauseIcon');
@@ -884,6 +895,21 @@
         const setupName = document.getElementById('setupName');
         const savedSetupList = document.getElementById('savedSetupList');
         const setupStatus = document.getElementById('setupStatus');
+        const copyCurrentSetupBtn = document.getElementById('copyCurrentSetupBtn');
+        const saveCurrentSetupBtn = document.getElementById('saveCurrentSetupBtn');
+        const setupLinkFallback = document.getElementById('setupLinkFallback');
+        const setupLinkText = document.getElementById('setupLinkText');
+        const setupLinkVersion = '1';
+        const roundFields = {
+            country: { input: countrySelect, label: 'Country / Mode' },
+            start: { input: letterSelect, label: 'Starting Letter' },
+            end: { input: endLetterSelect, label: 'Ending Letter' },
+            minutes: { input: timeSelect, label: 'Time Limit' },
+            spelling: { input: spellingSelect, label: 'Spelling' },
+            hints: { input: hintMode, label: 'Hints in Preferences' }
+        };
+        const sharedSetupIssues = new Map();
+        let hasSharedSetup = false;
         const clearDataBtn = document.getElementById('clearDataBtn');
         const clearDataPrompt = document.getElementById('clearDataPrompt');
 
@@ -915,7 +941,7 @@
                 if (data.dictionary) {
                     dictionaryStates.set(data.dictionary, data.state);
                     if (data.state === 'ready' && dictionaryReady(roundFilters().country) &&
-                        setupCount === null && !roundJob && !readingSavedState &&
+                        setupCount === null && !roundJob && !readingSavedState && !sharedSetupIssues.size &&
                         (restoringRound || getRemainingMs() === 0)) {
                         prepareRound();
                     }
@@ -1049,23 +1075,9 @@
 
             loadGameState();
 
-            countrySelect.addEventListener('change', handleCountryChangeAndSaveSettings);
-            [letterSelect, endLetterSelect].forEach(select => {
-                select.addEventListener('change', () => {
-                    setDailySelection(null);
-                    savePreferences();
-                    refreshSetup();
-                });
-            });
-            timeSelect.addEventListener('change', () => {
-                setDailySelection(null);
-                updateTimerDisplay();
-                savePreferences();
-            });
-            spellingSelect.addEventListener('change', () => {
-                setDailySelection(null);
-                savePreferences();
-            });
+            for (const [key, { input }] of Object.entries(roundFields)) {
+                input.addEventListener('change', () => handleRoundSettingChange(key));
+            }
 
             searchBtn.addEventListener('click', performSearch);
             [searchIncludeInput, searchExcludeInput, searchMinLengthInput, searchMaxLengthInput].forEach(input => {
@@ -1094,8 +1106,8 @@
         }
 
         function studyToolsLocked() {
-            return hintMode.value === 'after' &&
-                (!activeRound?.finishedAt || Boolean(selectedDaily && selectedDaily !== activeRound.daily));
+            return sharedSetupIssues.has('hints') || (hintMode.value === 'after' &&
+                (!activeRound?.finishedAt || Boolean(selectedDaily && selectedDaily !== activeRound.daily)));
         }
 
         function updateStudyTools() {
@@ -1104,7 +1116,7 @@
             displayLabel.textContent = clues ? 'Get a clue' : 'Display Places';
             displayIcon.className = clues ? 'fas fa-lightbulb' : 'fas fa-list';
             exampleLabel.textContent = clues ? 'Clue' : 'Example Places';
-            displayBtn.disabled = locked || (clues && Boolean(restoringRound));
+            displayBtn.disabled = locked || sharedSetupIssues.size > 0 || (clues && Boolean(restoringRound));
             showSearchBtn.disabled = locked;
             if (locked) {
                 setPanelVisibility(showSearchBtn, searchContainer, false);
@@ -1116,7 +1128,8 @@
                 clues: 'Get a matching place’s country and letter count.',
                 after: 'Search and examples unlock when the timer ends or you finish practice.'
             };
-            hintModeHelp.textContent = hintMode.disabled ? 'Finish or reset the round to change this setting.' : help[hintMode.value];
+            hintModeHelp.textContent = hintMode.disabled ? 'Finish or reset the round to change this setting.' :
+                sharedSetupIssues.get('hints') ?? help[hintMode.value];
         }
 
         function refreshSetup(preload = false) {
@@ -1126,18 +1139,29 @@
             setupCount = null;
             roundLoadState = 'idle';
             const { country } = roundFilters();
-            if (preload || country !== 'any' || ['loading', 'ready'].includes(dictionaryStates.get(country))) {
+            if (!sharedSetupIssues.size && (preload || country !== 'any' || ['loading', 'ready'].includes(dictionaryStates.get(country)))) {
                 prepareRound();
             } else {
                 updateStartButton();
             }
         }
 
-        function handleCountryChangeAndSaveSettings() {
+        function handleRoundSettingChange(key) {
             setDailySelection(null);
-            updatePlaceInputPlaceholder();
-            savePreferences();
-            refreshSetup();
+            const repaired = sharedSetupIssues.delete(key);
+            if (repaired) {
+                clearSharedField(key);
+                updateSharedSetupStatus();
+            }
+            if (key === 'country') updatePlaceInputPlaceholder();
+            if (key === 'minutes') updateTimerDisplay();
+            if (key === 'hints') {
+                updateStudyTools();
+                clearExamples();
+            }
+            if (repaired || ['country', 'start', 'end'].includes(key)) refreshSetup(repaired && !sharedSetupIssues.size);
+            const saved = savePreferences();
+            if (key === 'hints') preferencesStatus.textContent = saved ? '' : storageWarning;
         }
 
         function setPanelVisibility(button, panel, isVisible) {
@@ -1151,7 +1175,7 @@
         });
 
         showSearchBtn.addEventListener('click', function() {
-            if (studyToolsLocked()) return;
+            if (showSearchBtn.disabled) return;
             const open = searchContainer.hidden;
             setPanelVisibility(showSearchBtn, searchContainer, open);
             if (!open && cancelResults(searchResultsContainer)) {
@@ -1191,7 +1215,7 @@
             const finishInPauseSlot = canFinish && canResume;
             const count = loading || roundIsOpen() || restoringRound ? null : setupCount;
             const empty = count === 0;
-            startBtn.disabled = (running && !finishInStartSlot) || empty || finishing;
+            startBtn.disabled = (running && !finishInStartSlot) || empty || finishing || sharedSetupIssues.size > 0;
             pauseBtn.disabled = !running && !finishInPauseSlot;
             if (loading) startBtn.setAttribute('aria-disabled', 'true');
             else startBtn.removeAttribute('aria-disabled');
@@ -1213,7 +1237,7 @@
             } else if (canResume) {
                 label = 'Resume Game';
                 status = 'Round paused. Select Resume Game when ready.';
-            } else if (count !== null) label = 'Start Game';
+            } else if (count !== null || sharedSetupIssues.size) label = 'Start Game';
             startLabel.textContent = label;
             startIcon.className = finishInStartSlot || finishing ? 'fas fa-flag-checkered' : 'fas fa-play';
             pauseLabel.textContent = finishInPauseSlot ? 'Finish Practice' : 'Pause';
@@ -1339,7 +1363,7 @@
         }
 
         startBtn.addEventListener('click', function() {
-            if (readingSavedState || roundJob || setupCount === 0 || activeRound?.finishing) return;
+            if (readingSavedState || roundJob || setupCount === 0 || activeRound?.finishing || sharedSetupIssues.size) return;
             if (roundIsOpen()) {
                 if (!activeRound.playing) resumeRound();
                 else if (activeRound.setup.minutes === 'practice') finishPractice();
@@ -1349,6 +1373,7 @@
         });
 
         function beginRound() {
+            clearSharedSetup();
             const { minutes } = activeRound.setup;
             pausedMs = minutes === 'practice' ? 0 : Number(minutes) * 60_000;
             score = 0;
@@ -1879,14 +1904,102 @@
         }
 
         function currentSettings() {
-            return {
-                country: countrySelect.value,
-                start: letterSelect.value,
-                end: endLetterSelect.value,
-                minutes: timeSelect.value,
-                spelling: spellingSelect.value,
-                hints: hintMode.value
-            };
+            return Object.fromEntries(Object.entries(roundFields).map(([key, { input }]) => [key, input.value]));
+        }
+
+        function loadSharedSetup() {
+            const params = new URLSearchParams(window.location.search);
+            hasSharedSetup = params.has('setup');
+            if (!hasSharedSetup) return false;
+
+            if (params.getAll('setup').length !== 1 || params.get('setup') !== setupLinkVersion) {
+                sharedSetupStatus.textContent = 'This setup link uses an unsupported format. Choose your own rules to play.';
+                refreshSetup();
+                return true;
+            }
+
+            const setup = {};
+            for (const [key, { input, label }] of Object.entries(roundFields)) {
+                const values = params.getAll(key);
+                const value = values[0];
+                if (values.length === 1 && value && Array.from(input.options).some(option => option.value === value)) {
+                    setup[key] = value;
+                    continue;
+                }
+
+                const placeholder = new Option('Choose again', '');
+                placeholder.disabled = true;
+                placeholder.dataset.sharedPlaceholder = '';
+                input.add(placeholder, 0);
+                input.setAttribute('aria-invalid', 'true');
+                if (key !== 'hints') {
+                    const description = input.getAttribute('aria-describedby');
+                    input.setAttribute('aria-describedby', description ? `${description} sharedSetupStatus` : 'sharedSetupStatus');
+                }
+
+                const supplied = value?.length > 64 ? `${value.slice(0, 64)}…` : value;
+                const message = values.length > 1 ? `${label} has more than one value` :
+                    supplied ? `${label} “${supplied}” is unavailable` : `${label} is missing`;
+                sharedSetupIssues.set(key, message);
+                setup[key] = '';
+            }
+
+            applySettings(setup);
+            updateSharedSetupStatus();
+            refreshSetup(true);
+            return true;
+        }
+
+        function clearSharedField(key) {
+            const { input } = roundFields[key];
+            input.querySelector('[data-shared-placeholder]')?.remove();
+            input.removeAttribute('aria-invalid');
+            const descriptions = input.getAttribute('aria-describedby')?.split(' ').filter(id => id !== 'sharedSetupStatus');
+            if (descriptions?.length) input.setAttribute('aria-describedby', descriptions.join(' '));
+            else input.removeAttribute('aria-describedby');
+        }
+
+        function updateSharedSetupStatus() {
+            const blocked = sharedSetupIssues.size > 0;
+            sharedSetupStatus.classList.toggle('text-muted', !blocked);
+            sharedSetupStatus.textContent = blocked
+                ? `${[...sharedSetupIssues.values()].join('. ')}. Choose again to start.`
+                : 'Shared setup loaded. Start Game when ready.';
+            copyCurrentSetupBtn.disabled = blocked;
+            saveCurrentSetupBtn.disabled = blocked;
+            updateStudyTools();
+        }
+
+        function clearSharedSetup() {
+            if (!hasSharedSetup) return;
+            hasSharedSetup = false;
+            for (const key of sharedSetupIssues.keys()) clearSharedField(key);
+            sharedSetupIssues.clear();
+            sharedSetupStatus.textContent = '';
+            copyCurrentSetupBtn.disabled = false;
+            saveCurrentSetupBtn.disabled = false;
+
+            const url = new URL(window.location.href);
+            for (const key of ['setup', ...Object.keys(roundFields)]) url.searchParams.delete(key);
+            window.history.replaceState(window.history.state, '', url);
+        }
+
+        async function copySetupLink(setup) {
+            const url = new URL(window.location.href);
+            url.search = new URLSearchParams({ setup: setupLinkVersion, ...setup }).toString();
+            url.hash = '';
+            setupLinkText.value = url.href;
+            setupLinkFallback.hidden = true;
+            try {
+                await navigator.clipboard.writeText(url.href);
+                if (preferencesDialog.open && setupLinkText.value === url.href) showSetupStatus(true, 'Setup link copied');
+            } catch {
+                if (!preferencesDialog.open || setupLinkText.value !== url.href) return;
+                setupLinkFallback.hidden = false;
+                showSetupStatus(true, 'Copy the selected link');
+                setupLinkText.focus();
+                setupLinkText.select();
+            }
         }
 
         function dailyChallengeFor(date = new Date().toISOString().slice(0, 10)) {
@@ -1920,12 +2033,7 @@
             const expected = daily?.revision === catalog.revision ? dailyChallengeFor(daily.date).setup : null;
             const validDaily = expected && storage.challengeKey(expected) === storage.challengeKey(setup) && setup.hints === expected.hints;
             setDailySelection(validDaily ? daily : null);
-            countrySelect.value = setup.country;
-            letterSelect.value = setup.start;
-            endLetterSelect.value = setup.end;
-            timeSelect.value = setup.minutes;
-            spellingSelect.value = setup.spelling;
-            hintMode.value = setup.hints;
+            for (const [key, { input }] of Object.entries(roundFields)) input.value = setup[key];
             updatePlaceInputPlaceholder();
             updateTimerDisplay();
             updateStudyTools();
@@ -1933,8 +2041,9 @@
         }
 
         function savePreferences() {
+            const setup = sharedSetupIssues.size ? storage.read('preferences')?.setup ?? storage.normalize.preferences().setup : currentSettings();
             return storage.write('preferences', {
-                setup: currentSettings(),
+                setup,
                 leaveMode: leaveMode.value,
                 search: {
                     country: searchCountrySelect.value,
@@ -2015,6 +2124,7 @@
 
         function restoreGame(preferences, savedRound) {
             applyPreferences(preferences ?? storage.normalize.preferences());
+            if (loadSharedSetup()) return;
             if (!savedRound) {
                 refreshSetup();
                 return;
@@ -2096,7 +2206,7 @@
         function renderSavedSetups() {
             savedSetupList.replaceChildren(...savedSetups.map((preset, index) => {
                 const item = document.createElement('li');
-                item.className = 'd-flex gap-2';
+                item.className = 'd-flex flex-wrap gap-2';
 
                 const apply = document.createElement('button');
                 apply.type = 'button';
@@ -2105,12 +2215,20 @@
                 apply.setAttribute('aria-label', `Apply ${preset.name}`);
                 apply.addEventListener('click', () => {
                     if (countrySelect.disabled) return;
+                    clearSharedSetup();
                     applySettings(preset.setup);
                     refreshSetup();
                     savePreferences();
                     preferencesDialog.close();
                     document.getElementById('settings-heading').focus();
                 });
+
+                const copy = document.createElement('button');
+                copy.type = 'button';
+                copy.className = 'btn btn-outline-secondary btn-sm';
+                copy.textContent = 'Copy setup link';
+                copy.setAttribute('aria-label', `Copy setup link for ${preset.name}`);
+                copy.addEventListener('click', () => copySetupLink(preset.setup));
 
                 const remove = document.createElement('button');
                 remove.type = 'button';
@@ -2126,7 +2244,10 @@
                     (nextRow?.querySelector('button:last-child') ?? setupName).focus();
                 });
 
-                item.append(apply, remove);
+                const actions = document.createElement('div');
+                actions.className = 'd-flex gap-2';
+                actions.append(copy, remove);
+                item.append(apply, actions);
                 return item;
             }));
             document.getElementById('emptySetups').hidden = Boolean(savedSetups.length);
@@ -2244,15 +2365,13 @@
             preferencesStatus.textContent = savePreferences() && storage.available ? '' : storageWarning;
         });
 
-        hintMode.addEventListener('change', () => {
-            setDailySelection(null);
-            updateStudyTools();
-            clearExamples();
-            preferencesStatus.textContent = savePreferences() ? '' : storageWarning;
+        copyCurrentSetupBtn.addEventListener('click', () => {
+            if (!sharedSetupIssues.size) copySetupLink(currentSettings());
         });
 
         dailyChallengeBtn.addEventListener('click', () => {
             if (dailyChallengeBtn.disabled) return;
+            clearSharedSetup();
             const { daily, setup } = dailyChallengeFor();
             applySettings(setup, daily);
             refreshSetup(true);
@@ -2267,6 +2386,8 @@
             dailyChallengeRules.textContent = `${daily.date} UTC · ${country} · Starts with ${setup.start} · ${time} · Standard spelling · Hints after the round`;
             renderSavedSetups();
             setupStatus.textContent = '';
+            setupLinkFallback.hidden = true;
+            setupLinkText.value = '';
             if (storage.available) loadScoreHistories();
             renderScorebook();
             setClearPrompt(false);
@@ -2276,6 +2397,7 @@
 
         document.getElementById('saveSetupForm').addEventListener('submit', event => {
             event.preventDefault();
+            if (sharedSetupIssues.size) return;
             const name = setupName.value.trim();
             if (!name) {
                 showSetupStatus(false, 'Enter a name for this setup');
@@ -2311,6 +2433,7 @@
 
         document.getElementById('confirmClearDataBtn').addEventListener('click', () => {
             legacyStorage?.remove(legacyKeys);
+            clearSharedSetup();
             applyPreferences(storage.normalize.preferences());
             cancelResults(searchResultsContainer);
             showResultMessage(searchResultsContainer, 'Search results will appear here');
@@ -2320,6 +2443,8 @@
             for (const record of Object.keys(scoreHistories)) scoreHistories[record] = [];
             setupName.value = '';
             setupStatus.textContent = '';
+            setupLinkFallback.hidden = true;
+            setupLinkText.value = '';
             renderSavedSetups();
             renderScorebook();
             setClearPrompt(false);
