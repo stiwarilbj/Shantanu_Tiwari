@@ -238,7 +238,8 @@ let audioContext;
 const catalog = JSON.parse(document.getElementById('countryCatalog').textContent);
 const countryIndexes = new Map(catalog.countries.map((country, index) => [country, index]));
 const filterLetters = ['', ...'abcdefghijklmnopqrstuvwxyz'];
-const decodedFilterCounts = new WeakMap();
+const filterBytesPerBlock = Math.ceil(filterLetters.length ** 2 / 8);
+const filterAvailability = Uint8Array.from(atob(catalog.filterAvailability), character => character.charCodeAt(0));
 const storage = createPlacesStorage(countryIndexes);
 const legacyStorage = window.chrome?.storage?.local;
 const legacyKeys = ['gameState', 'gameSettings', 'searchFilters'];
@@ -610,25 +611,13 @@ function roundFilters() {
     };
 }
 
-function setupAnswerCount({ country, start, end }) {
-    const { worldwideNames, worldwidePairs, byCountry } = catalog.filterCounts;
-    const packed = country === 'any' ?
-        (countrySelect.value === 'placeAndCountry' ? worldwidePairs : worldwideNames) :
-        byCountry[countryIndexes.get(country)];
-    let counts = decodedFilterCounts.get(packed);
-    const axisSize = filterLetters.length;
-    if (!counts) {
-        counts = new Uint32Array(axisSize ** 2);
-        let offset = 0;
-        for (const value of packed) {
-            if (value < 0) offset -= value;
-            else counts[offset++] = value;
-        }
-        decodedFilterCounts.set(packed, counts);
-    }
+function hasMatchingPlaces({ country, start, end }) {
+    const block = country === 'any' ? 0 : countryIndexes.get(country) + 1;
     const row = filterLetters.indexOf(start);
     const column = filterLetters.indexOf(end);
-    return counts[row * axisSize + column];
+    const index = row * filterLetters.length + column;
+    const byte = filterAvailability[block * filterBytesPerBlock + (index >> 3)];
+    return (byte & (1 << (index & 7))) !== 0;
 }
 
 function roundIsOpen(round = activeRound) {
@@ -647,7 +636,7 @@ function updateStartButton() {
     const finishInPauseSlot = canFinish && canResume;
     const filters = roundFilters();
     const empty = !readingSavedState && !roundIsOpen() && !restoringRound && !sharedSetupIssues.size &&
-        setupAnswerCount(filters) === 0;
+        !hasMatchingPlaces(filters);
     startBtn.disabled = (running && !finishInStartSlot) || empty || finishing || sharedSetupIssues.size > 0;
     pauseBtn.disabled = !running && !finishInPauseSlot;
     if (loading) startBtn.setAttribute('aria-disabled', 'true');
@@ -1124,7 +1113,7 @@ function showExamples() {
     if (displayBtn.disabled) return;
     const round = roundIsOpen() ? activeRound : undefined;
     const filters = round?.filters ?? roundFilters();
-    if (!round && setupAnswerCount(filters) === 0) {
+    if (!round && !hasMatchingPlaces(filters)) {
         showResultMessage(examplePlacesContainer, 'No places found matching current game filters');
         return;
     }
@@ -1615,7 +1604,7 @@ function restoreGame(preferences, savedRound) {
 
     restoringRound = savedRound;
     applySettings(savedRound.setup, savedRound.daily);
-    if (setupAnswerCount(roundFilters()) === 0) {
+    if (!hasMatchingPlaces(roundFilters())) {
         restoringRound = undefined;
         discardSavedRound(savedRound.id);
         refreshSetup();
