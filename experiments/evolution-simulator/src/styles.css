@@ -1,6 +1,6 @@
-@font-face{font-family:Lab Mono;src:url('./assets/latin-modern-mono.ttf') format('truetype');font-display:swap}
-@font-face{font-family:Source Sans;src:url('./assets/source-sans-pro.ttf') format('truetype');font-display:swap}
-@font-face{font-family:Source Sans;src:url('./assets/source-sans-semibold.ttf') format('truetype');font-weight:600 900;font-display:swap}
+@font-face{font-family:Lab Mono;src:url('./assets/latin-modern-mono.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Source Sans;src:url('./assets/source-sans-pro.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Source Sans;src:url('./assets/source-sans-semibold.woff2') format('woff2');font-weight:600 900;font-display:swap}
 :root{
   color-scheme:dark;
   --stage:#242424;--dock:#171717;--panel:#151514;--ink:#FFFDFC;--cream:#EEEDD6;
