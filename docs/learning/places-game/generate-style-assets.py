@@ -61,8 +61,12 @@ def keep_used_rules(rules, classes):
 
 
 def subset_icons(codepoints):
-    # Subset the original outlines from the vendored TrueType face.
-    font = TTFont(VENDOR / "fontawesome/webfonts/fa-solid-900.ttf", recalcTimestamp=False)
+    # Preserve the source glyph bounds to keep the icons in their original positions.
+    font = TTFont(
+        VENDOR / "fontawesome/webfonts/fa-solid-900.ttf",
+        recalcBBoxes=False,
+        recalcTimestamp=False,
+    )
     options = subset.Options()
     options.ignore_missing_unicodes = False
     options.name_IDs.extend([13, 14])
