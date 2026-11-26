@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const siteRoot = new URL("../", import.meta.url);
-const sharedDirectory = /^(assets|navbar)\//;
+const versionedAssets = /^(?:(?:assets|navbar)\/|learning\/places-game\/places-game\.js$)/;
 const pageAssets = /(^[ \t]*<(?:link|script)\b[^<>]*?\s(?:href|src)=)(["'])([^"']+)\2/gm;
 const stylesheetAssets = /(\burl\(\s*)(["']?)([^'"\s)]+)\2(?=\s*\))/g;
 const moduleImports = /(^[ \t]*import\s+(?:[^'";]*?\s+from\s+)?)(["'])(\.{1,2}\/[^"']+)\2/gm;
@@ -21,7 +21,7 @@ export function createAssetVersions() {
       if (!url.href.startsWith(siteRoot.href)) return attribute;
 
       const asset = url.pathname.slice(siteRoot.pathname.length);
-      if (!sharedDirectory.test(asset)) return attribute;
+      if (!versionedAssets.test(asset)) return attribute;
 
       url.searchParams.set("v", assetVersion(asset));
       return `${prefix}${quote}${relativePath}${url.search}${url.hash}${quote}`;

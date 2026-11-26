@@ -30,3 +30,16 @@ After editing `PlacesData.js`, run these commands from this folder to update the
 node generate-place-dictionary.mjs
 node generate-place-dictionary.mjs --check
 ```
+
+After adding a Bootstrap class or icon, rebuild the bundled stylesheet and icon font from this folder. The build reads class names in the HTML and game script, so spell out any classes the script adds.
+
+```sh
+uv run generate-style-assets.py
+uv run generate-style-assets.py --check
+```
+
+After editing `places-game.js`, run the site generator to refresh its version in the page.
+
+```sh
+node ../../navbar/generate.mjs
+```
