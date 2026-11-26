@@ -25,6 +25,7 @@ export function renderNavbar(html, pageFile, versions = createAssetVersions()) {
 
   const root = "../".repeat(pageFile.split("/").length - 1) || "./";
   const pagePath = pageFile.replace(/(^|\/)index\.html$/, "$1");
+  const isSectionLanding = sections.some(([slug]) => pagePath === `${slug}/`);
   const href = (path) => `href="${escapeHtml(root + path)}"${path === pagePath ? ' aria-current="page"' : ""}`;
 
   const sectionLinks = sections.map(([slug, name, projects = []]) => {
@@ -76,6 +77,9 @@ ${navbarScript}
     ...["navbar", "dropdown", "search"].map((name) =>
       `<link rel="stylesheet" href="${root}navbar/${name}.css">`),
     `<link id="navbar-search-module" rel="modulepreload" href="${root}navbar/search.js">`,
+    ...(isSectionLanding ? [
+      `<link rel="preload" as="font" type="font/woff2" crossorigin fetchpriority="low" href="${root}assets/inter-latin.woff2">`,
+    ] : []),
     "<!-- End shared navbar assets -->",
   ];
 
