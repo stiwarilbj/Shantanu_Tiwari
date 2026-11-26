@@ -101,8 +101,16 @@ function setupDownload(run) {
     ...(run.traitAdjustments?.length && { traitAdjustments: run.traitAdjustments }),
   },null,2))
 }
+async function exportSavedSetup(id) {
+  message.value=''
+  try {
+    const run=await lab.loadRun(id)
+    if (!run) throw new Error('The saved run is unavailable.')
+    setupDownload(run)
+  } catch { message.value='Could not open the saved setup.' }
+}
 async function share(run) {
-  const link=!run.revisions.length && setupLink(run.setup)
+  const link=!run.ruleVersions.length && setupLink(run.setup)
   if(!link) { message.value='Use Export setup for branch histories or longer configurations.'; return }
   try { await navigator.clipboard.writeText(link); message.value='Setup link copied. It opens a new experiment draft.' }
   catch { message.value='The clipboard is unavailable. Use Export setup.' }
@@ -216,24 +224,26 @@ onMounted(()=>dialog.value.showModal())
         <button class="secondary" @click="file.click()"><Upload :size="16"/> Import setup</button>
         <button class="primary" @click="lab.openSettings({...starter(),name:'New experiment',seed:randomSeed()})">New experiment</button>
       </div>
-      <p v-if="!matches.length" class="quiet">No matching saved runs.</p>
+      <p v-if="lab.libraryLoading" class="quiet" role="status">Loading saved runs…</p>
+      <p v-else-if="lab.libraryError" class="issue" role="alert">{{ lab.libraryError }}</p>
+      <p v-else-if="!matches.length" class="quiet">No matching saved runs.</p>
       <div class="library-rows">
         <article v-for="run in matches" :key="run.id">
           <div><strong>{{ run.setup.name }}</strong> <span v-if="run.id===lab.run.id" class="teal">● Active</span>
-            <small>Seed {{ run.setup.seed }} · Saved through Day {{ run.summaries.at(-1)?.day ?? 0 }}</small></div>
-          <button class="secondary" @click="emit('resume',run)">Resume</button>
+            <small>Seed {{ run.setup.seed }} · Saved through Day {{ run.savedThrough }}</small></div>
+          <button class="secondary" @click="emit('resume',run.id)">Resume</button>
           <button v-if="run.id!==lab.run.id" class="secondary" @click="emit('compare',run.id)">Compare</button>
           <button type="button" class="secondary library-action-toggle" :aria-expanded="actionsId===run.id"
             :aria-controls="'run-actions-'+run.id" @click="actionsId=actionsId===run.id ? null : run.id">Actions</button>
           <div v-show="actionsId===run.id" :id="'run-actions-'+run.id" class="library-menu" role="group" :aria-label="'Actions for '+run.setup.name">
-            <button @click="emit('results',run)">View results</button>
+            <button @click="emit('results',run.id)">View results</button>
             <button @click="renameId=run.id;newName=run.setup.name">Rename</button>
             <button @click="lab.openSettings({...run.setup,name:(run.setup.name+' copy').slice(0,60)})">Duplicate</button>
-            <button @click="setupDownload(run)">Export setup</button>
+            <button @click="exportSavedSetup(run.id)">Export setup</button>
             <button @click="share(run)">Copy setup link</button>
             <button v-if="run.id!==lab.run.id" @click="removeId=run.id">Delete</button>
           </div>
-          <form v-if="renameId===run.id" class="library-confirm" @submit.prevent="lab.rename(run,newName.trim());renameId=null"><label>Name <input v-model="newName" required maxlength="60"></label><button class="primary" :disabled="!newName.trim()">Save</button></form>
+          <form v-if="renameId===run.id" class="library-confirm" @submit.prevent="lab.rename(run.id,newName.trim());renameId=null"><label>Name <input v-model="newName" required maxlength="60"></label><button class="primary" :disabled="!newName.trim()">Save</button></form>
           <div v-if="removeId===run.id" class="library-confirm">Delete {{ run.setup.name }}? <button class="secondary" @click="removeId=null">Cancel</button>
             <button class="secondary issue" @click="lab.remove(run.id);removeId=null">Delete run</button></div>
         </article>

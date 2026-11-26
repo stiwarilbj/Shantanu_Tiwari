@@ -5,7 +5,7 @@ import { dawnForRun, founders, snapshot } from './engine/simulation.js'
 import { validSpeciesHistory } from './engine/species-actions.js'
 import { validTraitAdjustment } from './engine/trait-adjustments.js'
 import { DT, clamp } from './engine/geometry.js'
-import { listRuns, saveRun, saveRunPair, deleteRun } from './archive.js'
+import { deleteRun, indexLegacyRuns, readLibrary, readRun, saveRun, saveRunPair, summarizeRun } from './archive.js'
 import { adjacentFrameTime, prepareTrack, trackFrame } from './track.js'
 
 const createWorker = () => new Worker(new URL('./engine/worker.js', import.meta.url), { type: 'module' })
@@ -80,6 +80,7 @@ export function prepareExperiment(setup, signal, progress) {
 
 export const useLab = defineStore('lab', () => {
   const run = shallowRef(null), library = shallowRef([])
+  const libraryLoading = ref(true), libraryError = ref('')
   const frame = shallowRef(null), liveFrame = shallowRef(null)
   const viewing = ref(1), replay = ref(false), playing = ref(false)
   const rate = ref(6), through = ref(false), scope = ref('all')
@@ -135,19 +136,61 @@ export const useLab = defineStore('lab', () => {
   let raf, initialised = false, waiting = null
   let persistQueue = Promise.resolve()
   const unsavedRuns = new Map()
+  const deletingRuns = new Set()
+  let libraryChanges = new Set()
 
   const savedRun = id => library.value.find(value => value.id === id)
-  function latestRun(value) {
-    return unsavedRuns.get(value.id) ?? savedRun(value.id) ?? value
+  function updateLibrary(id, entry) {
+    libraryChanges?.add(id)
+    const entries = library.value.filter(value => value.id !== id)
+    if (entry) entries.push(entry)
+    library.value = entries
+  }
+
+  function mergeLibrary(entries) {
+    const merged = new Map(library.value.map(entry => [entry.id, entry]))
+    for (const entry of entries) {
+      if (!libraryChanges.has(entry.id)) merged.set(entry.id, entry)
+    }
+    library.value = [...merged.values()]
+  }
+
+  async function loadLibrary(restoring) {
+    try {
+      const { summaries, missing } = await readLibrary()
+      mergeLibrary(summaries)
+      if (missing.length) {
+        await restoring
+        mergeLibrary(await indexLegacyRuns(missing))
+      }
+    } catch (error) {
+      libraryError.value = error?.message || 'Could not open the saved run library.'
+    } finally {
+      libraryChanges = null
+      libraryLoading.value = false
+    }
+  }
+
+  function runAvailable(id, listed) {
+    return !deletingRuns.has(id) && (!listed || !!savedRun(id))
+  }
+
+  async function loadRun(id) {
+    if (deletingRuns.has(id)) return
+    const inMemory = () => run.value?.id === id ? run.value : unsavedRuns.get(id)
+    const existing = inMemory()
+    if (existing) return existing
+    const listed = savedRun(id)
+    const archived = await readRun(id)
+    if (runAvailable(id, listed)) return inMemory() ?? archived
   }
 
   function persist(value = run.value) {
     if (!value) return
-    const count = last(value)
     unsavedRuns.set(value.id, value)
-    persistQueue = persistQueue.then(() => saveRun(value)).then(() => {
-      library.value = [...library.value.filter(r => r.id !== value.id), value]
-      if (run.value?.id === value.id) saved.value = count
+    persistQueue = persistQueue.then(() => saveRun(value)).then(entry => {
+      updateLibrary(entry.id, entry)
+      if (run.value?.id === value.id) saved.value = entry.savedThrough
       if (unsavedRuns.get(value.id) === value) unsavedRuns.delete(value.id)
     }).catch(() => { error.value = 'Local saving is unavailable. You can still export this run.' })
     return persistQueue
@@ -310,7 +353,7 @@ export const useLab = defineStore('lab', () => {
     }
   }
 
-  async function useRun(value, newRun = false, restoreDay = null, isCurrent = () => true, onActivate) {
+  async function useRun(value, { newRun = false, restoreDay = null, isCurrent = () => true, onActivate, remember = true } = {}) {
     const switchId = ++runRequest
     cancelReplay()
     const viewRequest = request
@@ -340,7 +383,7 @@ export const useLab = defineStore('lab', () => {
     if (!canSwitch()) return false
     const sameRun = run.value?.id === value.id
     if (sameRun) value = run.value
-    else if (!newRun) value = latestRun(value)
+    else if (!newRun) value = unsavedRuns.get(value.id) ?? value
     let restoredTrack
     if (run.value && !sameRun && restoreDay >= 1 && restoreDay <= last(value)) {
       replayDay.value = restoreDay
@@ -362,7 +405,7 @@ export const useLab = defineStore('lab', () => {
     waiting = null
     batch.value = null
     autoPrepare = false
-    if (!sameRun) saved.value = last(savedRun(value.id))
+    if (!sameRun) saved.value = savedRun(value.id)?.savedThrough ?? (newRun || unsavedRuns.has(value.id) ? 0 : last(value))
     selected.value = null
     following.value = false
     scope.value = 'all'
@@ -371,7 +414,9 @@ export const useLab = defineStore('lab', () => {
     run.value = value
     error.value = ''
     workerError.value = ''
-    try { localStorage.setItem('evolution.active', value.id) } catch {}
+    if (remember) {
+      try { localStorage.setItem('evolution.active', value.id) } catch {}
+    }
     const day = extinctDay.value ? last(value) : Math.min(last(value) + 1, value.setup.days)
     viewing.value = day
     frame.value = null
@@ -412,15 +457,27 @@ export const useLab = defineStore('lab', () => {
     }
   }
 
-  async function init() {
-    if (initialised) return
-    initialised = true
-    try { library.value = await listRuns() } catch {}
+  async function restoreActiveRun() {
     const address = location.hash.match(/^#\/r\/([^/]+)\/s\/(\d+)\//)
     let activeId
     try { activeId = localStorage.getItem('evolution.active') } catch {}
-    const found = library.value.find(r => r.id === address?.[1]) ?? library.value.find(r => r.id === activeId)
-    await useRun(found ?? makeRun(starter()), !found, found?.id===address?.[1] && address ? +address[2] : null)
+    const addressedId = address?.[1]
+    let found, remember = true
+    try {
+      if (addressedId) found = await readRun(addressedId)
+      if (!found && activeId && activeId !== addressedId) found = await readRun(activeId)
+    } catch { remember = false }
+    if (found && libraryLoading.value && !savedRun(found.id)) mergeLibrary([summarizeRun(found)])
+    const restoreDay = found && found.id === addressedId ? +address[2] : null
+    await useRun(found ?? makeRun(starter()), { newRun: !found, restoreDay, remember })
+  }
+
+  async function init() {
+    if (initialised) return
+    initialised = true
+    const restoring = restoreActiveRun()
+    void loadLibrary(restoring)
+    await restoring
     raf = requestAnimationFrame(animate)
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) stopPlayback()
@@ -439,9 +496,10 @@ export const useLab = defineStore('lab', () => {
     const right = await prepareExperiment(setups[1], signal, day => progress(1, day))
     signal.throwIfAborted()
     onSaving()
-    try { await saveRunPair(left, right) }
+    try {
+      for (const entry of await saveRunPair(left, right)) updateLibrary(entry.id, entry)
+    }
     catch { throw new Error('Could not save the experiment pair in this browser. Try again when local storage is available.') }
-    library.value = [...library.value, left, right]
     return { left:left.id, right:right.id, day:Math.min(last(left), last(right)) }
   }
 
@@ -787,15 +845,24 @@ export const useLab = defineStore('lab', () => {
       return {}
     }
     clearSettings()
-    await useRun(makeRun(setup), true)
+    await useRun(makeRun(setup), { newRun: true })
     return {}
   }
 
-  async function switchRun(value, isCurrent, restoreDay) {
+  async function switchRun(id, isCurrent, restoreDay) {
+    const listed = savedRun(id)
+    let value
+    try { value = await loadRun(id) }
+    catch {
+      if (isCurrent()) error.value = 'Could not open the saved run.'
+      return false
+    }
+    if (!isCurrent()) return false
+    if (!value || !runAvailable(id, listed)) return null
     cancelBranch()
     modal.value = null
     draft.value = null
-    return useRun(value, false, restoreDay, isCurrent)
+    return useRun(value, { restoreDay, isCurrent: () => isCurrent() && runAvailable(id, listed) })
   }
 
   async function importBranch(setup, revisions = [], speciesActions = [], traitAdjustments = []) {
@@ -817,16 +884,20 @@ export const useLab = defineStore('lab', () => {
     cancelBranch()
     modal.value=null
     draft.value=null
-    await useRun(value,true)
+    await useRun(value, { newRun: true })
     return true
   }
 
-  function rename(value, name) {
-    const active = run.value?.id === value.id
-    const source = active ? run.value : latestRun(value)
-    const updated = { ...source, setup: { ...source.setup, name } }
-    if (active) run.value = updated
-    persist(updated)
+  async function rename(id, name) {
+    try {
+      const value = run.value?.id === id ? run.value : await loadRun(id)
+      if (!value) throw new Error('The saved run is unavailable.')
+      const active = run.value?.id === id
+      const source = active ? run.value : unsavedRuns.get(id) ?? value
+      const updated = { ...source, setup: { ...source.setup, name } }
+      if (active) run.value = updated
+      persist(updated)
+    } catch { error.value = 'Could not rename that saved run.' }
   }
 
   function toggleBookmark(day) {
@@ -838,13 +909,16 @@ export const useLab = defineStore('lab', () => {
   }
 
   async function remove(id) {
-    if (run.value?.id === id) return
+    if (run.value?.id === id || deletingRuns.has(id)) return
+    deletingRuns.add(id)
     try {
       await persistQueue
+      if (run.value?.id === id) return
       await deleteRun(id)
-      library.value = library.value.filter(r => r.id !== id)
+      updateLibrary(id)
       unsavedRuns.delete(id)
     } catch { error.value = 'Could not remove that saved run.' }
+    finally { deletingRuns.delete(id) }
   }
 
   function cancelBranch() {
@@ -870,11 +944,15 @@ export const useLab = defineStore('lab', () => {
         revisions: [...(base.revisions.length ? base.revisions.filter(r => r.day <= day) : [{ day: 1, setup: base.setup }]),
           { day: day + 1, setup }],
       }
-      const switched = await useRun(value, true, null, () => activated || current(), () => {
-        activated = true
-        cancelBranch()
-        modal.value = null
-        if (fromSettings) clearSettings()
+      const switched = await useRun(value, {
+        newRun: true,
+        isCurrent: () => activated || current(),
+        onActivate: () => {
+          activated = true
+          cancelBranch()
+          modal.value = null
+          if (fromSettings) clearSettings()
+        },
       })
       if (switched && setup.mode === 'prepare' && day < setup.days) simulate(setup.days, 'Preparing')
     } catch (error) {
@@ -884,7 +962,7 @@ export const useLab = defineStore('lab', () => {
     }
   }
 
-  return { run, library, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
+  return { run, library, libraryLoading, libraryError, loadRun, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
     canChangeSpecies, canAdjustSpecies, recordedChangesAhead, openSpecies, changeSpecies, speciesResult,
     canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,

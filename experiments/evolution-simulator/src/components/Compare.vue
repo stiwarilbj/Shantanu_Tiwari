@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowReactive, watch } from 'vue'
 import { ArrowLeftRight, ChevronLeft, ChevronRight, Pause, Play, Scan } from 'lucide-vue-next'
 import Board from './Board.vue'
 import TrendPlot from './TrendPlot.vue'
@@ -7,6 +7,7 @@ import ForecastStatus from './ForecastStatus.vue'
 import { pairedForecastRows } from '../forecast.js'
 import { useForecast } from '../use-forecast.js'
 import { useLab } from '../store.js'
+import { summarizeRun } from '../archive.js'
 import { trackFrame } from '../track.js'
 import { rulesFor, usesWalkthroughForaging, WALKTHROUGH_RULE_VERSION } from '../engine/config.js'
 import { runSpecies, speciesWithEdits } from '../engine/species-actions.js'
@@ -18,16 +19,51 @@ const emit=defineEmits(['library','change'])
 const lab=useLab()
 const sequenceSurface=document.body.classList.contains('project-lab-page') ? '#app' : 'body'
 const available=computed(()=>[
-  lab.run,
+  summarizeRun(lab.run),
   ...lab.library.filter(run=>run.id!==lab.run.id).sort((a,b)=>b.created-a.created),
 ])
-const recordedRuns=available.value.filter(run=>run.summaries.length>0)
-const leftCandidates=recordedRuns.length>=2 ? recordedRuns : available.value
-const leftId=ref(props.initial?.left ?? leftCandidates.find(run=>run.id!==props.initial?.right)?.id ?? '')
-const otherRun=run=>run.id!==leftId.value
-const rightId=ref(props.initial?.right ?? recordedRuns.find(otherRun)?.id ?? available.value.find(otherRun)?.id ?? '')
-const left=computed(()=>available.value.find(r=>r.id===leftId.value))
-const right=computed(()=>available.value.find(r=>r.id===rightId.value))
+const leftId=ref(props.initial?.left ?? null)
+const rightId=ref(props.initial?.right ?? null)
+watch(()=>lab.libraryLoading,loading=>{
+  if (loading) return
+  const recorded=available.value.filter(run=>run.savedThrough>0)
+  const candidates=recorded.length>=2 ? recorded : available.value
+  leftId.value ??= candidates.find(run=>run.id!==rightId.value)?.id ?? ''
+  const other=run=>run.id!==leftId.value
+  rightId.value ??= recorded.find(other)?.id ?? available.value.find(other)?.id ?? ''
+},{immediate:true})
+
+const archives=shallowReactive(new Map())
+const findRun=id=>id===lab.run.id ? lab.run : archives.get(id)?.run
+const left=computed(()=>findRun(leftId.value))
+const right=computed(()=>findRun(rightId.value))
+const loadingRuns=computed(()=>
+  (lab.libraryLoading && (leftId.value==null || rightId.value==null)) ||
+  [...archives.values()].some(entry=>entry.loading))
+const archiveErrors=computed(()=>[...archives].filter(([,entry])=>entry.error))
+async function loadArchive(id,summary) {
+  const entry={ summary, loading:true }
+  archives.set(id,entry)
+  let run, error=''
+  try {
+    run=await lab.loadRun(id)
+    if (!run) error='This saved run is no longer available.'
+  } catch { error='Could not open the saved run.' }
+  if (archives.get(id)===entry) archives.set(id,{ ...entry, run, error, loading:false })
+}
+watch([leftId,rightId,()=>lab.run.id,()=>lab.library],([left,right,activeId,library])=>{
+  const ids=new Set([left,right].filter(id=>id && id!==activeId))
+  for (const id of archives.keys()) {
+    if (!ids.has(id)) archives.delete(id)
+  }
+  for (const id of ids) {
+    const summary=library.find(run=>run.id===id)
+    const entry=archives.get(id)
+    if (!entry || (entry.summary && entry.summary!==summary)) void loadArchive(id,summary)
+    else entry.summary=summary
+  }
+},{immediate:true})
+
 const runs=computed(()=>[left.value,right.value])
 const runDays=computed(()=>runs.value.map(run=>run?.summaries.length ?? 0))
 const horizon=computed(()=>Math.min(...runDays.value))
@@ -93,7 +129,7 @@ const largestHuntGap=computed(()=>{
 const videoPair=computed(()=>{
   const match=(run,size)=>run.setup.seed===SIZE_MUTATION_SEED && run.setup.name.startsWith('Size mutation · '+(size===1?'Wide':'Narrow')) &&
     run.setup.food===50 && run.setup.foraging==='walkthrough' && run.setup.species.some(s=>s.enabled && s.standardDeviation?.size===size) &&
-    run.summaries.length>=77 && [6,77].every(day=>rulesFor(run.setup, run.revisions, day).version===WALKTHROUGH_RULE_VERSION)
+    run.savedThrough>=77 && [6,77].every(day=>rulesFor(run.setup, run.ruleVersions, day).version===WALKTHROUGH_RULE_VERSION)
   const wide=available.value.find(run=>match(run,1))
   const narrow=available.value.find(run=>match(run,.5))
   return wide && narrow && wide.id!==narrow.id ? { wide,narrow } : null
@@ -340,6 +376,8 @@ watch([leftId,()=>days.value[0],replayAvailable],()=>syncTrack(0),{immediate:tru
 watch([rightId,()=>days.value[1],replayAvailable],()=>syncTrack(1),{immediate:true})
 watch(()=>[runDays.value[0],runDays.value[1]],limits=>{
   for (let index=0;index<2;index++) {
+    const id=index===0 ? leftId.value : rightId.value
+    if (id==null || (id && !runs.value[index])) continue
     if (!limits[index]) days.value[index]=1
     else days.value[index]=Math.max(1,Math.min(limits[index],days.value[index]))
   }
@@ -348,8 +386,11 @@ watch([leftId,rightId,()=>days.value[0],()=>days.value[1],day,()=>cameras.value[
   left:leftId.value,right:rightId.value,day:day.value,leftDay:days.value[0],rightDay:days.value[1],
   leftCamera:cameras.value[0],rightCamera:cameras.value[1],
 }),{immediate:true})
-watch(horizon,limit=>{ if (day.value>limit) day.value=Math.max(1,limit) },{immediate:true})
+watch([horizon,loadingRuns],([limit,loading])=>{
+  if (!loading && day.value>limit) day.value=Math.max(1,limit)
+},{immediate:true})
 onBeforeUnmount(()=>{
+  archives.clear()
   jobs.fill(null)
   stopVideoSequence()
   videoPairController?.abort()
@@ -365,12 +406,18 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
     <header><h1>Compare runs</h1><button class="secondary" @click="emit('library')">Run Library</button></header>
     <div class="compare-selects">
       <label v-for="(name,index) in names" :key="name" :class="index===0 ? 'run-left' : 'run-right'">{{ name }}
-        <select :value="index===0 ? leftId : rightId" @change="index===0 ? leftId=$event.target.value : rightId=$event.target.value">
+        <select :value="(index===0 ? leftId : rightId) ?? ''" @change="index===0 ? leftId=$event.target.value : rightId=$event.target.value">
           <option value="">Choose a run</option><option v-for="r in available" :key="r.id" :value="r.id">{{ r.setup.name }} · Seed {{ r.setup.seed }}</option>
         </select>
       </label>
     </div>
-    <p v-if="!left||!right||leftId===rightId" class="notice">Choose two different saved experiments.</p>
+    <p v-if="loadingRuns" class="notice" role="status">Loading saved runs…</p>
+    <div v-else-if="archiveErrors.length" class="notice">
+      <p v-for="[id,entry] in archiveErrors" :key="id">
+        {{ entry.error }} <button class="secondary" @click="loadArchive(id,entry.summary)">Try again</button>
+      </p>
+    </div>
+    <p v-else-if="!left||!right||leftId===rightId" class="notice">{{ lab.libraryError || 'Choose two different saved experiments.' }}</p>
     <p v-else-if="!horizon" class="notice">Complete a generation in each run to compare them.</p>
     <template v-else>
       <section v-if="experimentSizes" class="comparison-size" aria-labelledby="comparison-size-title">

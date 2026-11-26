@@ -50,7 +50,7 @@ async function stepTo(page, seconds) {
 
 async function savedManualProgress(page) {
   return page.evaluate(() => new Promise((resolve, reject) => {
-    const open = indexedDB.open('evolution-simulator', 1)
+    const open = indexedDB.open('evolution-simulator')
     open.onerror = () => reject(open.error)
     open.onsuccess = () => {
       const db = open.result

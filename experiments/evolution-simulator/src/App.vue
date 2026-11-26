@@ -128,7 +128,7 @@ function changeLesson(id) {
   rememberLesson(id)
   if (page.value==='about') syncAddress()
 }
-async function applyAddress(hash = location.hash) {
+async function applyAddress(hash = location.hash, startup = false) {
   const token = beginNavigation()
   const current = () => token === routeRequest
   if (hash.startsWith('#/setup/')) {
@@ -145,9 +145,8 @@ async function applyAddress(hash = location.hash) {
   const query = new URLSearchParams(match[4])
   navigating = true
   try {
-    if (match[1]!==lab.run.id) {
-      const saved = lab.library.find(run => run.id===match[1])
-      if (saved && !await lab.switchRun(saved, current, +match[2])) {
+    if (!startup && match[1]!==lab.run.id) {
+      if (await lab.switchRun(match[1], current, +match[2]) === false) {
         if (current() && lab.replayFailure) retryNavigation = { failure: lab.replayFailure, retry: () => applyAddress(hash) }
         return
       }
@@ -163,7 +162,7 @@ async function applyAddress(hash = location.hash) {
     }
     else if (day>lab.completed && lab.replay) lab.goLive()
     if (!current()) return
-    if (match[3]==='compare') {
+    if (!startup && match[3]==='compare') {
       comparison.value = readComparison(query)
       comparisonVersion.value++
     }
@@ -252,8 +251,8 @@ function openBatchResults(range) {
     mainSurface.value?.focus({ preventScroll:true })
   })
 }
-async function openRun(value, view) {
-  if (view === 'stats' && value.id === lab.run.id) {
+async function openRun(id, view) {
+  if (view === 'stats' && id === lab.run.id) {
     lab.modal = null
     go(view)
     return
@@ -262,11 +261,13 @@ async function openRun(value, view) {
   const current = () => token === routeRequest
   navigating = true
   try {
-    if (await lab.switchRun(value, current) && current()) {
+    const opened = await lab.switchRun(id, current)
+    if (!current()) return
+    if (opened) {
       example.value = null
       show(view)
       history.pushState(null,'',address())
-    }
+    } else if (opened === null) lab.error = 'This saved run is no longer available.'
   } finally {
     if (current()) navigating = false
   }
@@ -280,6 +281,7 @@ watch(() => [lab.run?.id,lab.viewing,lab.settings], ([id], [previousId]) => {
   } else syncAddress()
 })
 onMounted(async () => {
+  const startingHash = location.hash
   let firstVisit=false
   try { firstVisit=!location.hash && !localStorage.getItem('evolution.active') && !localStorage.getItem('evolution.tour') } catch {}
   await lab.init()
@@ -288,7 +290,7 @@ onMounted(async () => {
   document.addEventListener('pointerdown',dismissMenu)
   document.addEventListener('keydown',escapeMenu)
   if (location.hash) {
-    await applyAddress()
+    await applyAddress(location.hash, location.hash === startingHash)
   } else {
     if (firstVisit && lab.workerReady) lab.modal = 'tour'
     history.replaceState(null,'',address())
