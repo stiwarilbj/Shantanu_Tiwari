@@ -9,7 +9,8 @@ import CreatureThought from './CreatureThought.vue'
 const props = defineProps({
   frame: Object, species: Array, layers: Object, selected: Number, follow: Boolean, camera: String,
   scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean,
-  playbackRun: String, liveRate: Number, liveFinished: Boolean
+  playbackRun: String, liveRate: Number, liveFinished: Boolean,
+  active: { type: Boolean, default: true }
 })
 const emit = defineEmits(['select', 'fallback'])
 const host = ref(null), cloud = ref(null), visionMask = ref(null)
@@ -37,7 +38,7 @@ const radiusGeometry = new THREE.CircleGeometry(1, 32)
 const homeColor = '#E5E5E5'
 const legacyOutlineSize = FIELD - 16
 const meshKinds = {}
-let renderer, canvas, ctx, orbit, resize, raf, down, previousFrame, height = 1, width = 1, dirty = true
+let renderer, canvas, ctx, orbit, resize, raf = null, down, previousFrame, height = 0, width = 0, dirty = true
 let tabletop, refugeSurface, refugeOutline
 let contact, contactTexture
 let pickBody, bodyIds = [], screenBlobs = [], followed = false, manual = false, previousTime = 0
@@ -440,9 +441,7 @@ function draw2d(blobs, frame, view, { min, max }) {
 }
 
 function fit() {
-  if (!host.value?.clientWidth || !host.value.clientHeight) return
-  width = host.value.clientWidth
-  height = host.value.clientHeight
+  if (!width || !height) return
   camera.aspect = width / height
   camera.updateProjectionMatrix()
   const units = (props.tabletop ? 300 : 355) * Math.max(1, height / width)
@@ -485,9 +484,8 @@ function resetView() {
   dirty = true
 }
 
-function draw(now) {
-  if (!host.value?.offsetWidth) { raf = requestAnimationFrame(draw); return }
-  const delta = Math.min(80, now-previousTime)
+function draw(now, revealed = false) {
+  const delta = clamp(now-previousTime, 0, 80)
   previousTime = now
   const frame = samplePlayback(props.frame, now, { run: props.playbackRun, rate: props.liveRate, finished: props.liveFinished })
   if (frame) {
@@ -495,6 +493,7 @@ function draw(now) {
     const blob = props.follow && props.camera !== 'overhead' && blobs.find(b => b.id === props.selected && b.alive)
     if (followedBlob.value?.id !== blob?.id || followedBlob.value?.state !== blob?.state) followedBlob.value = blob || null
     const follow = !!blob
+    const immediate = revealed || reduced.matches
     if (follow) {
       if (!followed) {
         originalPosition.copy(camera.position)
@@ -512,11 +511,11 @@ function draw(now) {
         position.set(x+distance*(.19*c+.98*s),Math.max(close ? 21 : 32,blob.r*3.1),z+distance*(.19*s-.98*c))
         aim.set(x+c*(close ? 2 : lookAhead),Math.max(close ? 2 : 13,blob.r*1.65),z+s*(close ? 2 : lookAhead))
       }
-      const ease = reduced.matches ? 1 : 1 - Math.exp(-delta / 135)
+      const ease = immediate ? 1 : 1 - Math.exp(-delta / 135)
       camera.position.lerp(position,ease)
       target.lerp(aim,ease)
     } else if (followed) {
-      const ease = reduced.matches ? 1 : 1 - Math.exp(-delta / 195)
+      const ease = immediate ? 1 : 1 - Math.exp(-delta / 195)
       camera.position.lerp(originalPosition,ease)
       target.lerp(originalTarget,ease)
       if (camera.position.distanceTo(originalPosition)<.8) followed = false
@@ -545,6 +544,36 @@ function draw(now) {
     }
   } else followedBlob.value = null
   raf = requestAnimationFrame(draw)
+}
+
+function stopDrawing() {
+  if (raf !== null) cancelAnimationFrame(raf)
+  raf = null
+}
+
+function resizeBoard(nextWidth, nextHeight) {
+  if (!props.active || !nextWidth || !nextHeight) {
+    stopDrawing()
+    return
+  }
+  if (nextWidth !== width || nextHeight !== height) {
+    width = nextWidth
+    height = nextHeight
+    fit()
+  }
+  if (raf !== null) return
+
+  const now = performance.now()
+  // Resume at the current pose instead of playing snapshots from before the board was hidden.
+  samplePlayback(null, now)
+  dirty = true
+  draw(now, true)
+}
+
+function updateVisibility() {
+  // Measure once after a reveal so the first draw can use the new size before the observer fires.
+  if (props.active) resizeBoard(host.value.clientWidth, host.value.clientHeight)
+  else stopDrawing()
 }
 
 function hit(event) {
@@ -623,18 +652,21 @@ function setupRenderer() {
     useCanvasFallback()
   }
   if (renderer) mountCanvas()
-  resize = new ResizeObserver(fit)
+  resize = new ResizeObserver(([{ contentRect }]) => {
+    resizeBoard(Math.round(contentRect.width), Math.round(contentRect.height))
+  })
   resize.observe(host.value)
   reduced.addEventListener('change', redraw)
-  raf = requestAnimationFrame(draw)
+  updateVisibility()
 }
 watch(() => props.species, list => { for (const s of list ?? []) colors.set(s.id,s.color); dirty = true }, { immediate:true })
 watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,props.scope,props.speedRange], () => { dirty = true }, { deep:true })
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })
+watch(() => props.active, updateVisibility, { flush:'post' })
 onMounted(setupRenderer)
 onBeforeUnmount(() => {
-  cancelAnimationFrame(raf)
+  stopDrawing()
   resize?.disconnect()
   reduced.removeEventListener('change', redraw)
   orbit?.dispose()

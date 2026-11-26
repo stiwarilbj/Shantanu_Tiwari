@@ -219,7 +219,7 @@ defineExpose({ select, overhead })
 <template>
   <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead', 'is-replay':replayCanSeek }" tabindex="-1" @keydown="shortcuts">
     <section class="stage" aria-label="Simulation field">
-      <Board ref="board" :frame="lab.frame" :species="fieldSpecies" :layers="layers" :selected="lab.selected"
+      <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @fallback="fallback=true"/>

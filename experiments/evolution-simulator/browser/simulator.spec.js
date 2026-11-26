@@ -633,6 +633,103 @@ test('World continues drawing live playback after losing WebGL', async ({ page }
   expect(errors).toEqual([])
 })
 
+test('World suspends its hidden board and restores the current view @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    const activity = window.worldBoardActivity = { callbacks:0, measurements:0, paints:0 }
+    const getContext = HTMLCanvasElement.prototype.getContext
+    HTMLCanvasElement.prototype.getContext = function (kind, ...options) {
+      return kind === 'webgl2' ? null : getContext.call(this, kind, ...options)
+    }
+    // Identify the board's animation callback by a paint on the World canvas.
+    let drawing, boardCallback
+    const schedule = window.requestAnimationFrame.bind(window)
+    window.requestAnimationFrame = callback => schedule(now => {
+      drawing = callback
+      if (callback === boardCallback) activity.callbacks++
+      try { callback(now) } finally { drawing = null }
+    })
+    const fill = CanvasRenderingContext2D.prototype.fillRect
+    CanvasRenderingContext2D.prototype.fillRect = function (...args) {
+      if (this.canvas.matches('.world .world-canvas') && this.fillStyle === '#242424') {
+        if (drawing) boardCallback = drawing
+        activity.paints++
+      }
+      return fill.apply(this, args)
+    }
+    for (const [owner, property] of [
+      [HTMLElement.prototype, 'offsetWidth'], [Element.prototype, 'clientWidth'], [Element.prototype, 'clientHeight'],
+    ]) {
+      const descriptor = Object.getOwnPropertyDescriptor(owner, property)
+      Object.defineProperty(owner, property, { ...descriptor, get() {
+        if (this.matches('.world .board')) activity.measurements++
+        return descriptor.get.call(this)
+      } })
+    }
+  })
+  await openSimulator(page)
+  await startRun(page, '10', () => fixedDay(page, '20'))
+  const canvas = page.locator('.world .world-canvas')
+  const image = () => canvas.evaluate(element => element.toDataURL())
+  const activity = () => page.evaluate(() => window.worldBoardActivity)
+  const waitForFrames = () => page.evaluate(async () => {
+    for (let frame = 0; frame < 5; frame++) await new Promise(requestAnimationFrame)
+  })
+  const trends = page.getByRole('link', { name: 'Trends', exact: true })
+  const world = page.getByRole('link', { name: 'World', exact: true })
+  const elapsed = () => page.getByRole('progressbar', { name: 'Current day elapsed' }).getAttribute('aria-valuenow').then(Number)
+  const play = page.getByRole('button', { name: 'Play', exact: true })
+
+  async function switchViews(viewport) {
+    await trends.press('Enter')
+    await expect(canvas).toBeHidden()
+    const hidden = await activity()
+    if (viewport) await page.setViewportSize(viewport)
+    await waitForFrames()
+    expect(await activity()).toEqual(hidden)
+    await world.press('Enter')
+    await expect(canvas).toBeVisible()
+    await expect.poll(async () => (await activity()).paints).toBeGreaterThan(hidden.paints)
+  }
+
+  await play.click()
+  await expect.poll(elapsed).toBeGreaterThan(.2)
+  await expect.poll(async () => (await activity()).callbacks).toBeGreaterThan(0)
+  await switchViews({ width: 740, height: 700 })
+  const visible = await activity()
+  await waitForFrames()
+  expect(await activity()).toMatchObject({ measurements: visible.measurements })
+  await expect(play).toBeEnabled()
+  expect(await elapsed()).toBeGreaterThan(.2)
+  expect(await canvas.evaluate(element => {
+    const box = element.parentElement
+    const dpr = Math.min(devicePixelRatio, 1.8)
+    return element.width === Math.round(box.clientWidth * dpr) &&
+      element.height === Math.round(box.clientHeight * dpr)
+  })).toBe(true)
+
+  const pausedAt = await elapsed()
+  const unzoomed = await image()
+  const box = await canvas.boundingBox()
+  await page.mouse.move(box.x + box.width * .6, box.y + box.height * .42)
+  await page.mouse.wheel(0, 160)
+  await expect.poll(image).not.toBe(unzoomed)
+  const zoomed = await image()
+  await switchViews()
+  expect(await elapsed()).toBe(pausedAt)
+  expect(await image()).toBe(zoomed)
+
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  const scrubber = page.getByRole('slider', { name: 'Replay time' })
+  await scrubber.fill('2.4')
+  await waitForFrames()
+  const replay = await image()
+  await switchViews()
+  await expect(scrubber).toHaveValue('2.4')
+  expect(await image()).toBe(replay)
+})
+
 test('slow live playback draws intermediate poses and replay seeks directly to the requested pose', async ({ page }) => {
   await page.addInitScript(() => {
     const motion = window.motionTest = { time:0, poses:[] }
