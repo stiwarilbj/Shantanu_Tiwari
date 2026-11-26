@@ -21,7 +21,7 @@
 }
 
 .section-experiments {
-  --section-image: url("experiments-background.webp?v=2");
+  --section-image: url("experiments-background.webp?v=14354c498cf1a683");
   --section-focus: 47% 58%;
   --section-narrow-focus: 42% 58%;
   --section-light: linear-gradient(145deg, rgb(230 249 255 / 22%), transparent 55%);
@@ -29,7 +29,7 @@
 }
 
 .section-learning {
-  --section-image: url("learning-background.webp?v=2");
+  --section-image: url("learning-background.webp?v=a1b31bc5ad941c12");
   --section-focus: 69% 65%;
   --section-narrow-focus: 74% 65%;
   --section-light: radial-gradient(ellipse at 22% 15%, rgb(227 255 250 / 24%), transparent 55%);
@@ -37,7 +37,7 @@
 }
 
 .section-games {
-  --section-image: url("games-background.webp?v=2");
+  --section-image: url("games-background.webp?v=4ae6eac59b4d2cc3");
   --section-focus: 25% 60%;
   --section-narrow-focus: 16% 60%;
   --section-light: radial-gradient(ellipse at 12% 8%, rgb(247 230 255 / 19%), transparent 62%);
@@ -45,7 +45,7 @@
 }
 
 .section-old-projects {
-  --section-image: url("old-projects-background.webp?v=2");
+  --section-image: url("old-projects-background.webp?v=313884bd90bcdba4");
   --section-focus: 48% 60%;
   --section-narrow-focus: 54% 60%;
   --section-light: radial-gradient(ellipse at 92% 2%, rgb(255 230 220 / 25%), transparent 58%);

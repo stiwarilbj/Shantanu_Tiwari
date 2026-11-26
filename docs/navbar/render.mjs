@@ -1,3 +1,5 @@
+import { createAssetVersions } from "../assets/versions.mjs";
+
 const sections = [
   ["experiments", "Experiments", [["evolution-simulator", "Evolution Simulator"]]],
   ["learning", "Learning", [["places-game", "Place Naming Game"]]],
@@ -5,7 +7,6 @@ const sections = [
   ["old-projects", "Old Projects"],
 ];
 
-const navbarVersion = 34;
 const navbarHeader = /^([ \t]*)<header data-site-navbar>[\s\S]*?<\/header>/m;
 const navbarAssets = /^[ \t]*<!-- Shared navbar assets -->\r?\n[\s\S]*?^[ \t]*<!-- End shared navbar assets -->\r?\n/m;
 const endOfHead = /^([ \t]*)<\/head>/m;
@@ -15,7 +16,7 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-export function renderNavbar(html, pageFile) {
+export function renderNavbar(html, pageFile, versions = createAssetVersions()) {
   if (!navbarHeader.test(html) || !endOfHead.test(html)) {
     throw new Error(`Add a head and a <header data-site-navbar></header> to ${pageFile}`);
   }
@@ -67,17 +68,19 @@ export function renderNavbar(html, pageFile) {
   const assets = [
     "<!-- Shared navbar assets -->",
     ...["navbar", "dropdown", "search"].map((name) =>
-      `<link rel="stylesheet" href="${root}navbar/${name}.css?v=${navbarVersion}">`),
-    `<link rel="modulepreload" href="${root}navbar/search.js?v=1">`,
-    `<script type="module" src="${root}navbar/navbar.js?v=${navbarVersion}" blocking="render"></script>`,
+      `<link rel="stylesheet" href="${root}navbar/${name}.css">`),
+    `<link rel="modulepreload" href="${root}navbar/search.js">`,
+    `<script type="module" src="${root}navbar/navbar.js" blocking="render"></script>`,
     "<!-- End shared navbar assets -->",
   ];
 
-  return html
+  const rendered = html
     .replace(navbarHeader, (_, indent) => markup.split("\n").map((line) => indent + line).join("\n"))
     .replace(navbarAssets, "")
     .replace(endOfHead, (tag, indent) => [
       ...assets.map((line) => `${indent}  ${line}`),
       tag,
     ].join("\n"));
+
+  return versions.versionPage(rendered, pageFile);
 }

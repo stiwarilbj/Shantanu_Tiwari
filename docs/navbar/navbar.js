@@ -1,4 +1,4 @@
-import { setupNavbarSearch } from "./search.js?v=1";
+import { setupNavbarSearch } from "./search.js?v=4f7b0067ba6eff48";
 
 const navbarContainer = document.querySelector("[data-site-navbar]");
 const navigation = navbarContainer.querySelector(".site-nav");

@@ -59,7 +59,7 @@ a[href], button:enabled {
   position: absolute;
   z-index: -1;
   inset: 0 0 calc(0px - var(--art-blend));
-  background: center / cover no-repeat url("01-screenshot-insight.png");
+  background: center / cover no-repeat url("01-screenshot-insight.png?v=82d8f3f14588b210");
   opacity: 0.95;
   pointer-events: none;
   content: "";
@@ -174,7 +174,7 @@ h2 {
 .explore-art::before {
   position: absolute;
   inset: -50% 0 0;
-  background: center bottom / cover no-repeat url("02-ocr-glass.png");
+  background: center bottom / cover no-repeat url("02-ocr-glass.png?v=d264eb0b30545257");
   content: "";
 }
 

@@ -6,7 +6,7 @@
 
 ## Site navigation
 
-- Add `<header data-site-navbar></header>` at the top of each new page under `docs`. Run `node docs/navbar/generate.mjs` from the repository root to fill the header and link its assets. Commit the generated pages. Use `node docs/navbar/generate.mjs --check` to verify they are up to date. The Evolution Simulator's Project Lab build uses the same renderer.
-- Add each new project or section to the list in `docs/navbar/render.mjs` and regenerate the pages so it appears in the desktop panels, phone menu, and navbar search. Update `navbarVersion` there when changing the shared navbar CSS or script.
+- Add `<header data-site-navbar></header>` at the top of each new page under `docs`. After adding a page or changing a shared asset, run `node docs/navbar/generate.mjs` from the repository root. It fills the headers and gives shared files content-based URLs. Commit the refreshed files and use `node docs/navbar/generate.mjs --check` to verify them. The Evolution Simulator's Project Lab build runs the same generator.
+- Add each new project or section to the list in `docs/navbar/render.mjs` and regenerate the pages so it appears in the desktop panels, phone menu, and navbar search.
 - Keep the navbar markup, sizing, and behavior in `docs/navbar`. The shared navbar stays visible on scroll. Desktop hover panels sit under the section buttons, and the phone menu reserves space when expanded. Check the links and layout with mouse, keyboard, and touch, and fix any overlap or blocked controls.
 - Give each new project a `.project-preview` card on its section page. Keep its one-sentence description and two to four sentences of details in `docs/assets/project-previews.js`, and use the same `data-project-preview` key when featuring it in Project Showcase.

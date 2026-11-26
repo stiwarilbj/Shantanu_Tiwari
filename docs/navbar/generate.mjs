@@ -1,22 +1,27 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createAssetVersions } from "../assets/versions.mjs";
 import { renderNavbar } from "./render.mjs";
 
 const pages = fileURLToPath(new URL("../", import.meta.url));
 const check = process.argv.includes("--check");
 const files = readdirSync(pages, { recursive: true }).filter((file) => file.endsWith(".html")).sort();
+const versions = createAssetVersions();
+const updatedPages = new Map();
 
 for (const file of files) {
-  const path = join(pages, file);
-  const original = readFileSync(path, "utf8");
-  const rendered = renderNavbar(original, file.split(sep).join("/"));
-  if (original === rendered) continue;
+  const page = file.split(sep).join("/");
+  const original = readFileSync(join(pages, file), "utf8");
+  const rendered = renderNavbar(original, page, versions);
+  if (original !== rendered) updatedPages.set(page, rendered);
+}
 
+for (const [file, contents] of [...versions.updatedSources, ...updatedPages]) {
   if (check) {
-    console.error(`Regenerate the navbar in docs/${file}`);
+    console.error(`Regenerate shared references in docs/${file}`);
     process.exitCode = 1;
   } else {
-    writeFileSync(path, rendered);
+    writeFileSync(join(pages, file), contents);
   }
 }
