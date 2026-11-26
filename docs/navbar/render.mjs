@@ -1,6 +1,6 @@
 import { createAssetVersions } from "../assets/versions.mjs";
 
-const sections = [
+export const sections = [
   ["experiments", "Experiments", [["evolution-simulator", "Evolution Simulator"]]],
   ["learning", "Learning", [["places-game", "Place Naming Game"]]],
   ["games", "Games"],
@@ -11,7 +11,7 @@ const navbarHeader = /^([ \t]*)<header data-site-navbar>[\s\S]*?<\/header>/m;
 const navbarAssets = /^[ \t]*<!-- Shared navbar assets -->\r?\n[\s\S]*?^[ \t]*<!-- End shared navbar assets -->\r?\n/m;
 const endOfHead = /^([ \t]*)<\/head>/m;
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

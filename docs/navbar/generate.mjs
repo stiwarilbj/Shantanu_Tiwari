@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { renderProjectPreviews } from "../assets/project-previews.mjs";
 import { createAssetVersions } from "../assets/versions.mjs";
 import { renderNavbar } from "./render.mjs";
 
@@ -13,7 +14,7 @@ const updatedPages = new Map();
 for (const file of files) {
   const page = file.split(sep).join("/");
   const original = readFileSync(join(pages, file), "utf8");
-  const rendered = renderNavbar(original, page, versions);
+  const rendered = renderNavbar(renderProjectPreviews(original, page), page, versions);
   if (original !== rendered) updatedPages.set(page, rendered);
 }
 
