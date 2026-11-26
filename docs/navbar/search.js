@@ -146,5 +146,5 @@ export function setupNavbarSearch(group, pages, closeMenu) {
     }
   });
 
-  return close;
+  return { close, refresh };
 }

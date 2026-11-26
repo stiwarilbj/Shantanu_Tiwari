@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createAssetVersions } from "../assets/versions.mjs";
 
 export const sections = [
@@ -10,6 +11,7 @@ export const sections = [
 const navbarHeader = /^([ \t]*)<header data-site-navbar>[\s\S]*?<\/header>/m;
 const navbarAssets = /^[ \t]*<!-- Shared navbar assets -->\r?\n[\s\S]*?^[ \t]*<!-- End shared navbar assets -->\r?\n/m;
 const endOfHead = /^([ \t]*)<\/head>/m;
+const navbarScript = readFileSync(new URL("./navbar.js", import.meta.url), "utf8").trimEnd();
 
 export function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
@@ -42,6 +44,9 @@ export function renderNavbar(html, pageFile, versions = createAssetVersions()) {
   }).join("");
 
   const markup = `<header data-site-navbar>
+  <script>
+${navbarScript}
+  </script>
   <nav class="site-nav" aria-label="Main navigation">
     <a class="wordmark" ${href("")}>Project Lab</a>
     <div class="nav-search" role="search" aria-label="Project Lab">
@@ -63,19 +68,19 @@ export function renderNavbar(html, pageFile, versions = createAssetVersions()) {
       </ul>
     </div>
   </nav>
+  <script>document.currentScript.parentElement.dispatchEvent(new Event("navbar-parsed"));</script>
 </header>`;
 
   const assets = [
     "<!-- Shared navbar assets -->",
     ...["navbar", "dropdown", "search"].map((name) =>
       `<link rel="stylesheet" href="${root}navbar/${name}.css">`),
-    `<link rel="modulepreload" href="${root}navbar/search.js">`,
-    `<script type="module" src="${root}navbar/navbar.js" blocking="render"></script>`,
+    `<link id="navbar-search-module" rel="modulepreload" href="${root}navbar/search.js">`,
     "<!-- End shared navbar assets -->",
   ];
 
   const rendered = html
-    .replace(navbarHeader, (_, indent) => markup.split("\n").map((line) => indent + line).join("\n"))
+    .replace(navbarHeader, (_, indent) => markup.split("\n").map((line) => line && indent + line).join("\n"))
     .replace(navbarAssets, "")
     .replace(endOfHead, (tag, indent) => [
       ...assets.map((line) => `${indent}  ${line}`),
