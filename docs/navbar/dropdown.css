@@ -110,7 +110,7 @@
 }
 
 @media (width < 35rem), (hover: none) {
-  .site-nav[data-ready] .nav-links {
+  .site-nav .nav-links {
     position: absolute;
     inset: 100% 0 auto;
     max-block-size: calc(100vh - var(--nav-height));
@@ -121,7 +121,7 @@
     box-shadow: var(--dropdown-shadow);
   }
 
-  .site-nav[data-ready] .menu-toggle[aria-expanded="false"] + .nav-links {
+  .site-nav .menu-toggle[aria-expanded="false"] + .nav-links {
     display: none;
   }
 

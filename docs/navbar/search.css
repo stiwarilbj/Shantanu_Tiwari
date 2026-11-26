@@ -118,7 +118,7 @@
 }
 
 @media (width < 35rem), (hover: none) {
-  .site-nav[data-ready] {
+  .site-nav {
     flex-wrap: nowrap;
   }
 
@@ -126,7 +126,7 @@
     padding-inline-end: 0.5rem;
   }
 
-  .site-nav[data-ready] .menu-toggle {
+  .site-nav .menu-toggle {
     min-inline-size: clamp(5.25rem, 23vw, 8.25rem);
     padding-inline: 0.5rem var(--nav-gutter);
   }
@@ -149,7 +149,7 @@
 }
 
 @media (width < 20rem) {
-  .site-nav[data-ready] .menu-toggle {
+  .site-nav .menu-toggle {
     min-inline-size: auto;
     padding-inline: 0.5rem;
   }

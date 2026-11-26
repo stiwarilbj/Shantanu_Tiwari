@@ -34,6 +34,8 @@
 }
 
 [data-site-navbar] {
+  --nav-height: clamp(2.875rem, calc(2.125rem + 1.75vw), 3.375rem);
+  min-block-size: var(--nav-height);
   position: sticky;
   cursor: pointer;
   inset-block-start: 0;
@@ -166,11 +168,11 @@
     padding-inline-end: 2.5rem;
   }
 
-  .site-nav[data-ready] .nav-menu {
+  .site-nav .nav-menu {
     flex: initial;
   }
 
-  .site-nav[data-ready] .menu-toggle {
+  .site-nav .menu-toggle {
     display: flex;
     justify-content: flex-end;
     min-inline-size: min(8.25rem, 44vw);

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { renderNavbar } from '../../docs/navbar/render.mjs'
 
 export default defineConfig(({ mode }) => {
   const projectLab = mode === 'project-lab'
@@ -23,19 +24,10 @@ export default defineConfig(({ mode }) => {
         transformIndexHtml: {
           order: 'post',
           handler(html) {
-            const homepage = readFileSync(new URL('index.html', pages), 'utf8')
-            const navbar = homepage.match(/src="\.\/navbar\/(navbar\.js\?v=\d+)"/)?.[1]
-            if (!navbar) throw new Error('Could not find the shared navbar in the Project Lab homepage')
-
-            return {
-              html: html
-                .replace('<body>', '<body class="project-lab-page">'),
-              tags: [
-                { tag: 'link', attrs: { rel: 'stylesheet', href: './project-lab.css' }, injectTo: 'head' },
-                { tag: 'script', attrs: { type: 'module', src: `../../navbar/${navbar}`, blocking: 'render' }, injectTo: 'head' },
-                { tag: 'header', attrs: { 'data-site-navbar': true }, injectTo: 'body-prepend' },
-              ],
-            }
+            const page = html
+              .replace('  </head>', '    <link rel="stylesheet" href="./project-lab.css">\n  </head>')
+              .replace('<body>', '<body class="project-lab-page">\n    <header data-site-navbar></header>\n')
+            return renderNavbar(page, 'experiments/evolution-simulator/index.html')
           },
         },
       },

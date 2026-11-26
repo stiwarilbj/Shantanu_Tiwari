@@ -6,10 +6,80 @@
   <title>Filler – Learning | Project Lab</title>
   <link rel="stylesheet" href="../../assets/site.css?v=3">
   <link rel="icon" href="../../assets/favicon.ico" sizes="16x16 32x32 48x48 64x64">
-  <script type="module" src="../../navbar/navbar.js?v=33" blocking="render"></script>
+  <!-- Shared navbar assets -->
+  <link rel="stylesheet" href="../../navbar/navbar.css?v=34">
+  <link rel="stylesheet" href="../../navbar/dropdown.css?v=34">
+  <link rel="stylesheet" href="../../navbar/search.css?v=34">
+  <link rel="modulepreload" href="../../navbar/search.js?v=1">
+  <script type="module" src="../../navbar/navbar.js?v=34" blocking="render"></script>
+  <!-- End shared navbar assets -->
 </head>
 <body>
-  <header data-site-navbar></header>
+  <header data-site-navbar>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="wordmark" href="../../">Project Lab</a>
+      <div class="nav-search" role="search" aria-label="Project Lab">
+        <span class="nav-search-field">
+          <input type="search" role="combobox" aria-label="Search projects and sections"
+            aria-autocomplete="list" aria-expanded="false" aria-controls="nav-search-options"
+            placeholder="Search" autocomplete="off" spellcheck="false">
+        </span>
+        <div class="nav-search-results" hidden>
+          <ul id="nav-search-options" role="listbox" aria-label="Search results"></ul>
+          <p class="nav-search-empty" role="status">No matching pages</p>
+        </div>
+      </div>
+      <div class="nav-menu">
+        <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false">
+          Menu <span class="chevron" aria-hidden="true"></span>
+        </button>
+        <ul class="nav-links" id="nav-links">
+          <li class="nav-item">
+            <a class="category-link" href="../../experiments/" aria-controls="experiments-panel" aria-expanded="false" data-nav-search>
+              <span class="category-label">Experiments <span class="chevron" aria-hidden="true"></span></span>
+            </a>
+            <div class="nav-panel" id="experiments-panel" hidden>
+              <ul class="nav-panel-links">
+                <li><a href="../../experiments/evolution-simulator/" data-nav-search>Evolution Simulator</a></li>
+                <li><a href="../../experiments/filler/" aria-label="Filler for Experiments">Filler</a></li>
+              </ul>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a class="category-link" href="../../learning/" aria-controls="learning-panel" aria-expanded="false" data-nav-search>
+              <span class="category-label">Learning <span class="chevron" aria-hidden="true"></span></span>
+            </a>
+            <div class="nav-panel" id="learning-panel" hidden>
+              <ul class="nav-panel-links">
+                <li><a href="../../learning/places-game/" data-nav-search>Place Naming Game</a></li>
+                <li><a href="../../learning/filler/" aria-current="page" aria-label="Filler for Learning">Filler</a></li>
+              </ul>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a class="category-link" href="../../games/" aria-controls="games-panel" aria-expanded="false" data-nav-search>
+              <span class="category-label">Games <span class="chevron" aria-hidden="true"></span></span>
+            </a>
+            <div class="nav-panel" id="games-panel" hidden>
+              <ul class="nav-panel-links">
+                <li><a href="../../games/filler/" aria-label="Filler for Games">Filler</a></li>
+              </ul>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a class="category-link" href="../../old-projects/" aria-controls="old-projects-panel" aria-expanded="false" data-nav-search>
+              <span class="category-label">Old Projects <span class="chevron" aria-hidden="true"></span></span>
+            </a>
+            <div class="nav-panel" id="old-projects-panel" hidden>
+              <ul class="nav-panel-links">
+                <li><a href="../../old-projects/filler/" aria-label="Filler for Old Projects">Filler</a></li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
   <main></main>
 </body>
 </html>

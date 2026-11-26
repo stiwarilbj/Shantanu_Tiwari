@@ -1,84 +1,11 @@
 import { setupNavbarSearch } from "./search.js?v=1";
 
 const navbarContainer = document.querySelector("[data-site-navbar]");
-navbarContainer.style.setProperty("--nav-height", "clamp(2.875rem, calc(2.125rem + 1.75vw), 3.375rem)");
-navbarContainer.style.minBlockSize = "var(--nav-height)";
-
-const navbarUrl = new URL(import.meta.url);
-const siteRoot = new URL("../", navbarUrl);
-
-await Promise.all(["navbar.css", "dropdown.css", "search.css"].map((filename) => {
-  const stylesheetUrl = new URL(filename, navbarUrl);
-  stylesheetUrl.search = navbarUrl.search;
-
-  const stylesheet = document.createElement("link");
-  stylesheet.rel = "stylesheet";
-  stylesheet.href = stylesheetUrl.href;
-  return new Promise((resolve) => {
-    stylesheet.addEventListener("load", resolve, { once: true });
-    stylesheet.addEventListener("error", resolve, { once: true });
-    document.head.append(stylesheet);
-  });
-}));
-
-const sections = [
-  ["experiments", "Experiments", [["evolution-simulator", "Evolution Simulator"]]],
-  ["learning", "Learning", [["places-game", "Place Naming Game"]]],
-  ["games", "Games"],
-  ["old-projects", "Old Projects"],
-];
-
-const searchablePages = sections.flatMap(([slug, name, projects = []]) => [
-  { name, url: new URL(`${slug}/`, siteRoot).href },
-  ...projects.map(([path, title]) => ({
-    name: title,
-    url: new URL(`${slug}/${path}/`, siteRoot).href,
-  })),
-]);
-
-const sectionLinks = sections.map(([slug, name, projects = []]) => `
-      <li class="nav-item">
-        <a class="category-link" href="${slug}/" aria-controls="${slug}-panel">
-          <span class="category-label">${name} <span class="chevron" aria-hidden="true"></span></span>
-        </a>
-        <div class="nav-panel" id="${slug}-panel" hidden>
-          <ul class="nav-panel-links">
-            ${projects.map(([path, title]) => `<li><a href="${slug}/${path}/">${title}</a></li>`).join("")}
-            <li><a href="${slug}/filler/" aria-label="Filler for ${name}">Filler</a></li>
-          </ul>
-        </div>
-      </li>`).join("");
-
-navbarContainer.innerHTML = `
-  <nav class="site-nav" aria-label="Main navigation">
-    <a class="wordmark" href="./">Project Lab</a>
-    <div class="nav-search" role="search" aria-label="Project Lab">
-      <span class="nav-search-field">
-        <input type="search" role="combobox" aria-label="Search projects and sections"
-          aria-autocomplete="list" aria-expanded="false" aria-controls="nav-search-options"
-          placeholder="Search" autocomplete="off" spellcheck="false">
-      </span>
-      <div class="nav-search-results" hidden>
-        <ul id="nav-search-options" role="listbox" aria-label="Search results"></ul>
-        <p class="nav-search-empty" role="status">No matching pages</p>
-      </div>
-    </div>
-    <div class="nav-menu">
-      <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false" hidden>
-        Menu <span class="chevron" aria-hidden="true"></span>
-      </button>
-      <ul class="nav-links" id="nav-links">${sectionLinks}
-      </ul>
-    </div>
-  </nav>`;
-
 const navigation = navbarContainer.querySelector(".site-nav");
-const currentPath = window.location.pathname.replace(/\/index\.html$/, "/");
-for (const link of navigation.querySelectorAll("a[href]")) {
-  const destination = new URL(link.getAttribute("href"), siteRoot);
-  link.href = destination.href;
-  if (destination.pathname === currentPath) link.setAttribute("aria-current", "page");
-}
+const searchablePages = Array.from(navigation.querySelectorAll("[data-nav-search]"), (link) => ({
+  name: link.textContent.trim(),
+  url: link.href,
+}));
 
 const menu = navigation.querySelector(".menu-toggle");
 const menuGroup = navigation.querySelector(".nav-menu");
@@ -239,8 +166,6 @@ document.addEventListener("keydown", (event) => {
 compactLayout.addEventListener("change", syncLayout);
 
 syncLayout();
-menu.hidden = false;
-navigation.dataset.ready = "";
 
 const reservePanelSpace = new ResizeObserver(() => {
   const height = compactPanel.getBoundingClientRect().height;
