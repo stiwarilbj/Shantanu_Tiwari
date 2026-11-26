@@ -952,7 +952,7 @@
         function getPlacesWorker() {
             if (placesWorker) return placesWorker;
 
-            const worker = new Worker('places-worker.js?v=9');
+            const worker = new Worker('places-worker.js?v=10');
             placesWorker = worker;
             worker.addEventListener('message', ({ data }) => {
                 if (placesWorker !== worker) return;
