@@ -14,6 +14,16 @@ const placesByCountry = [];
 const composedCityKeys = new Map();
 const foldedCityKeys = new Map();
 const activeRequests = new Set();
+const TYPO_SCAN_THRESHOLD = 4096;
+const TYPO_BUCKET_BITS = 11;
+const TYPO_BUCKETS = 1 << TYPO_BUCKET_BITS;
+const TYPO_HASH_BASE = 31;
+const TYPO_HASH_INVERSE = 0xbdef7bdf;
+// Leave room for cache keys and bookkeeping inside the one MiB limit.
+const TYPO_INDEX_BYTES = 1024 * 1024 - 8 * 1024;
+const typoIndexes = new Map();
+let typoIndexBytes = 0;
+let typoBuild = false;
 const nonAscii = /[^\x00-\x7f]/u;
 const countryAliases = new Map([
     ['us', 'united states'], ['usa', 'united states'],
@@ -71,12 +81,16 @@ async function runRequest(type, payload, id, cancelled) {
                 if (cancelled()) return;
                 const lookup = await indexRound(places, needsCountry, spelling, cancelled);
                 if (cancelled()) return;
-                index = { key, places, needsCountry, spelling, ...lookup };
+                index = { key, cacheKey, worldwide: filters.country === 'any', places, needsCountry, spelling, ...lookup };
             }
             // Keep dictionary positions and their ordered place list together across attempts.
             roundIndexes.set(cacheKey, index);
             if (roundIndexes.size > MAX_CACHED_ROUND_INDEXES) {
-                roundIndexes.delete(roundIndexes.keys().next().value);
+                const oldest = roundIndexes.keys().next().value;
+                roundIndexes.delete(oldest);
+                for (const [key, table] of typoIndexes) {
+                    if (table.cacheKey === oldest) evictTypoIndex(key, table);
+                }
             }
             round = { ...index, id: roundId };
             const { places, groups } = index;
@@ -93,7 +107,7 @@ async function runRequest(type, payload, id, cancelled) {
         }
         case 'guess': {
             if (round?.id !== roundId) throw new Error('Round index is unavailable');
-            const result = round.spelling === 'standard' ? checkGuess(round, guess) : checkSpellingGuess(round, guess);
+            const result = round.spelling === 'standard' ? checkGuess(round, guess, id) : checkSpellingGuess(round, guess, id);
             if (result.place === undefined) return includeFeedback ? result : null;
             const place = displayPlace(result.place);
             return includeFeedback ? { ...result, place } : place;
@@ -414,7 +428,8 @@ function standardPairs(parts) {
     ]);
 }
 
-function checkGuess({ places, groups, needsCountry }, guess) {
+function checkGuess(round, guess, requestId) {
+    const { places, groups, needsCountry } = round;
     const lowerGuess = guess.toLowerCase();
     const parts = needsCountry ? lowerGuess.split(',').map(part => part.trim()) : [lowerGuess];
     if (needsCountry && parts.length < 2) return { reason: 'country' };
@@ -430,20 +445,12 @@ function checkGuess({ places, groups, needsCountry }, guess) {
     if (firstIndex !== Infinity) return { place: places[firstIndex], match: 'exact' };
 
     for (const [guessedCity, guessedCountry] of candidatePairs) {
+        const eligible = [];
         for (const [country, group] of groups) {
-            if (country !== guessedCountry && !isCloseMatch(country, guessedCountry)) continue;
-
-            for (let length = guessedCity.length - 1; length <= guessedCity.length + 1; length++) {
-                const cities = group.byLength.get(length);
-                if (!cities) continue;
-                for (const city of cities) {
-                    if (city === guessedCity || isCloseMatch(city, guessedCity)) {
-                        // Each bucket lists cities in dictionary order.
-                        firstIndex = Math.min(firstIndex, group.byName.get(city));
-                        break;
-                    }
-                }
-            }
+            if (country === guessedCountry || isCloseMatch(country, guessedCountry)) eligible.push(group);
+        }
+        for (const index of matchingTypos(round, guessedCity, eligible, requestId)) {
+            firstIndex = Math.min(firstIndex, index);
         }
     }
     if (firstIndex !== Infinity) return { place: places[firstIndex], match: 'corrected' };
@@ -456,6 +463,178 @@ function checkGuess({ places, groups, needsCountry }, guess) {
         }
     }
     return { reason: 'not-found' };
+}
+
+function typoIndexKey(round, length) {
+    return `${round.cacheKey}:${length}`;
+}
+
+function evictTypoIndex(key, table) {
+    typoIndexes.delete(key);
+    typoIndexBytes -= table.offsets.byteLength + table.positions.byteLength + table.postings.byteLength;
+}
+
+function reserveTypoBytes(bytes, protectedKeys) {
+    let protectedBytes = 0;
+    for (const key of protectedKeys) {
+        const table = typoIndexes.get(key);
+        if (table) protectedBytes += table.offsets.byteLength + table.positions.byteLength + table.postings.byteLength;
+    }
+    if (protectedBytes + bytes > TYPO_INDEX_BYTES) return false;
+    for (const [key, table] of typoIndexes) {
+        if (typoIndexBytes + bytes <= TYPO_INDEX_BYTES) break;
+        if (!protectedKeys.has(key)) evictTypoIndex(key, table);
+    }
+    return true;
+}
+
+// Hash full names and one-code-unit deletions. A hash hit still needs the spelling checker.
+function* typoHashes(name) {
+    let full = 1;
+    for (let i = 0; i < name.length; i++) {
+        full = Math.imul(full, TYPO_HASH_BASE) + name.charCodeAt(i);
+    }
+    yield typoBucket(full);
+
+    let suffix = 0;
+    let power = 1;
+    for (let i = name.length - 1; i >= 0; i--) {
+        const character = Math.imul(name.charCodeAt(i), power);
+        if (i === 0 || name[i] !== name[i - 1]) {
+            // Remove this unit and shift its prefix down one power. The inverse divides modulo 2^32.
+            const prefix = Math.imul(full - suffix - character, TYPO_HASH_INVERSE);
+            yield typoBucket(prefix + suffix);
+        }
+        suffix = (suffix + character) | 0;
+        power = Math.imul(power, TYPO_HASH_BASE);
+    }
+}
+
+function typoBucket(hash) {
+    return Math.imul(hash ^ (hash >>> 16), 0x9e3779b1) >>> (32 - TYPO_BUCKET_BITS);
+}
+
+function* placesOfLength(groups, length) {
+    for (const group of groups.values()) {
+        for (const city of group.byLength.get(length) ?? []) yield group.byName.get(city);
+    }
+}
+
+async function buildTypoLength(owner, length, protectedKeys, cancelled) {
+    let count = 0;
+    for (const group of owner.groups.values()) count += group.byLength.get(length)?.length ?? 0;
+    if (count === 0) return true;
+    if (count > 65536) return false;
+
+    const baseBytes = (TYPO_BUCKETS + 1 + count) * Uint32Array.BYTES_PER_ELEMENT;
+    if (!reserveTypoBytes(baseBytes, protectedKeys)) return false;
+    const offsets = new Uint32Array(TYPO_BUCKETS + 1);
+    const positions = new Uint32Array(count);
+    const cityAt = position => cityNameKey(owner.places[position], owner.spelling);
+    await visitInBatches(placesOfLength(owner.groups, length), (position, entry) => {
+        positions[entry] = position;
+        for (const hash of typoHashes(cityAt(position))) offsets[hash + 1]++;
+    }, cancelled);
+    if (cancelled()) return;
+
+    for (let bucket = 1; bucket <= TYPO_BUCKETS; bucket++) offsets[bucket] += offsets[bucket - 1];
+    const postingCount = offsets[TYPO_BUCKETS];
+    const bytes = baseBytes + postingCount * Uint16Array.BYTES_PER_ELEMENT;
+    if (!reserveTypoBytes(bytes, protectedKeys)) return false;
+    const postings = new Uint16Array(postingCount);
+    await visitInBatches(positions, (position, entry) => {
+        for (const hash of typoHashes(cityAt(position))) postings[--offsets[hash + 1]] = entry;
+    }, cancelled);
+    if (cancelled()) return;
+
+    // Filling backwards turns each bucket's end into its start, without another cursor array.
+    offsets.copyWithin(0, 1);
+    offsets[TYPO_BUCKETS] = postingCount;
+    const key = typoIndexKey(owner, length);
+    typoIndexes.set(key, { cacheKey: owner.cacheKey, offsets, positions, postings });
+    typoIndexBytes += bytes;
+    return true;
+}
+
+function scheduleTypoBuild(owner, length, requestId) {
+    const requests = owner.typoRequests ??= new Map();
+    const initialRequest = requests.get(length);
+    if (initialRequest === undefined) {
+        requests.set(length, requestId);
+        return;
+    }
+    if (initialRequest === null || initialRequest === requestId || typoBuild) return;
+    requests.delete(length);
+
+    const lengths = [length, length - 1, length + 1];
+    const keys = new Set(lengths.map(value => typoIndexKey(owner, value)));
+    const cancelled = () => round !== owner;
+    typoBuild = true;
+    setTimeout(async () => {
+        try {
+            for (const value of lengths) {
+                if (cancelled()) break;
+                if (value >= 0 && !typoIndexes.has(typoIndexKey(owner, value))) {
+                    const built = await buildTypoLength(owner, value, keys, cancelled);
+                    if (built === false) requests.set(length, null);
+                }
+            }
+        } catch {
+            // The original scan remains available if the browser cannot allocate the index.
+            requests.set(length, null);
+        } finally {
+            typoBuild = false;
+        }
+    }, 0);
+}
+
+function* matchingTypos(round, guess, eligible, requestId) {
+    if (!eligible.length) return;
+
+    const buckets = [];
+    let scanSize = 0;
+    for (let length = Math.max(0, guess.length - 1); length <= guess.length + 1; length++) {
+        const key = round.worldwide ? typoIndexKey(round, length) : undefined;
+        const table = key === undefined ? undefined : typoIndexes.get(key);
+        if (table) {
+            typoIndexes.delete(key);
+            typoIndexes.set(key, table);
+        } else if (round.worldwide) {
+            for (const group of eligible) scanSize += group.byLength.get(length)?.length ?? 0;
+        }
+        buckets.push({ length, table });
+    }
+    if (scanSize >= TYPO_SCAN_THRESHOLD) scheduleTypoBuild(round, guess.length, requestId);
+
+    let hashes;
+    let allowed;
+    for (const { length, table } of buckets) {
+        if (table) {
+            hashes ??= new Set(typoHashes(guess));
+            if (eligible.length < round.groups.size) allowed ??= new Set(eligible);
+            for (const hash of hashes) {
+                for (let i = table.offsets[hash]; i < table.offsets[hash + 1]; i++) {
+                    const position = table.positions[table.postings[i]];
+                    const place = round.places[position];
+                    if (allowed) {
+                        const country = countryNameKey(placeCountry(place), round.spelling);
+                        if (!allowed.has(round.groups.get(country))) continue;
+                    }
+                    const city = cityNameKey(place, round.spelling);
+                    if (city === guess || isCloseMatch(city, guess)) yield position;
+                }
+            }
+        } else {
+            for (const group of eligible) {
+                for (const city of group.byLength.get(length) ?? []) {
+                    if (city !== guess && !isCloseMatch(city, guess)) continue;
+                    yield group.byName.get(city);
+                    // Standard needs the earliest match in each country and length.
+                    if (round.spelling === 'standard') break;
+                }
+            }
+        }
+    }
 }
 
 function splitNames(guess) {
@@ -576,28 +755,27 @@ function findAccentAnswer({ places, foldedNames, needsCountry, spelling }, attem
 }
 
 // Keep Standard's one-edit allowance in Relaxed when it identifies one place.
-function findRelaxedTypo({ groups, places }, attempts) {
+function findRelaxedTypo(round, attempts, requestId) {
+    const { groups, places } = round;
     let match;
     for (const [city, country] of attempts) {
         const alias = countryAliases.get(foldName(country));
+        const eligible = [];
         for (const [countryName, group] of groups) {
             if (country && (alias ? countryName !== alias :
                 countryName !== country && !isCloseMatch(countryName, country))) continue;
-            for (let length = city.length - 1; length <= city.length + 1; length++) {
-                for (const key of group.byLength.get(length) ?? []) {
-                    if (key !== city && !isCloseMatch(key, city)) continue;
-                    const index = group.byName.get(key);
-                    if (match !== undefined && match !== index) return { reason: 'ambiguous' };
-                    match = index;
-                }
-            }
+            eligible.push(group);
+        }
+        for (const index of matchingTypos(round, city, eligible, requestId)) {
+            if (match !== undefined && match !== index) return { reason: 'ambiguous' };
+            match = index;
         }
     }
     if (match !== undefined) return { place: places[match], match: 'corrected' };
     return null;
 }
 
-function checkSpellingGuess(round, guess) {
+function checkSpellingGuess(round, guess, requestId) {
     const { groups, places, foldedNames, needsCountry, spelling } = round;
     const city = nameKey(guess.trim(), spelling);
     const pairs = splitNames(city);
@@ -623,7 +801,7 @@ function checkSpellingGuess(round, guess) {
         const accent = findAccentAnswer(round, attempts);
         if (accent) return accent;
         if (spelling === 'relaxed') {
-            const typo = findRelaxedTypo(round, attempts);
+            const typo = findRelaxedTypo(round, attempts, requestId);
             if (typo) return typo;
         }
     }
