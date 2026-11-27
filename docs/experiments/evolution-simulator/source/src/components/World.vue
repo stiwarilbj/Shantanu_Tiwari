@@ -231,11 +231,11 @@ defineExpose({ select, overhead })
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @fallback="fallback=true"/>
       <div class="view-tools">
-        <button ref="speciesButton" type="button" class="secondary world-species-button" title="Add or edit blob species" aria-haspopup="dialog"
+        <button ref="speciesButton" type="button" class="secondary world-species-button" aria-description="Add or edit blob species" aria-haspopup="dialog"
           :disabled="!lab.canChangeSpecies && !lab.replay" @click="lab.openSpecies()">Species</button>
-        <button class="icon" aria-label="Layers" title="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
-        <button class="icon" aria-label="Follow creature" title="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
-        <button class="icon view-menu-button" aria-label="View options" title="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
+        <button class="icon" aria-label="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
+        <button class="icon" aria-label="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
+        <button class="icon view-menu-button" aria-label="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
       </div>
       <div v-if="tool==='layers'" class="layer-panel pop">
         <button class="icon" aria-label="Close layers" @click="tool=null"><ChevronUp :size="20"/></button>
@@ -272,7 +272,7 @@ defineExpose({ select, overhead })
           <i :style="{background:species && speciesDisplayColor(species)}"></i>{{ species?.name }} · #{{ visible.id }}
         </button>
         <button class="vision-toggle" type="button" :aria-pressed="layers.vision" @click="layers.vision=!layers.vision"
-          title="Dim the area beyond this creature’s sense range"><Aperture :size="14"/> Sense focus</button>
+          aria-description="Dim the area beyond this creature’s sense range"><Aperture :size="14"/> Sense focus</button>
       </div>
       <div v-if="speedRange && !['rate','player'].includes(tool)" class="speed-key" aria-label="Body color by speed">
         <span>Run speed · points</span>
@@ -283,22 +283,22 @@ defineExpose({ select, overhead })
       <div v-if="lab.loading" class="stage-note" role="status">Building replay for Day {{ lab.replayDay }}…</div>
       <div class="player">
         <div class="transport" role="group" aria-label="Day playback">
-          <button class="icon" title="Previous day" aria-label="Previous day" :disabled="lab.viewing<=1 || lab.loading" @click="lab.moveDay(-1)"><ChevronLeft :size="19"/></button>
-          <button class="icon play" :title="transportLabel" :aria-label="transportLabel"
+          <button class="icon" aria-label="Previous day" :disabled="lab.viewing<=1 || lab.loading" @click="lab.moveDay(-1)"><ChevronLeft :size="19"/></button>
+          <button class="icon play" :aria-label="transportLabel"
             :disabled="!lab.frame || lab.loading || !lab.replay && (!lab.workerReady || !!lab.batch)" @click="lab.play">
             <Pause v-if="lab.playing" :size="18" fill="currentColor"/>
             <RotateCcw v-else-if="transportLabel==='Replay day'" :size="18"/>
             <Play v-else :size="18" fill="currentColor"/>
           </button>
-          <button class="icon" title="Next day" aria-label="Next day" :disabled="!lab.canMoveNext || lab.loading" @click="lab.moveDay(1)"><ChevronRight :size="19"/></button>
+          <button class="icon" aria-label="Next day" :disabled="!lab.canMoveNext || lab.loading" @click="lab.moveDay(1)"><ChevronRight :size="19"/></button>
         </div>
-        <button class="icon through" title="Play through generations" aria-label="Play through generations" :aria-pressed="lab.through" @click="lab.toggleThrough"><StepForward :size="15"/></button>
+        <button class="icon through" aria-label="Play through generations" :aria-pressed="lab.through" @click="lab.toggleThrough"><StepForward :size="15"/></button>
       </div>
       <div class="player-actions">
         <button class="quick" :disabled="!!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch ? 'quick-progress' : 'quick'"><FastForward :size="15" fill="currentColor"/>{{ quickLabel }}</button>
-        <button ref="playbackActions" class="icon" aria-label="Playback actions" title="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
+        <button ref="playbackActions" class="icon" aria-label="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
         <button ref="speedButton" type="button" class="rate-trigger" aria-label="Viewing speed" :aria-description="'Current speed '+rateText"
-          :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" :aria-controls="tool==='rate' ? 'speed-controls' : undefined"
+          :aria-expanded="tool==='rate'" :aria-controls="tool==='rate' ? 'speed-controls' : undefined"
           @click="toggle('rate')" @keydown.esc="closeSpeedControls">
           {{ rateText }} <ChevronDown :size="12" aria-hidden="true"/>
         </button>
@@ -370,7 +370,7 @@ defineExpose({ select, overhead })
               {{ format(lab.frame?.time ?? 0) }} {{ lab.displayDuration == null ? 's elapsed' : '/ '+format(lab.displayDuration)+' s' }}
             </div>
           </div>
-          <span v-if="fallback" class="render-note" title="Canvas rendering is active">Canvas view</span>
+          <span v-if="fallback" class="render-note">Canvas view</span>
         </div>
         <div class="time-fill"></div><div class="time-thumb"></div>
         <input v-if="replayCanSeek" :value="lab.frame?.time ?? 0" type="range" min="0" :max="lab.displayDuration" step=".05"
@@ -379,10 +379,10 @@ defineExpose({ select, overhead })
         <span v-else-if="lab.displayDuration != null" role="progressbar" aria-label="Current day elapsed" :aria-valuenow="lab.frame?.time ?? 0" :aria-valuemax="lab.displayDuration"></span>
       </div>
       <div v-if="replayCanSeek" class="frame-controls" role="group" aria-label="Replay frame controls">
-        <button type="button" class="icon" aria-label="Previous frame" title="Previous frame" :disabled="lab.playing || !lab.frame?.time" @click="lab.stepReplayFrame(-1)">
+        <button type="button" class="icon" aria-label="Previous frame" :disabled="lab.playing || !lab.frame?.time" @click="lab.stepReplayFrame(-1)">
           <StepBack :size="18" aria-hidden="true"/>
         </button>
-        <button type="button" class="icon" aria-label="Next frame" title="Next frame" :disabled="lab.playing || lab.dayEnded" @click="lab.stepReplayFrame(1)">
+        <button type="button" class="icon" aria-label="Next frame" :disabled="lab.playing || lab.dayEnded" @click="lab.stepReplayFrame(1)">
           <StepForward :size="18" aria-hidden="true"/>
         </button>
       </div>

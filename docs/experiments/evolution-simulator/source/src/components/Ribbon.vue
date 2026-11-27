@@ -219,7 +219,6 @@ function escapeRibbon(event) {
             :aria-current="lab.viewing===tile.day ? 'true' : undefined"
             :aria-label="'Day '+tile.day+(tile.row ? ', population '+tile.row.population : ', '+(tile.day===lab.liveDay && !lab.batch ? 'live' : 'pending'))+(bookmarks.has(tile.day) ? ', bookmarked' : '')+
               (forecastForDay(tile.day)!=null ? ', '+forecastLabel(tile.day) : '')"
-            :title="forecastForDay(tile.day)!=null ? forecastLabel(tile.day) : undefined"
             :tabindex="tile.day===focusDay ? 0 : -1" :aria-keyshortcuts="tile.row ? 'I Shift+F10' : undefined"
             @focus="focusDay=tile.day" @click="clickTile($event,tile)" @keydown="keys($event,tile.day)"
             @contextmenu="tile.row && ($event.preventDefault(),inspect(tile.day))">
@@ -231,7 +230,7 @@ function escapeRibbon(event) {
             <small v-if="forecastForDay(tile.day)!=null" class="mini-prediction">≈ {{ forecastText(forecastForDay(tile.day)) }}</small>
           </button>
           <div v-for="day in extraForecastDays" :key="day" class="day-tile line-tile predicted-tile" :data-day="day"
-            :tabindex="focusDay===day ? 0 : -1" role="img" :aria-label="forecastLabel(day)" :title="forecastLabel(day)"
+            :tabindex="focusDay===day ? 0 : -1" role="img" :aria-label="forecastLabel(day)"
             @focus="focusDay=day" @keydown="keys($event,day)">
             <span class="day-number">{{ day }}</span><small class="mini-prediction">If extended</small>
             <small v-if="forecastForDay(day)!=null" class="mini-prediction">≈ {{ forecastText(forecastForDay(day)) }}</small>
@@ -257,16 +256,16 @@ function escapeRibbon(event) {
           @click="chooseLegendMetric(idx,i)" :style="{ '--metric':METRICS[idx].petal }">
           <i></i>{{ METRICS[idx].short }}<b v-if="i===rotation" aria-hidden="true">•</b>
         </button>
-        <button class="legend-help" title="Scale and exact values" @click="emit('table')"><Info :size="13"/> Exact values</button>
+        <button class="legend-help" @click="emit('table')"><Info :size="13"/> Exact values</button>
         <button class="legend-toggle" aria-label="Hide generation legend" @click="legend=false"><ChevronLeft :size="16"/></button>
       </div>
       <button v-else class="icon legend-open" aria-label="Show generation legend" @click="legend=true"><ChevronRight :size="16"/></button>
       <div class="ribbon-actions">
-        <button class="icon compact" title="Reroll seed" aria-label="Reroll seed" @click="emit('reroll')"><Dices :size="16"/></button>
-        <button v-if="!lab.extinctDay" class="icon compact" title="More Generations" aria-label="More Generations" @click="lab.modal='extend'"><Layers :size="16"/></button>
-        <button ref="optionsButton" class="icon compact" title="Generation options" aria-label="Generation options"
+        <button class="icon compact" aria-label="Reroll seed" @click="emit('reroll')"><Dices :size="16"/></button>
+        <button v-if="!lab.extinctDay" class="icon compact" aria-label="More Generations" @click="lab.modal='extend'"><Layers :size="16"/></button>
+        <button ref="optionsButton" class="icon compact" aria-label="Generation options"
           :aria-expanded="!!panel" aria-controls="generation-panel" @click="toggleOptions"><Ellipsis :size="16"/></button>
-        <button class="icon compact" title="Collapse generations" aria-label="Collapse generations" @click="fold=true"><ChevronDown :size="16"/></button>
+        <button class="icon compact" aria-label="Collapse generations" @click="fold=true"><ChevronDown :size="16"/></button>
       </div>
       <div v-if="panel" id="generation-panel" ref="menu" class="pop ribbon-menu" :class="{'bookmark-menu':panel==='bookmarks'}"
         role="region" :aria-label="panel==='bookmarks' ? 'Bookmarked generations' : 'Generation options'" tabindex="-1">
@@ -293,7 +292,7 @@ function escapeRibbon(event) {
         <div class="ribbon-detail-heading">
           <strong>Day {{ inspection }} <small>· Final</small></strong>
           <button type="button" class="icon compact" :class="{'bookmark-mark':bookmarks.has(inspection)}"
-            :aria-label="bookmarkAction(inspection)" :title="bookmarkAction(inspection)" @click="lab.toggleBookmark(inspection)">
+            :aria-label="bookmarkAction(inspection)" @click="lab.toggleBookmark(inspection)">
             <Bookmark :size="15" aria-hidden="true"/>
           </button>
         </div>
@@ -305,8 +304,8 @@ function escapeRibbon(event) {
     <div class="stats">
       <div class="stats-heading">
         <h2>Current Generation Stats</h2>
-        <button class="icon compact stat-info" title="View generation table" aria-label="View generation table" @click="emit('table')"><Info :size="15"/></button>
-        <button class="icon compact" type="button" title="Advanced stats" aria-label="Advanced stats" aria-haspopup="dialog" @click="lab.modal='advanced-stats'">
+        <button class="icon compact stat-info" aria-label="View generation table" @click="emit('table')"><Info :size="15"/></button>
+        <button class="icon compact" type="button" aria-label="Advanced stats" aria-haspopup="dialog" @click="lab.modal='advanced-stats'">
           <ChartNoAxesCombined :size="15" aria-hidden="true"/>
         </button>
         <select v-model="lab.scope" aria-label="Generation statistics species">

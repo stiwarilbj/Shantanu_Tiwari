@@ -350,7 +350,7 @@ onUnmounted(() => {
     </nav>
     <div v-if="lab.run" class="run-center" :inert="!ready">
       <button class="primary settings-pill" aria-label="Simulation Settings" @click="settings()">settings</button>
-      <button ref="menuButton" class="run-status" aria-label="Run options" :aria-expanded="menu" :title="lab.run.setup.name" @click="menu=!menu">
+      <button ref="menuButton" class="run-status" aria-label="Run options" :aria-description="lab.run.setup.name" :aria-expanded="menu" @click="menu=!menu">
         {{ statusText }} <ChevronDown :size="12"/>
       </button>
       <div v-if="menu" class="pop run-menu">

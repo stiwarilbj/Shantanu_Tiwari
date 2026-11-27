@@ -168,7 +168,7 @@ function watchCreature(){
     </div>
     <header><h3>Trait distribution</h3><label>Trait <select v-model="metric"><option value="speed">Speed</option><option value="size">Size</option><option value="sense">Sense Range</option><option value="age">Age</option></select></label>
       <label v-if="metric!=='age'">Bins <input :value="bins" type="number" min="5" max="50" @change="bins=wholeNumber($event,bins,5,50)"></label><label><input v-model="percent" type="checkbox"> Percentage</label>
-      <label>Compare day <input :value="compare" type="number" min="0" :max="lab.completed" title="0 shows one day" @change="compare=wholeNumber($event,compare,0,lab.completed)"></label>
+      <label>Compare day <input :value="compare" type="number" min="0" :max="lab.completed" aria-description="Enter 0 to show one day" @change="compare=wholeNumber($event,compare,0,lab.completed)"></label>
     </header>
     <div v-if="compareIssue">
       <p class="issue" role="alert">Could not load comparison Day {{ compare }}. {{ compareIssue }}</p>

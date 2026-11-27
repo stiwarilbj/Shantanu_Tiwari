@@ -3062,14 +3062,14 @@ test('renaming the active run keeps days whose saves are still pending', async (
   await active.getByLabel('Name', { exact: true }).fill('Renamed field')
   await active.getByRole('button', { name: 'Save', exact: true }).click()
   await closeDialog.click()
-  await expect(runOptions).toHaveAttribute('title', 'Renamed field')
+  await expect(runOptions).toHaveAccessibleDescription('Renamed field')
   await expect(dayTile(page, 3)).toBeVisible()
 
   await releaseSaves(page)
   await openRunLibrary(page)
   await expect(library.locator('article').filter({ hasText: 'Renamed field' })).toContainText('Saved through Day 3')
   await page.reload()
-  await expect(runOptions).toHaveAttribute('title', 'Renamed field')
+  await expect(runOptions).toHaveAccessibleDescription('Renamed field')
   await expect(dayTile(page, 3)).toBeVisible()
 })
 
@@ -3095,10 +3095,10 @@ test('resuming a run keeps completed days while saves are pending', async ({ pag
 
   await openRunLibrary(page)
   await other.getByRole('button', { name: 'Resume' }).click()
-  await expect(runOptions).toHaveAttribute('title', 'Other run')
+  await expect(runOptions).toHaveAccessibleDescription('Other run')
   await openRunLibrary(page)
   await original.getByRole('button', { name: 'Resume' }).click()
-  await expect(runOptions).toHaveAttribute('title', 'Browser test run')
+  await expect(runOptions).toHaveAccessibleDescription('Browser test run')
   await expect(runOptions).toHaveText('Day 4 / 10 · Ready')
   await expect(dayTile(page, 3)).toBeVisible()
 
@@ -3154,10 +3154,10 @@ test('switching runs saves the day Quick Sim was working on', async ({ page }) =
   await openRunLibrary(page)
   await other.getByRole('button', { name: 'Resume', exact: true }).click()
   await expect(runOptions).toHaveText('Day 1 / 10 · Stopping batch')
-  await expect(runOptions).toHaveAttribute('title', 'Browser test run')
+  await expect(runOptions).toHaveAccessibleDescription('Browser test run')
   expect(await page.evaluate(() => window.batchTest.stopping)).toBe(true)
   await page.evaluate(() => window.batchTest.release())
-  await expect(runOptions).toHaveAttribute('title', 'Other run')
+  await expect(runOptions).toHaveAccessibleDescription('Other run')
 
   await openRunLibrary(page)
   await expect(original).toContainText('Saved through Day 1')

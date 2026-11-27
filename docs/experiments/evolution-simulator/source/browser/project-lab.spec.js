@@ -60,8 +60,12 @@ test('the keyboard skip link clears the shared navbar and Experiments stays reac
 
 test('simulator popups remain keyboard accessible below the shared navbar @pages', async ({ page }) => {
   const run = page.getByRole('button', { name: 'Run options' })
+  await run.hover()
+  await expect(page.locator('#app button[title]')).toHaveCount(0)
+  await expect(run).toHaveAttribute('aria-expanded', 'false')
   await run.press('Enter')
   await expect(run).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('.run-menu strong')).toHaveText('Starter field')
   await page.getByRole('button', { name: 'Run Library', exact: true }).press('Escape')
   await expect(run).toBeFocused()
   await expect(run).toHaveAttribute('aria-expanded', 'false')
@@ -227,7 +231,7 @@ test.describe('short touch viewports', () => {
     await page.getByRole('button', { name: 'Evolve!', exact: true }).tap()
 
     const run = page.getByRole('button', { name: 'Run options' })
-    await expect(run).toHaveAttribute('title', name)
+    await expect(run).toHaveAccessibleDescription(name)
     await run.tap()
     const menu = page.locator('.run-menu')
     await expect(menu).toContainText('Seed 42')

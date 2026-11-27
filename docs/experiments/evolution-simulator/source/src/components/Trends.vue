@@ -394,10 +394,10 @@ onBeforeUnmount(()=>ageDemoController?.abort())
       <div class="trend-actions">
         <button class="secondary" :disabled="ageDemoVisible" @click="lab.modal='table'"><Table2 :size="17" aria-hidden="true"/> Generation table</button>
         <button class="secondary" :disabled="ageDemoVisible" aria-haspopup="dialog" @click="lab.modal='advanced-stats'"><ChartNoAxesCombined :size="17" aria-hidden="true"/> Advanced stats</button>
-        <button class="secondary" :disabled="ageDemoVisible" :title="ageDemoVisible?'Close the age walkthrough to download your run':''" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
-        <button class="icon" title="Run again" aria-label="Run again" :disabled="ageDemoVisible" @click="emit('restart')"><RotateCcw :size="17"/></button>
-        <button class="icon" title="Reroll seed" aria-label="Reroll seed" :disabled="ageDemoVisible" @click="emit('reroll')"><Dices :size="17"/></button>
-        <button v-if="!lab.extinctDay" class="icon" title="More Generations" aria-label="More Generations" :disabled="ageDemoVisible" @click="lab.modal='extend'"><Layers :size="17"/></button>
+        <button class="secondary" :disabled="ageDemoVisible" :aria-description="ageDemoVisible ? 'Close the age walkthrough to download your run' : undefined" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
+        <button class="icon" aria-label="Run again" :disabled="ageDemoVisible" @click="emit('restart')"><RotateCcw :size="17"/></button>
+        <button class="icon" aria-label="Reroll seed" :disabled="ageDemoVisible" @click="emit('reroll')"><Dices :size="17"/></button>
+        <button v-if="!lab.extinctDay" class="icon" aria-label="More Generations" :disabled="ageDemoVisible" @click="lab.modal='extend'"><Layers :size="17"/></button>
         <button class="secondary" :disabled="ageDemoVisible || !!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch?'quick-progress':'quick'"><FastForward :size="17"/> {{ lab.batch?'Progress':'Quick Sim' }}</button>
       </div>
     </div>
@@ -433,7 +433,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
             <h2>Compare age across two run lengths</h2>
             <p>The yellow Age plot moves into the center while the other four plots stay in view. Switch between the 600-day and 100-day seed 118 runs; both size mutation settings appear on each plot.</p>
           </div>
-          <button class="icon" aria-label="Close age walkthrough" title="Close age walkthrough" @click="closeAgeDemo">×</button>
+          <button class="icon" aria-label="Close age walkthrough" @click="closeAgeDemo">×</button>
         </header>
         <div class="age-demo-controls">
           <button class="secondary" :aria-pressed="ageDemoPhase==='long'" :disabled="!!ageDemoProgress" @click="changeAgePhase('long')">Long run · 600 days</button>
