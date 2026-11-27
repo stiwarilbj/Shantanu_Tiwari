@@ -330,6 +330,7 @@
       <nav class="reference-index" aria-label="Reference sections">
         <ul>
           <li><a href="#navigation">Navigation</a></li>
+          <li><a href="#board">Reading the board</a></li>
           <li><a href="#world">World and playback</a></li>
           <li><a href="#live-edits">Changes during a live day</a></li>
           <li><a href="#settings-basic">Basic settings</a></li>
@@ -420,15 +421,84 @@
           </dl>
         </section>
       </section>
+      <section class="reference-group" id="board" aria-labelledby="board-title">
+        <h2 id="board-title">Reading the board</h2>
+        <section class="reference-section">
+          <h3>World → Simulation field</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>White playing surface</dt>
+              <dd>This is where blobs move, look for plants, and hunt when the rules allow it. The gray sides below the surface and the dark space outside the board are scenery.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Refuge border</dt>
+              <dd>In runs with a refuge strip, the light-gray border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Green plant pellets</dt>
+              <dd>Each green dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Blob color and size</dt>
+              <dd>Body color shows species by default. Color by speed replaces it with a speed scale. A larger blob usually has a larger Size trait. Open Creature Details for the exact value.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Faded or tipped-over blob</dt>
+              <dd>After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Camera and selection</dt>
+              <dd>Drag to rotate the angled view. Scroll or pinch to zoom. Select a blob to follow it, or select empty field to clear the selection. You can also pick a blob by ID in View options → Creatures. Use Fit board if you lose your bearings.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Teal ring or red outline</dt>
+              <dd>When visible, a teal ring marks the selected blob. A red outline marks the blob under the mouse.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World → Signs and readouts on the board</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Creature thought bubble</dt>
+              <dd>Appears over a blob you are following. Select it to read its current action. Dots mean searching, a leaf means heading for a plant, utensils mean hunting, wind means fleeing, an arrow means returning home, and zzz means resting.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Creature flower and caption</dt>
+              <dd>While following a blob, the flower shows its age in yellow, speed in red, size in teal, and sense range in blue. The caption shows its species and ID. Select it to open Creature Details.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Sense circles and Sense focus</dt>
+              <dd>Layers → Sense range draws pale blue circles showing how far blobs can detect food or danger. Sense focus, beside the followed blob’s caption, dims everything outside that blob’s range.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Energy disk</dt>
+              <dd>Layers → Energy adds a disk under each blob. Gold means more energy remains and gray means less. Creature Details gives the exact amount.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food-credit dots</dt>
+              <dd>Layers → Food credits shows the meals each blob has eaten that day. Green dots count plants and rust-colored dots count prey. Each dot is one food credit.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run speed key</dt>
+              <dd>Layers → Color by speed shows a brown-to-red scale with the slowest and fastest speed values. The same scale is used across the run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>HUD counts</dt>
+              <dd>Turn on View options → HUD. Alive counts all living blobs and Home counts those already settled. Plants left counts uneaten plants. Hunts and Deaths count events so far that day, up to the moment you are watching.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food season readout</dt>
+              <dd>When Food seasons is enabled, the strip below the time bar shows the current phase and how many plants spawned at dawn. Use the HUD to see how many are left.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
       <section class="reference-group" id="world" aria-labelledby="world-title">
         <h2 id="world-title">World and playback</h2>
         <section class="reference-section">
-          <h3>World → Field and top-right controls</h3>
+          <h3>World → Top-right controls</h3>
           <dl>
-            <div class="reference-entry">
-              <dt>Field</dt>
-              <dd>Drag to orbit with the mouse or touch. Scroll or pinch to zoom. Select a blob to follow it and see its readings.</dd>
-            </div>
             <div class="reference-entry">
               <dt>Species</dt>
               <dd>Open the species editor. You can make changes during an unfinished live generation. Historical replay is read-only.</dd>
@@ -475,11 +545,7 @@
             </div>
             <div class="reference-entry">
               <dt>View options → Dim other species and HUD</dt>
-              <dd>Dim other species makes the picked species stand out. HUD toggles the on-board readouts.</dd>
-            </div>
-            <div class="reference-entry">
-              <dt>Creature caption and Sense focus</dt>
-              <dd>Open details from the selected blob’s caption or toggle the view that emphasizes what it can sense.</dd>
+              <dd>Dim other species fades the other blobs when you pick a species in Current Generation Stats. HUD shows the field counts, including how many blobs have made it home.</dd>
             </div>
           </dl>
         </section>
@@ -504,7 +570,7 @@
             </div>
             <div class="reference-entry">
               <dt>Replay time</dt>
-              <dd>Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.</dd>
+              <dd>The clock shows seconds elapsed and the day’s total length when known. Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.</dd>
             </div>
             <div class="reference-entry">
               <dt>Previous frame and Next frame</dt>
@@ -571,6 +637,10 @@
             <div class="reference-entry">
               <dt>Generation tiles</dt>
               <dd>Open a day by selecting its tile. Use the arrow keys to move between tiles and Home or End to reach the first or latest completed day. A day with only a forecast has no recorded replay yet.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation flowers and center dots</dt>
+              <dd>On a completed day’s tile, the colored petals show averages for the chosen species or all species. Longer petals mean higher values on the run’s scale. The pale center dot grows with population. Hover a petal or dot for its number, or open Day readings for all the values.</dd>
             </div>
             <div class="reference-entry">
               <dt>Extinction tile and More</dt>

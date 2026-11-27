@@ -26,11 +26,35 @@ export const groups = [
     ],
   },
   {
+    id: 'board',
+    title: 'Reading the board',
+    sections: [
+      ['World → Simulation field', [
+        ['White playing surface', 'This is where blobs move, look for plants, and hunt when the rules allow it. The gray sides below the surface and the dark space outside the board are scenery.'],
+        ['Refuge border', 'In runs with a refuge strip, the light-gray border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.'],
+        ['Green plant pellets', 'Each green dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout.'],
+        ['Blob color and size', 'Body color shows species by default. Color by speed replaces it with a speed scale. A larger blob usually has a larger Size trait. Open Creature Details for the exact value.'],
+        ['Faded or tipped-over blob', 'After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.'],
+        ['Camera and selection', 'Drag to rotate the angled view. Scroll or pinch to zoom. Select a blob to follow it, or select empty field to clear the selection. You can also pick a blob by ID in View options → Creatures. Use Fit board if you lose your bearings.'],
+        ['Teal ring or red outline', 'When visible, a teal ring marks the selected blob. A red outline marks the blob under the mouse.'],
+      ]],
+      ['World → Signs and readouts on the board', [
+        ['Creature thought bubble', 'Appears over a blob you are following. Select it to read its current action. Dots mean searching, a leaf means heading for a plant, utensils mean hunting, wind means fleeing, an arrow means returning home, and zzz means resting.'],
+        ['Creature flower and caption', 'While following a blob, the flower shows its age in yellow, speed in red, size in teal, and sense range in blue. The caption shows its species and ID. Select it to open Creature Details.'],
+        ['Sense circles and Sense focus', 'Layers → Sense range draws pale blue circles showing how far blobs can detect food or danger. Sense focus, beside the followed blob’s caption, dims everything outside that blob’s range.'],
+        ['Energy disk', 'Layers → Energy adds a disk under each blob. Gold means more energy remains and gray means less. Creature Details gives the exact amount.'],
+        ['Food-credit dots', 'Layers → Food credits shows the meals each blob has eaten that day. Green dots count plants and rust-colored dots count prey. Each dot is one food credit.'],
+        ['Run speed key', 'Layers → Color by speed shows a brown-to-red scale with the slowest and fastest speed values. The same scale is used across the run.'],
+        ['HUD counts', 'Turn on View options → HUD. Alive counts all living blobs and Home counts those already settled. Plants left counts uneaten plants. Hunts and Deaths count events so far that day, up to the moment you are watching.'],
+        ['Food season readout', 'When Food seasons is enabled, the strip below the time bar shows the current phase and how many plants spawned at dawn. Use the HUD to see how many are left.'],
+      ]],
+    ],
+  },
+  {
     id: 'world',
     title: 'World and playback',
     sections: [
-      ['World → Field and top-right controls', [
-        ['Field', 'Drag to orbit with the mouse or touch. Scroll or pinch to zoom. Select a blob to follow it and see its readings.'],
+      ['World → Top-right controls', [
         ['Species', 'Open the species editor. You can make changes during an unfinished live generation. Historical replay is read-only.'],
         ['Follow creature', 'Toggle the camera following the selected blob. Choose a creature on the board if one is needed.'],
         ['Layers → Sense range', 'Draw circles around blobs to show how far they can detect food or danger.'],
@@ -42,15 +66,14 @@ export const groups = [
         ['View options → Full screen', 'Expand the field to fill the screen. Use Exit full screen or Escape to return.'],
         ['View options → Creatures', 'Open or close Creature Details.'],
         ['View options → Graphics', 'Pick Auto, Full, or Efficient to balance detail and drawing speed. Canvas view appears if the board uses its 2D fallback.'],
-        ['View options → Dim other species and HUD', 'Dim other species makes the picked species stand out. HUD toggles the on-board readouts.'],
-        ['Creature caption and Sense focus', 'Open details from the selected blob’s caption or toggle the view that emphasizes what it can sense.'],
+        ['View options → Dim other species and HUD', 'Dim other species fades the other blobs when you pick a species in Current Generation Stats. HUD shows the field counts, including how many blobs have made it home.'],
       ]],
       ['World → Playback, beneath the board', [
         ['Previous day and Next day', 'Move one generation back or forward when that day is available.'],
         ['Play, Pause, and Replay day', 'Start or pause live play or a replay. At the end of a replay, the same button restarts that day.'],
         ['Play through generations', 'Keep going into the next day when the current one ends.'],
         ['Viewing speed', 'Open the clock or multiplier button beside Quick Sim. Pick 1×, 2×, 4×, or 8×, or use the slider for a speed from ⅛× to 8×. This changes playback speed for live days and replays.'],
-        ['Replay time', 'Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.'],
+        ['Replay time', 'The clock shows seconds elapsed and the day’s total length when known. Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.'],
         ['Previous frame and Next frame', 'While a replay is paused, move backward or forward by one recorded frame.'],
         ['Playback actions → Finish Day or Go to end', 'Finish simulating the current live generation or jump to the final frame of a replay.'],
         ['Playback actions → Step one tick', 'Advance by a single simulation step.'],
@@ -69,6 +92,7 @@ export const groups = [
       ]],
       ['World → Generations and Current Generation Stats', [
         ['Generation tiles', 'Open a day by selecting its tile. Use the arrow keys to move between tiles and Home or End to reach the first or latest completed day. A day with only a forecast has no recorded replay yet.'],
+        ['Generation flowers and center dots', 'On a completed day’s tile, the colored petals show averages for the chosen species or all species. Longer petals mean higher values on the run’s scale. The pale center dot grows with population. Hover a petal or dot for its number, or open Day readings for all the values.'],
         ['Extinction tile and More', 'The extinction tile opens the last scene. More or More Generations extends a run while the population can still continue.'],
         ['Legend and Exact values', 'The legend explains the colors and lets you emphasize a metric. Its chevrons hide or show it. Exact values opens the generation table.'],
         ['Day readings', 'Right-click a completed generation tile or focus it and press I to see its exact numbers. Use its bookmark button to save or remove the day. Close dismisses the readings.'],
