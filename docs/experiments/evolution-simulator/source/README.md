@@ -1,5 +1,7 @@
 [Play Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
+[Controls and settings reference](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/reference.html)
+
 # Evolution Simulator
 
 Watch blobs look for food, hunt, and have babies. Small changes in speed, size, and sight can affect which blobs survive.

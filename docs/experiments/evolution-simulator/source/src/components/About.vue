@@ -76,6 +76,7 @@ onBeforeUnmount(() => pairController?.abort())
       <button class="primary" @click="emit('world')">Open World</button>
       <button class="secondary" @click="lab.modal='tour'">Show tour</button>
       <button class="secondary" @click="continueWalkthrough">Continue walkthrough</button>
+      <a class="secondary" href="./reference.html">Controls &amp; settings reference</a>
     </div>
     <section class="lesson">
       <h2>Walkthrough</h2>

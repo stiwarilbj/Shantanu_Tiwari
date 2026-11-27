@@ -3,10 +3,14 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { renderNavbar } from '../../../navbar/render.mjs'
+import { renderReference } from './src/reference/render.js'
 
+const indexPage = fileURLToPath(new URL('./index.html', import.meta.url))
+const referencePage = fileURLToPath(new URL('./reference.html', import.meta.url))
 const worldModule = fileURLToPath(new URL('./src/components/World.vue', import.meta.url))
 
-function preloadWorldEntrance(html, { bundle }) {
+function preloadWorldEntrance(html, { bundle, filename }) {
+  if (filename !== indexPage) return []
   const world = Object.values(bundle).find(chunk => chunk.type === 'chunk' && chunk.facadeModuleId === worldModule)
   if (!world) throw new Error('Could not find the World entry for the simulator build')
 
@@ -55,6 +59,15 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       {
+        name: 'simulator-controls-reference',
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html, { filename }) {
+            return filename === referencePage ? renderReference(html) : html
+          },
+        },
+      },
+      {
         name: 'world-entrance-preload',
         apply: 'build',
         transformIndexHtml: { order: 'post', handler: preloadWorldEntrance },
@@ -70,7 +83,12 @@ export default defineConfig(({ mode }) => {
         },
         transformIndexHtml: {
           order: 'post',
-          handler(html) {
+          handler(html, { filename }) {
+            if (filename === referencePage) {
+              const reference = html.replace('<body class="reference-page">',
+                '<body class="reference-page">\n    <header data-site-navbar></header>')
+              return renderNavbar(reference, 'experiments/evolution-simulator/reference.html')
+            }
             const page = html
               .replace('  </head>', '    <link rel="stylesheet" href="./project-lab.css">\n  </head>')
               .replace('<body>', '<body class="project-lab-page">\n    <header data-site-navbar></header>\n')
@@ -86,6 +104,7 @@ export default defineConfig(({ mode }) => {
         emptyOutDir: true,
       } : {}),
       rolldownOptions: {
+        input: { index: indexPage, reference: referencePage },
         output: {
           codeSplitting: {
             groups: [

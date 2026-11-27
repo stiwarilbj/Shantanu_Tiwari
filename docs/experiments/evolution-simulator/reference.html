@@ -1,0 +1,1699 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Find every Evolution Simulator control, where it lives, and what it changes.">
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <title>Controls &amp; settings reference · Evolution Simulator</title>
+    <script type="module" crossorigin src="./assets/reference-B-_MRxWI.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-P2Xu9kJm.js">
+    <link rel="stylesheet" crossorigin href="./assets/reference-_PS5EYxr.css">
+    <!-- Shared navbar assets -->
+    <link rel="stylesheet" href="../../navbar/navbar.css?v=158f75e00b18e271">
+    <link rel="stylesheet" href="../../navbar/dropdown.css?v=59a29811228fc3ed">
+    <link rel="stylesheet" href="../../navbar/search.css?v=2209bdd1ce1efcdd">
+    <link id="navbar-search-module" rel="modulepreload" href="../../navbar/search.js?v=0bd3cd32eee8e21e">
+    <!-- End shared navbar assets -->
+  </head>
+  <body class="reference-page">
+    <header data-site-navbar>
+      <script>
+    {
+      const header = document.currentScript.parentElement;
+      const compactLayout = window.matchMedia("(width < 35rem), (hover: none)");
+      let menuOpenedOnHover = false;
+      let openCategory;
+      let panelCloseTimer;
+      let panelSwitchTimer;
+      let navbarParsed = false;
+      let setupSearch;
+      let search;
+      let pendingSearch;
+
+      function setExpanded(control, expanded) {
+        control?.setAttribute("aria-expanded", String(expanded));
+      }
+
+      function cancelPanelSwitch() {
+        clearTimeout(panelSwitchTimer);
+        panelSwitchTimer = undefined;
+      }
+
+      function closePanel() {
+        clearTimeout(panelCloseTimer);
+        cancelPanelSwitch();
+        if (!openCategory) return;
+
+        setExpanded(openCategory.link, false);
+        openCategory.panel.hidden = true;
+        openCategory = undefined;
+      }
+
+      function showPanel(link) {
+        if (openCategory?.link === link) return;
+        const item = link.closest(".nav-item");
+        const panel = item.querySelector(".nav-panel");
+        if (!panel) return;
+
+        closeSearch();
+        closePanel();
+        openCategory = { item, link, panel };
+        setExpanded(link, true);
+        panel.hidden = false;
+      }
+
+      function closeMenu() {
+        closePanel();
+        setExpanded(header.querySelector(".menu-toggle"), false);
+        menuOpenedOnHover = false;
+      }
+
+      function syncCategoryLayout() {
+        for (const item of header.querySelectorAll(".nav-item")) {
+          const link = item.querySelector(".category-link");
+          const panel = item.querySelector(".nav-panel");
+          if (!link || !panel) continue;
+          panel.hidden = !compactLayout.matches;
+          if (compactLayout.matches) link.removeAttribute("aria-expanded");
+          else setExpanded(link, false);
+        }
+      }
+
+      function startSearch() {
+        if (!navbarParsed || !setupSearch || !pendingSearch) return;
+
+        const group = pendingSearch.closest(".nav-search");
+        pendingSearch = undefined;
+        const pages = Array.from(header.querySelectorAll("[data-nav-search]"), (link) => ({
+          name: link.textContent.trim(),
+          url: link.href,
+        }));
+        search = setupSearch(group, pages, closeMenu);
+        search.refresh();
+      }
+
+      function requestSearch(event) {
+        if (search || !event.target.matches(".nav-search input")) return;
+
+        closeMenu();
+        pendingSearch = event.target;
+        startSearch();
+      }
+
+      function closeSearch() {
+        const hadPendingQuery = Boolean(pendingSearch?.value.trim());
+        pendingSearch = undefined;
+        return search?.close() || hadPendingQuery;
+      }
+
+      // Delegate interactions before the parser reaches any of the controls.
+      header.addEventListener("click", (event) => {
+        requestSearch(event);
+        const menu = event.target.closest(".menu-toggle");
+        if (!menu) return;
+
+        if (menuOpenedOnHover && event.detail > 0) {
+          menuOpenedOnHover = false;
+        } else if (menu.getAttribute("aria-expanded") === "true") {
+          closeMenu();
+        } else {
+          closeSearch();
+          setExpanded(menu, true);
+        }
+      });
+
+      header.addEventListener("pointerover", (event) => {
+        const group = event.target.closest(".nav-menu");
+        if (group && !group.contains(event.relatedTarget)) clearTimeout(panelCloseTimer);
+
+        const menu = event.target.closest(".menu-toggle");
+        if (!menu || menu.contains(event.relatedTarget) || event.pointerType === "touch" ||
+            menu.getAttribute("aria-expanded") === "true") return;
+
+        closeSearch();
+        menuOpenedOnHover = true;
+        setExpanded(menu, true);
+      });
+
+      header.addEventListener("pointerout", (event) => {
+        const link = event.target.closest(".category-link");
+        if (link && !link.contains(event.relatedTarget)) cancelPanelSwitch();
+
+        const group = event.target.closest(".nav-menu");
+        if (!group || group.contains(event.relatedTarget)) return;
+        if (menuOpenedOnHover && !group.contains(document.activeElement)) closeMenu();
+        if (openCategory && !openCategory.item.querySelector(":focus-visible")) {
+          panelCloseTimer = setTimeout(() => {
+            if (!openCategory?.item.querySelector(":focus-visible")) closePanel();
+          }, 150);
+        }
+      });
+
+      header.addEventListener("pointermove", (event) => {
+        const link = event.target.closest(".category-link");
+        if (!link || event.pointerType === "touch" || compactLayout.matches ||
+            openCategory?.panel.contains(document.activeElement)) return;
+
+        // A gap disappearing under a stationary pointer shouldn't reopen a panel.
+        if (!openCategory) {
+          showPanel(link);
+        } else if (openCategory.link !== link && panelSwitchTimer === undefined) {
+          // Give the pointer time to cross another button on the way to the open panel.
+          panelSwitchTimer = setTimeout(() => {
+            panelSwitchTimer = undefined;
+            if (link.matches(":hover") && !openCategory?.panel.contains(document.activeElement)) showPanel(link);
+          }, 50);
+        }
+      });
+
+      header.addEventListener("focusin", (event) => {
+        requestSearch(event);
+        if (!compactLayout.matches && event.target.matches(".category-link:focus-visible")) showPanel(event.target);
+      });
+
+      header.addEventListener("focusout", (event) => {
+        if (event.target === pendingSearch) pendingSearch = undefined;
+      });
+
+      header.addEventListener("input", requestSearch);
+
+      header.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowDown" || compactLayout.matches || !event.target.matches(".category-link")) return;
+
+        showPanel(event.target);
+        if (!openCategory) return;
+        event.preventDefault();
+        openCategory.panel.querySelector("a")?.focus();
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".nav-search")) closeSearch();
+        if (!header.contains(event.target)) closeMenu();
+      });
+
+      document.addEventListener("focusin", (event) => {
+        if (!event.target.closest(".nav-search")) closeSearch();
+        if (!header.contains(event.target)) {
+          closeMenu();
+        } else if (openCategory && !openCategory.item.contains(event.target)) {
+          closePanel();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || event.isComposing) return;
+
+        const menu = header.querySelector(".menu-toggle");
+        if (closeSearch()) {
+          event.preventDefault();
+        } else if (openCategory) {
+          if (openCategory.panel.contains(document.activeElement)) openCategory.link.focus();
+          closePanel();
+          event.preventDefault();
+        } else if (menu?.getAttribute("aria-expanded") === "true") {
+          closeMenu();
+          menu.focus();
+          event.preventDefault();
+        }
+      });
+
+      compactLayout.addEventListener("change", () => {
+        closeMenu();
+        syncCategoryLayout();
+      });
+
+      header.addEventListener("navbar-parsed", () => {
+        navbarParsed = true;
+        if (compactLayout.matches) syncCategoryLayout();
+        startSearch();
+
+        const compactPanel = header.querySelector(".nav-links");
+        const reservePanelSpace = new ResizeObserver(() => {
+          const height = compactPanel.getBoundingClientRect().height;
+          header.style.setProperty("--nav-panel-height", `${height}px`);
+        });
+        reservePanelSpace.observe(compactPanel, { box: "border-box" });
+      }, { once: true });
+
+      const searchModuleURL = document.getElementById("navbar-search-module").href;
+      import(searchModuleURL).then(({ setupNavbarSearch }) => {
+        setupSearch = setupNavbarSearch;
+        startSearch();
+      }, () => {
+        pendingSearch = undefined;
+      });
+    }
+      </script>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="wordmark" href="../../">Project Lab</a>
+        <div class="nav-search" role="search" aria-label="Project Lab">
+          <span class="nav-search-field">
+            <input type="search" role="combobox" aria-label="Search projects and sections"
+              aria-autocomplete="list" aria-expanded="false" aria-controls="nav-search-options"
+              placeholder="Search" autocomplete="off" spellcheck="false">
+          </span>
+          <div class="nav-search-results" hidden>
+            <ul id="nav-search-options" role="listbox" aria-label="Search results"></ul>
+            <p class="nav-search-empty" role="status">No matching pages</p>
+          </div>
+        </div>
+        <div class="nav-menu">
+          <button class="menu-toggle" type="button" aria-controls="nav-links" aria-expanded="false">
+            Menu <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <ul class="nav-links" id="nav-links">
+            <li class="nav-item">
+              <a class="category-link" href="../../experiments/" aria-controls="experiments-panel" aria-expanded="false" data-nav-search>
+                <span class="category-label">Experiments <span class="chevron" aria-hidden="true"></span></span>
+              </a>
+              <div class="nav-panel" id="experiments-panel" hidden>
+                <ul class="nav-panel-links">
+                  <li><a href="../../experiments/evolution-simulator/" data-nav-search>Evolution Simulator</a></li>
+                  <li><a href="../../experiments/filler/" aria-label="Filler for Experiments">Filler</a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a class="category-link" href="../../learning/" aria-controls="learning-panel" aria-expanded="false" data-nav-search>
+                <span class="category-label">Learning <span class="chevron" aria-hidden="true"></span></span>
+              </a>
+              <div class="nav-panel" id="learning-panel" hidden>
+                <ul class="nav-panel-links">
+                  <li><a href="../../learning/places-game/" data-nav-search>Place Naming Game</a></li>
+                  <li><a href="../../learning/filler/" aria-label="Filler for Learning">Filler</a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a class="category-link" href="../../games/" aria-controls="games-panel" aria-expanded="false" data-nav-search>
+                <span class="category-label">Games <span class="chevron" aria-hidden="true"></span></span>
+              </a>
+              <div class="nav-panel" id="games-panel" hidden>
+                <ul class="nav-panel-links">
+                  <li><a href="../../games/filler/" aria-label="Filler for Games">Filler</a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="nav-item">
+              <a class="category-link" href="../../old-projects/" aria-controls="old-projects-panel" aria-expanded="false" data-nav-search>
+                <span class="category-label">Old Projects <span class="chevron" aria-hidden="true"></span></span>
+              </a>
+              <div class="nav-panel" id="old-projects-panel" hidden>
+                <ul class="nav-panel-links">
+                  <li><a href="../../old-projects/filler/" aria-label="Filler for Old Projects">Filler</a></li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </nav>
+      <script>document.currentScript.parentElement.dispatchEvent(new Event("navbar-parsed"));</script>
+    </header>
+    <main class="reference" id="reference">
+      <header class="reference-intro">
+        <a class="reference-back" href="./">← Evolution Simulator</a>
+        <h1>Controls &amp; settings reference</h1>
+        <p>Find a button, setting, or readout and see where to look for it. A day, a generation, and a cycle all mean one round of the simulation. Some settings stay hidden until you turn on their feature. Older runs can keep their original rules.</p>
+      </header>
+      <div class="reference-tools" hidden>
+        <form class="reference-search" role="search" aria-label="Find in the simulator reference">
+          <label for="reference-query">Find a control or setting</label>
+          <div class="reference-search-row">
+            <input id="reference-query" type="search" placeholder="Try “hunting”, “seed”, or “replay”" autocomplete="off">
+            <button type="reset" disabled>Clear</button>
+          </div>
+        </form>
+        <button class="reference-print" type="button">Print reference</button>
+      </div>
+      <p class="reference-count" aria-live="polite" aria-atomic="true"></p>
+      <nav class="reference-index" aria-label="Reference sections">
+        <ul>
+          <li><a href="#navigation">Navigation</a></li>
+          <li><a href="#world">World and playback</a></li>
+          <li><a href="#live-edits">Changes during a live day</a></li>
+          <li><a href="#settings-basic">Basic settings</a></li>
+          <li><a href="#field-food">Advanced · Field &amp; food</a></li>
+          <li><a href="#creature-behavior">Advanced · Creature behavior</a></li>
+          <li><a href="#life-cycle">Advanced · Life cycle</a></li>
+          <li><a href="#run-charts">Advanced · Run &amp; charts</a></li>
+          <li><a href="#stats">Charts, stats, and Trait Space</a></li>
+          <li><a href="#runs">Run library, Quick Sim, and exports</a></li>
+          <li><a href="#compare">Compare runs</a></li>
+          <li><a href="#walkthrough">About, walkthrough, and tour</a></li>
+        </ul>
+      </nav>
+      <section class="reference-group" id="navigation" aria-labelledby="navigation-title">
+        <h2 id="navigation-title">Navigation</h2>
+        <section class="reference-section">
+          <h3>Top bar → Project Lab</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Project Lab</dt>
+              <dd>Returns to the site homepage.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Search projects and sections</dt>
+              <dd>Type a name and open a suggestion. Use the arrow keys to move through results, Enter to open one, and Escape to close the list.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Experiments, Learning, Games, Old Projects</dt>
+              <dd>Select a section name to open it. Hover or use the keyboard to reach its project links and Filler page. On a narrow screen, open Menu first.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Simulator header</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Blob icon and World</dt>
+              <dd>Open the simulation field, playback controls, and generation timeline.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>About</dt>
+              <dd>Opens the walkthrough, sample experiments, and this reference.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Trends</dt>
+              <dd>Opens the charts and Trait Space for the current run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Compare</dt>
+              <dd>Appears when you are comparing two runs.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Settings</dt>
+              <dd>Opens Simulation Settings so you can set up an experiment.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run options</dt>
+              <dd>Open the menu using the Day and Live or Replay label. It shows the run name, random seed, and how far results have been saved.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run Library</dt>
+              <dd>Find, open, or manage saved experiments.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Compare runs</dt>
+              <dd>Opens two boards so you can compare saved runs.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Branch here</dt>
+              <dd>Start a new run from a completed day while keeping the original run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Back to Live</dt>
+              <dd>Return to the newest playable day when another day can still be simulated.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Show tour</dt>
+              <dd>Opens a short interactive introduction.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Skip to content</dt>
+              <dd>Appears on keyboard focus and moves you to the main simulator view.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Retry simulation, Retry replay, and Dismiss error</dt>
+              <dd>These appear when something fails. Restart the simulation connection, reload a day, or clear the message.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="world" aria-labelledby="world-title">
+        <h2 id="world-title">World and playback</h2>
+        <section class="reference-section">
+          <h3>World → Field and top-right controls</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Field</dt>
+              <dd>Drag to orbit with the mouse or touch. Scroll or pinch to zoom. Select a blob to follow it and see its readings.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Species</dt>
+              <dd>Open the species editor. You can make changes during an unfinished live generation. Historical replay is read-only.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Follow creature</dt>
+              <dd>Toggle the camera following the selected blob. Choose a creature on the board if one is needed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Layers → Sense range</dt>
+              <dd>Draw circles around blobs to show how far they can detect food or danger.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Layers → Color by speed</dt>
+              <dd>Color blobs by speed. The key runs from brown for slower blobs to red for faster blobs on a scale shared across the run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Layers → Energy</dt>
+              <dd>Show the energy overlay. Gold means full and gray means spent.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Layers → Food credits</dt>
+              <dd>Show what blobs have eaten. Olive marks plants and rust marks prey. Each meal gives one food credit.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Layers → More layer options</dt>
+              <dd>Open Selected creature only to limit overlays to one blob, or Show refuges to mark the safe edges. Back to layers and Close layers leave those menus.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View options → Fit board and Overhead</dt>
+              <dd>Fit board resets the camera to show the field. Overhead looks straight down and stops following the selected blob.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View options → Full screen</dt>
+              <dd>Expand the field to fill the screen. Use Exit full screen or Escape to return.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View options → Creatures</dt>
+              <dd>Open or close Creature Details.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View options → Graphics</dt>
+              <dd>Pick Auto, Full, or Efficient to balance detail and drawing speed. Canvas view appears if the board uses its 2D fallback.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View options → Dim other species and HUD</dt>
+              <dd>Dim other species makes the picked species stand out. HUD toggles the on-board readouts.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Creature caption and Sense focus</dt>
+              <dd>Open details from the selected blob’s caption or toggle the view that emphasizes what it can sense.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World → Playback, beneath the board</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Previous day and Next day</dt>
+              <dd>Move one generation back or forward when that day is available.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play, Pause, and Replay day</dt>
+              <dd>Start or pause live play or a replay. At the end of a replay, the same button restarts that day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play through generations</dt>
+              <dd>Keep going into the next day when the current one ends.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Viewing speed</dt>
+              <dd>Open the clock or multiplier button beside Quick Sim. Pick 1×, 2×, 4×, or 8×, or use the slider for a speed from ⅛× to 8×. This changes playback speed for live days and replays.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Replay time</dt>
+              <dd>Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Previous frame and Next frame</dt>
+              <dd>While a replay is paused, move backward or forward by one recorded frame.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Playback actions → Finish Day or Go to end</dt>
+              <dd>Finish simulating the current live generation or jump to the final frame of a replay.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Playback actions → Step one tick</dt>
+              <dd>Advance by a single simulation step.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Playback actions → Adjust living traits</dt>
+              <dd>Pause at the live position and open a preview of trait changes for the creatures you choose.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Playback actions → Go to frontier and Back to Live</dt>
+              <dd>Go to frontier opens the last completed day. Back to Live moves to the current live position.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Quick Sim or Progress</dt>
+              <dd>Complete several generations in the background or check a batch that is already running.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World → Creature Details</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Creature</dt>
+              <dd>Choose a living blob by ID or select one directly on the field. Close creature details hides the panel.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Copy stats</dt>
+              <dd>Copies the creature’s ID, species, day, speed, size, and sense range as plain text. If clipboard access fails, copy the text shown in the panel.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>State, Foraging decision, and remaining energy</dt>
+              <dd>See what the blob is doing, why it chose that action when a reason is available, and how much energy it has left. Returning blobs also show the distance to refuge.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Age, Food credits, Speed, Size, and Sense range</dt>
+              <dd>Read the creature’s current age, meals earned, and three inherited traits at the displayed moment.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Travel rate, Body radius, and Energy cost</dt>
+              <dd>See its actual movement speed, body radius in field units, and the cost of moving under the current rules.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Born and Parent or Parents</dt>
+              <dd>Show the birth day and the IDs of known parents.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Filter creature events</dt>
+              <dd>Choose all events or narrow to plants, hunts, refuge, deaths, births, trait adjustments, introductions, or species transfers. Select a replay event to jump to its time.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World → Generations and Current Generation Stats</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Generation tiles</dt>
+              <dd>Open a day by selecting its tile. Use the arrow keys to move between tiles and Home or End to reach the first or latest completed day. A day with only a forecast has no recorded replay yet.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Extinction tile and More</dt>
+              <dd>The extinction tile opens the last scene. More or More Generations extends a run while the population can still continue.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Legend and Exact values</dt>
+              <dd>The legend explains the colors and lets you emphasize a metric. Its chevrons hide or show it. Exact values opens the generation table.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Day readings</dt>
+              <dd>Right-click a completed generation tile or focus it and press I to see its exact numbers. Use its bookmark button to save or remove the day. Close dismisses the readings.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation options → Bookmark and Bookmarks</dt>
+              <dd>Bookmark the completed day you are watching. Use Bookmarks to jump back to a marked day later, even after refreshing.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation options → Walkthrough flower, All six metrics, and Mini line</dt>
+              <dd>Change how the timeline summarizes generations.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation options → Numeric table and Go to day</dt>
+              <dd>Open the generation table or enter a day number and select Go.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Reroll seed</dt>
+              <dd>Opens the setup with a new random seed so you can try the same experiment with a different starting sequence.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Collapse generations and Expand generations</dt>
+              <dd>Hide or bring back the timeline to change how much space the board has.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation statistics species</dt>
+              <dd>Show all species or one species in the timeline and stats.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Current Generation Stats</dt>
+              <dd>Read population, age, age at death, speed, size, and sense range for the displayed day and scope.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>View generation table and Advanced stats</dt>
+              <dd>The info icon opens the generation table. The chart icon opens survival, trait spread, and food statistics.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="live-edits" aria-labelledby="live-edits-title">
+        <h2 id="live-edits-title">Changes during a live day</h2>
+        <section class="reference-section">
+          <h3>World → Playback actions → Adjust living traits</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Group and Activity</dt>
+              <dd>Choose all species, one species, multiple species, or individual blobs. Limit the group to any activity, active in field, or settled in refuge.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Choose species and Choose living blobs</dt>
+              <dd>Check the species or creatures to change. Find by ID or species narrows the list. Selected only shows the blobs you have picked.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Speed, Size, and Sense Range</dt>
+              <dd>Enter a change from −100 to +100 points with up to two decimals. Leave a field at zero to keep that trait. Each trait has a minimum.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Average traits before and after</dt>
+              <dd>Preview how many living blobs will change and how their average traits will move.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Apply adjustment and Cancel</dt>
+              <dd>Apply records the change at the paused step. Cancel closes the draft. The change is visible in replays.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World → Species</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Introduce species</dt>
+              <dd>Create a new species and release its founders into the paused generation. Set Name, Color, Blobs to introduce, Energy, Speed, Size, and Sense Range. Use a starting preset if you want set values for the traits.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Split living blobs and Source species</dt>
+              <dd>Move selected creatures from an existing species into a new one. They keep their IDs, positions, age, energy, meals, and family history.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Pick blobs, Number to move, and Find by ID</dt>
+              <dd>Use Seeded sample to pick a repeatable number of blobs or Choose by ID to select specific creatures.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Edit species and Species to edit</dt>
+              <dd>Change an existing species’ name or color and optionally adjust its living traits.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Living traits → Change type</dt>
+              <dd>Check Speed, Size, or Sense Range and either Add or subtract points or Set exact values. See the affected creatures in the preview.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food web diet</dt>
+              <dd>Set the diet for a new or split species. A split copies the source diet. A choice for its own species follows the split group and other prey choices keep their original targets.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Edit food web</dt>
+              <dd>Change diets and test encounters in one draft at the displayed generation and step. Apply changes records a single edit. Discard leaves the web as it was.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Creature ID preview</dt>
+              <dd>Expand the preview to see the IDs about to be introduced or changed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Apply changes, Cancel, Done, Make another change, and Resume</dt>
+              <dd>Apply records the edit. Cancel closes the draft. After applying, Done leaves the world paused, Make another change opens a fresh draft, and Resume continues the day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Close and Back to Live</dt>
+              <dd>Exit a read-only view or return from a replay to the live day to edit.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="settings-basic" aria-labelledby="settings-basic-title">
+        <h2 id="settings-basic-title">Basic settings</h2>
+        <section class="reference-section">
+          <h3>Simulator header → Settings → Basic → Blob Creatures</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Species tabs</dt>
+              <dd>Pick which species to edit. A tab shows its founder count or Off.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>New species and Duplicate</dt>
+              <dd>Start a blank species draft with preset traits or copy the currently selected species into a new draft.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Species actions → Move left, Move right, Remove, and Undo</dt>
+              <dd>Reorder species in the setup, remove one from the draft, or restore the last removal.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Name, Color, and Enabled</dt>
+              <dd>Choose a species label and swatch. Turning Enabled off leaves it in the setup without placing its founders.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Founders</dt>
+              <dd>Set the initial number of blobs for this species, from 10 to 1,000. The live introduction form starts at one blob.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Energy</dt>
+              <dd>Set each founder’s energy budget from 10 to 1,000. The card estimates travel speed and how long that budget lasts. Energy and food reset at dawn.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Speed, Size, and Sense Range</dt>
+              <dd>Set each starting trait from 1 to 100. Speed changes movement, size affects hunting and sometimes stride, and sense range changes how far blobs can detect nearby things.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Balanced, Fast, Sturdy, and Wide sight</dt>
+              <dd>Fill in starting traits using a preset when creating a species. Fast raises speed, Sturdy raises size, and Wide sight raises sense range.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Add to setup and Cancel</dt>
+              <dd>Confirm a pending species or discard it. Then use Evolve! when the whole setup is ready.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Reproduction and Inheritance &amp; mutation</dt>
+              <dd>Open the matching advanced settings directly from Basic.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Simulator header → Settings → Basic → Each generation and Finally</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Food</dt>
+              <dd>Set the base daily plant count from 10 to 1,000. Food schedules and seasons can change that count for later days.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run name</dt>
+              <dd>Name the experiment as it will appear in Run Library.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Days to run</dt>
+              <dd>Set the initial limit from 10 to 1,000 generations. Extinction can end a run earlier.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Random seed</dt>
+              <dd>Choose a whole number from 1 to 4,294,967,295. The same seed and rules reproduce the same result. Branches keep the seed from the original run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Roll seed and Copy seed</dt>
+              <dd>Pick a new random seed or copy the current number.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Prepare and watch</dt>
+              <dd>Compute the archive in the background so completed days can be replayed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch live</dt>
+              <dd>Run each simulation step while you watch and make live edits between steps.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Simulator header → Settings → Tabs and footer</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Basic, Advanced, Advanced Settings, and All categories</dt>
+              <dd>Switch between the setup and the advanced list. All categories returns to the list from an advanced topic.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Number fields</dt>
+              <dd>Type a value or use the minus and plus buttons to change it by one step. Hold and drag in the center strip to change it gradually. Drag farther from the middle to change it faster.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Setup summary</dt>
+              <dd>The footer totals enabled species and founders, and shows the number of base plants per founder.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Discard changes, Discard draft, and Keep editing</dt>
+              <dd>Open a confirmation, restore the setup you opened, or return to the draft.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Evolve! and Create branch</dt>
+              <dd>Start a run with the draft rules or apply them after a branch’s saved day. Review any field errors before submitting.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Close settings</dt>
+              <dd>Closes the settings sheet and takes you back to the simulator.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="field-food" aria-labelledby="field-food-title">
+        <h2 id="field-food-title">Advanced · Field &amp; food</h2>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Field &amp; food → Plant supply</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Food schedule</dt>
+              <dd>Constant keeps the base supply steady. Ramp changes it gradually between points. Step changes it on the day you set. Day 1 uses the Food value from Basic.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Day and Plants</dt>
+              <dd>Set a schedule point from Day 2 through the run limit. Enter 10 to 1,000 plants. Each point needs a different day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Add point, Remove schedule point, and Clear</dt>
+              <dd>Add a point for an unused day, delete one using its trash button, or remove all points.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Field &amp; food → Food seasons</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Enable food seasons</dt>
+              <dd>Apply a repeating rise and fall to the base plant supply. Daily supply stays between 10 and 1,000 plants.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Peak supply (%)</dt>
+              <dd>Set the richest day to 100–200% of the scheduled supply.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Lean supply (%)</dt>
+              <dd>Set the leanest day to 0–100% of the scheduled supply.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generations from peak to leanest</dt>
+              <dd>Set the length of the decline to 1–100 generations.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generations from leanest to peak</dt>
+              <dd>Set the length of the recovery to 1–100 generations. The decline and recovery together make one cycle.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>First peak day in cycle</dt>
+              <dd>Start the first peak at any day number within the cycle. The season repeats on that schedule.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food cycle</dt>
+              <dd>Read the forecast plant count against the base schedule for a full cycle, with the preview day marked.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Field &amp; food → Field layout</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Food placement</dt>
+              <dd>Scattered spreads plants across the field. Patches divide the day’s plant supply across clusters.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Number of patches</dt>
+              <dd>Choose 1–8 food clusters.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Patch radius</dt>
+              <dd>Choose a radius of 10–60 field units for the clusters.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Patch relocation</dt>
+              <dd>Fixed for the run keeps cluster centers in place. Move every N generations redraws the centers on a schedule.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generations between moves</dt>
+              <dd>Set the move interval to 1–100 generations.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Refuge width</dt>
+              <dd>Set the safe border to 10%, 15%, or 20% of the field width, measured inward from each edge. Wider borders leave less growing space.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Field &amp; food → Dawn preview in Plant supply, Food seasons, or Field layout</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Preview day</dt>
+              <dd>Enter a day to see the number of plants at dawn, where they grow, the refuge border, and whether hunting is active. At or before a branch point, the preview uses the saved rules.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Season reading and map</dt>
+              <dd>The reading explains the current seasonal phase and any plant-count limit. The map shows the field with plants and patches.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Field &amp; food → Starting territories</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Use starting territories</dt>
+              <dd>Turn on planned dawn locations for creatures. Leave it off to use the normal dawn placement.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Apply territories</dt>
+              <dd>Opening generation only places creatures with these rules at the start. Every dawn places the population again on each new day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Placement for and Use custom settings</dt>
+              <dd>Edit the Field default or choose a species. Turn on a species override to copy and edit the current field values. Turn it off to use the field again.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Starting edges</dt>
+              <dd>Check one or more of Top, Right, Bottom, and Left. Creatures can start along the selected refuge edges.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Band center (%)</dt>
+              <dd>Move the starting band along its edge from 0–100%. Horizontal edges read left to right. Vertical edges read top to bottom.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Band width (%)</dt>
+              <dd>Set the band to 5–100% of the edge. At a corner, it slides inward so it can keep its width.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Dawn preview and Retry preview</dt>
+              <dd>See the opening plant and creature positions with counts by species and edge. If a saved starting point fails to load, request it again.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="creature-behavior" aria-labelledby="creature-behavior-title">
+        <h2 id="creature-behavior-title">Advanced · Creature behavior</h2>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Creature behavior → Movement and energy</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Stride</dt>
+              <dd>Size-linked makes larger blobs take longer strides. Speed only leaves size out of the stride calculation.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Energy model</dt>
+              <dd>Video walkthrough uses (size³ × distance per step² + sight range) ÷ 10,000 per 0.1-second step. Product uses size³ × speed² × sense ÷ 20,000 per second. Earlier additive uses 0.001 × (size³ × effective speed² + sense) per second.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Energy calculation</dt>
+              <dd>See the movement cost for the species selected in Settings and the formula that produced it.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Refill energy after meals</dt>
+              <dd>Allow food to restore energy up to the blob’s starting amount. Turn it off to keep your reward amounts saved while meals still earn food credits.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Plant reward and Prey reward</dt>
+              <dd>Set the energy restored by each meal to 0–1,000. A reward of zero leaves energy unchanged.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Equal rewards</dt>
+              <dd>Copy the plant reward to the prey reward.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Creature behavior → Foraging decisions</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Foraging rules</dt>
+              <dd>Standard uses the decisions below. Video experiment uses its own step-based turning and dawn movement rules.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Use custom foraging decisions</dt>
+              <dd>Apply the field and species choices in Standard mode. Turning it off restores the built-in values and keeps your custom values saved.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Foraging decisions for and Use custom settings</dt>
+              <dd>Choose the Field default or a species. Turn on custom settings to start with a copy of the field values. Turn it off to inherit them again.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Plant memory (seconds)</dt>
+              <dd>Keep a targeted plant in mind for 0–3 seconds after losing sight of it. A blob drops the target sooner if it sees that the plant is gone. Default 0.6 seconds.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Time saved to switch meals (%)</dt>
+              <dd>Set the minimum time savings for switching targets. At 0%, switch to any strictly quicker meal. At 100%, keep a viable target. An exact tie keeps the current meal. Default 20%.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Return safety margin (steps)</dt>
+              <dd>Keep 0–20 extra simulation steps in reserve when deciding whether another meal still leaves time to get home. The panel shows the equivalent in seconds. Default 2 steps.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Maximum prey pursuit (seconds)</dt>
+              <dd>Set the longest estimated intercept to pursue, from 0–3 seconds. Zero stops deliberate pursuit and still allows eligible contact. Default 1 second.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Try a decision → Situation</dt>
+              <dd>Preview Plant leaves sight, Quicker meal appears, One more meal or head home, or Prey pulls away. The result uses the selected species and current settings.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Creature behavior → Hunting</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Predation</dt>
+              <dd>Allow blobs to hunt one another when the day, size, and diet rules permit it.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Same-species hunting</dt>
+              <dd>Allow eligible blobs to hunt their own species. The food web can still block that hunt.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Minimum hunting size advantage</dt>
+              <dd>Set how much larger a hunter must be than its prey, from 5–100%. The example shows the biggest prey a size-10 hunter could eat.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>First hunting day</dt>
+              <dd>Set the first generation when hunting is allowed. Before then, blobs can only eat plants if their diet allows them.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Creature behavior → Species food web</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Enable species food web</dt>
+              <dd>Give each species its own diet. Off uses the usual feeding rules and saves your custom diets for later.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Eating species</dt>
+              <dd>Choose whose diet to view or change. Diets follow species IDs through renames. Allowing one species to hunt another changes only the eater’s diet.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Eats plants</dt>
+              <dd>Allow the selected species to eat plants. A species with no sources of food can still be used for an experiment.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Can hunt and Allowed prey</dt>
+              <dd>Any eligible species includes future arrivals. Selected species limits prey to the checked list. None blocks hunts. Predation, hunting day, size, same-species rules, and refuge protection still apply.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Test an encounter → Food source and Generation</dt>
+              <dd>Choose a plant or a prey species and the day to test. The preview explains the first rule that decides if the encounter is allowed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Test an encounter → Hunter size and Prey size</dt>
+              <dd>Change the two sizes to test a prey encounter. With a 25% advantage, a size-15 hunter meets the cutoff for size-12 prey. The result describes eligibility for contact, since a catch still depends on movement.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="life-cycle" aria-labelledby="life-cycle-title">
+        <h2 id="life-cycle-title">Advanced · Life cycle</h2>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Life cycle → Reproduction</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Allow reproduction</dt>
+              <dd>Let creatures have offspring after reaching refuge with at least two food credits. Turning it off keeps your reproduction settings saved.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Parent mode</dt>
+              <dd>Single parent lets each eligible blob breed on its own. Two parents pairs eligible blobs of the same species at dusk, and each child starts with the average of its parents’ traits.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Minimum breeding age</dt>
+              <dd>Set how many full generations a blob must finish before it can breed, from 0–30. Zero allows breeding on its first day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Wait after a birth</dt>
+              <dd>Skip 0–30 full generations after having offspring. A wait of 1 after a birth on Day 4 allows the next birth on Day 6.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Chance of a birth (%)</dt>
+              <dd>Give each eligible parent or pair one roll, from 0–100%. Zero turns off births while preserving the other rules.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Chance of twins (%)</dt>
+              <dd>Set the chance of a second child after a successful birth roll, from 0–100%.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Life cycle → Inheritance &amp; mutation</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Species tabs</dt>
+              <dd>Choose whose offspring can mutate. Enable births to edit the mutation settings.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Mutation profile</dt>
+              <dd>All unlocked allows changes to all three traits. Speed only locks size and sense range. All locked turns mutation off. Custom describes a mix you set yourself.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Mutation pattern</dt>
+              <dd>Bell curve favors small changes. Bounded random gives values within its range equal odds.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Allow speed, size, or sense range mutation</dt>
+              <dd>Turn mutation on or off separately for each trait.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Speed, Size, and Sense Range mutation chance (%)</dt>
+              <dd>Set the chance from 0–100% that each unlocked trait changes in a child.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>σ Speed, σ Size, and σ Sense Range</dt>
+              <dd>Set the spread for each trait. A higher number allows larger changes. Current rules use standard deviation from 0–10. Some older runs use variance (σ²) instead.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Variance (σ²) and Example offspring</dt>
+              <dd>Variance is the square of standard deviation. The example shows possible offspring speed for the species you selected.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Life cycle → Aging and lifespan</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Aging rules for and Use custom settings</dt>
+              <dd>Edit the Field default or choose a species. Give the species its own copy of the field values or turn the override off to inherit them again.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Enable aging</dt>
+              <dd>Apply old-age risk and speed loss to creatures using these rules. Blobs gain one year at dusk, before the death check and breeding.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Aging starts after age</dt>
+              <dd>Choose an age from 0–1,000 before aging effects start.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Extra old-age death risk per generation</dt>
+              <dd>Add 0–100 percentage points of risk for each generation past the starting age, checked at dusk.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Travel speed lost per generation (%)</dt>
+              <dd>Reduce travel speed by 0–100 percentage points per generation after aging starts. The movement energy cost stays the same.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Minimum travel speed (%)</dt>
+              <dd>Limit how far travel speed can fall, from 10–100% of normal.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Set a maximum lifespan and Maximum lifespan</dt>
+              <dd>Turn on a hard age limit, then choose from 1–1,000 generations.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Age preview → Preview age</dt>
+              <dd>Enter 0–1,000 to see travel speed, the risk of dying from old age, and whether the lifespan limit has been reached.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="run-charts" aria-labelledby="run-charts-title">
+        <h2 id="run-charts-title">Advanced · Run &amp; charts</h2>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Run &amp; charts → Day length</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>End each day</dt>
+              <dd>When all blobs settle or die ends the day when no active creature remains. After a fixed time also sets a time limit.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Seconds per day</dt>
+              <dd>Set a fixed day from 1–60 simulated seconds in tenths of a second. The 1, 5, 10, 20, 30, and 60 s buttons fill in common choices.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Settings → Advanced → Run &amp; charts → Graph predictions</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Show predictions</dt>
+              <dd>Show or hide dashed future values on supported charts and the generation timeline. The chart needs at least three completed days in a row. Predictions use the seed and scheduled rules. Past the run limit, they are labeled If extended.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Cycles ahead</dt>
+              <dd>Choose 1–25 generations to predict. Press Enter or leave the field to save a valid number. This display preference applies immediately.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="stats" aria-labelledby="stats-title">
+        <h2 id="stats-title">Charts, stats, and Trait Space</h2>
+        <section class="reference-section">
+          <h3>Trends → Top controls</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Filter By Species</dt>
+              <dd>Show all creatures or focus the charts and readings on one species. Field-wide food counts still describe the whole field.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Range, From day, To day, and Reset range</dt>
+              <dd>Show the full run, last 25, last 100, or a custom range. Enter the first and last days for a custom range. Reset range shows the full run again.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Jump to chart</dt>
+              <dd>Scroll to the chosen chart.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation table and Advanced stats</dt>
+              <dd>Open the spreadsheet-style history or deeper statistics for survival, traits, and meals.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Download</dt>
+              <dd>Opens export options with the current date range.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run again and Reroll seed</dt>
+              <dd>Open another run with the same settings, or start from the same setup with a different seed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>More Generations and Quick Sim</dt>
+              <dd>Increase the run limit or simulate several days as a batch.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Trends and Trait Space</dt>
+              <dd>Switch between charts across generations and a view of individual creatures and their traits. Watch World opens the field if there are no results yet.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends → Chart options</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Cohort</dt>
+              <dd>Dawn measures the blobs that start the day. Dusk measures the survivors and newborns at the end.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Spread</dt>
+              <dd>Walkthrough spread shows the average and one sample standard deviation on either side. Percentiles show where different fractions of the group fall.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Order</dt>
+              <dd>Choose Walkthrough order for individual trait charts first, or Overview first for the combined chart.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Closing population or Opening population</dt>
+              <dd>Add the other population count to the one already shown for the chosen cohort.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Compare species populations</dt>
+              <dd>Show separate population lines for species.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Show death causes</dt>
+              <dd>Break deaths down by cause on the population changes chart.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Size 100 threshold</dt>
+              <dd>Mark the size-100 guide on the size chart.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends → Charts and pinned day</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Population, Age, Speed, Size, Sense Range, and Age at Death</dt>
+              <dd>Read the population, age, inherited traits, and ages of creatures that died over the selected days.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Overview, Separate scales, and Combined scales</dt>
+              <dd>See multiple traits and population together, or separate them into their own charts.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Births and Deaths or Population Changes</dt>
+              <dd>Track births, deaths, and species transfers or introductions when they are present.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food</dt>
+              <dd>See the base schedule, food available at dawn, and food used, depending on the setup and scope.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Chart point and date brush</dt>
+              <dd>Hover or use arrow keys on a focused chart to inspect a day. Click or press Space to pin a recorded day. Press Enter to watch it. Drag across a chart that supports range selection to narrow the date range.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Dashed predictions</dt>
+              <dd>Inspect predicted points the same way you inspect completed days. Only completed days can be pinned or replayed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Chart legend</dt>
+              <dd>Select a series name to hide or show its line.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Focus chart and Close focus chart</dt>
+              <dd>Expand a chart for a closer look, then return to the chart list. The focus view offers Pin day and Download chart PNG.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Hide chart, Restore chart, and Restore all</dt>
+              <dd>Use the chart’s minus button to hide it. Select its name above the charts to bring it back, or restore every hidden chart.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Find peak</dt>
+              <dd>On Population, pin the day with the highest count for the current date range and species filter.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch day, Show sense circles, View table, and Clear pinned day</dt>
+              <dd>Replay the pinned day, open it with the sense overlay, view the spreadsheet, or unpin the day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Compare sight ranges</dt>
+              <dd>Find the days with the narrowest and widest spread in the current cohort and range. Select Show Day at dawn or dusk to watch it with sense circles.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Walk through age</dt>
+              <dd>Prepare the paired size mutation example and compare age across the long and short runs. Use the long or short run buttons to switch. Cancel preparation stops the work, Retry restarts it, and Close age walkthrough returns to your run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch the sight example</dt>
+              <dd>Open the guided sight replay with a few moments ready to inspect.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends → Trait Space</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Day and Creature ID</dt>
+              <dd>Choose a completed day. Search for a blob by ID, such as #142, to highlight its dot. The search tells you if it is missing from the displayed group.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Trait scatter and Reset view</dt>
+              <dd>Drag to rotate the plot of speed, size, and sense range. Select a point or use the Creature list to see a blob’s values. Reset view restores the starting angle.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch creature</dt>
+              <dd>Replay the selected day with the chosen creature in view.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Trait distribution → Trait</dt>
+              <dd>Compare Speed, Size, Sense Range, or Age. Age shows counts by age, and the other traits show a histogram.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Bins and Percentage</dt>
+              <dd>Set 5–50 bars for the trait histogram or switch between counts and percentages.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Compare day</dt>
+              <dd>Enter another recorded day to compare distributions. Enter 0 to see just the chosen day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Retry Day and Retry comparison Day</dt>
+              <dd>Reload a day or comparison replay if it could not be opened.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends → Generation table or World → Exact values</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Spreadsheet</dt>
+              <dd>See one row per completed generation and one column per stat. New rows appear as days finish. Choose Species to change whose stats you see.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Column headers</dt>
+              <dd>Select a header to chart that stat. The columns cover opening and closing population, births, deaths, net change, age, age at death, speed, size, sense range, plants spawned, eaten, and left, and successful hunts. Introductions and transfers appear when the run includes them.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation number</dt>
+              <dd>Select a row’s day number to replay it.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Stat trends and Stat</dt>
+              <dd>Open a chart for one column and change which stat is graphed. Use the chart to pin a day and Replay generation to watch it. Latest shows the newest reading.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Download and Done</dt>
+              <dd>Open the export dialog or close the spreadsheet.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends or World → Advanced stats</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Survival &amp; Growth</dt>
+              <dd>Choose survival rate, net population growth, or births per 100 starters. Reading cards show the selected day’s values.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Trait Spread</dt>
+              <dd>Pick Speed, Size, or Sense Range, then chart the average, width of the middle 50%, or sample standard deviation. These describe the spread at the end of a generation.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Food &amp; Hunting</dt>
+              <dd>Choose plants eaten per starting creature, hunts per starting creature, or the percent of plants eaten across the field.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Species and Range</dt>
+              <dd>Choose which species to count and whether to show the full run, last 25, or last 100 days.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Generation and Meals by species</dt>
+              <dd>In Food &amp; Hunting, choose a generation or follow Latest completed. Each row is an eating species. Columns break meals down into plants, each prey species, and totals. Older runs may show known totals with the prey breakdown unavailable. Try again reloads the breakdown after an error.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Latest, Replay generation, and Done</dt>
+              <dd>Clear a pinned reading to follow the newest day, watch the chosen generation, or close the dialog.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="runs" aria-labelledby="runs-title">
+        <h2 id="runs-title">Run library, Quick Sim, and exports</h2>
+        <section class="reference-section">
+          <h3>Simulator header → Run options → Run Library</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Search name or seed</dt>
+              <dd>Find a saved run by its name or seed. An exact seed match comes first.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Import setup and New experiment</dt>
+              <dd>Open a setup JSON file or start with a fresh draft. Review it in Settings before starting.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Resume and Compare</dt>
+              <dd>Open a saved run where it can continue or load it beside the current run.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Actions → View results</dt>
+              <dd>Open the saved run’s Trends.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Actions → Rename, Name, and Save</dt>
+              <dd>Change the label in the library while keeping the run’s history.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Actions → Duplicate</dt>
+              <dd>Open a copy of the setup as a new draft.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Actions → Export setup and Copy setup link</dt>
+              <dd>Save a JSON copy of the setup or copy a compact link that opens its rules in Settings. Use JSON when the setup is too large for a link.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Actions → Delete and Delete run</dt>
+              <dd>Remove a saved run after confirming. Cancel closes the confirmation. The active run cannot be deleted through this menu.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>World or Trends → Quick Sim</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Additional generations and Complete through day</dt>
+              <dd>Count forward from the current completed day or enter the exact Target day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watching, Next day to simulate, and Saved through</dt>
+              <dd>See the day on screen, where new work starts, and how far the archive has been written. These can be different days.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Simulate and Watch Day</dt>
+              <dd>Run to the target without animating each step. If the requested day is already complete, watch it instead.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>More Generations and Cancel</dt>
+              <dd>Extend the run if the target is past its limit, or close the dialog before starting the batch.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Progress and Hide progress</dt>
+              <dd>See the completed count and batch progress. Hide the dialog while a batch keeps running.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Stop after this day</dt>
+              <dd>Let the generation underway finish, then stop the batch. Completed days stay saved.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>New Quick Sim, View batch results, and Watch last day</dt>
+              <dd>Start another batch, filter Trends to the days this batch finished, or open the last day it completed.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>More Generations → Additional days and Extend</dt>
+              <dd>Add days to an existing run up to the run limit.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Simulator header → Run options → Branch here</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Branch after day</dt>
+              <dd>Choose a completed generation to keep in the new run. Later changes start on the next day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Plants per day</dt>
+              <dd>Set the branch’s base plant supply.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Edit branch rules and Create branch</dt>
+              <dd>Review the full set of settings or start with the choices in the dialog. The original run stays available.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Trends or Generation table → Download</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>CSV results</dt>
+              <dd>Export end-of-day statistics for the chosen Scope, From day, and Through day. All scopes includes the all-species totals and the individual species readings.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Setup JSON</dt>
+              <dd>Download the seed, species, rules, and food schedule so the experiment can be opened again.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Download, Cancel, and Close dialog</dt>
+              <dd>Save the selected file or leave the dialog.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="compare" aria-labelledby="compare-title">
+        <h2 id="compare-title">Compare runs</h2>
+        <section class="reference-section">
+          <h3>Run options → Compare runs → Top controls</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Left run and Right run</dt>
+              <dd>Choose a saved experiment for each side. The comparison shows their average size across the shared range and readings for the days you selected.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run Library and Try again</dt>
+              <dd>Open the library or retry loading a saved run after an error.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Set both days, Previous comparison day, and Next comparison day</dt>
+              <dd>Synchronize both boards to a generation within their shared range.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Species and Sense circles</dt>
+              <dd>Focus on a species shared by both runs or show detection ranges on the boards.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Side by side, Reveal mode, and Reveal left and right</dt>
+              <dd>Switch between two separate boards and an overlaid comparison. Move the reveal slider to see more of either board.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Swap sides</dt>
+              <dd>Move each run to the other side with its day, camera, replay position, and creature selection.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Emphasis and Fit both boards</dt>
+              <dd>Highlight both boards or one side. Reset both cameras to fit the full field.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Compare runs → Board controls and hunt shortcuts</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Day and Camera</dt>
+              <dd>Choose a generation for just one board and switch it between Field view, Overhead, and Close view.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play or Pause board and playback slider</dt>
+              <dd>Control one replay on its own. Select a creature on the board to follow it.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play or Pause comparison and Shared day progress</dt>
+              <dd>Start or stop both boards or scrub them to the same fraction of the day.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Retry left or right replay</dt>
+              <dd>Reload a replay that failed on that side.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Largest hunt gap</dt>
+              <dd>Go to the shared day with the biggest difference in successful hunts for this scope.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch left hunt and Watch right hunt</dt>
+              <dd>Jump to the first successful hunt for the selected day and scope on that side.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Compare runs → Video scene controls</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Create seed 118 video pair · 100 days</dt>
+              <dd>Prepare the two sample runs used for comparing wide and narrow size mutation. Cancel setup stops preparation before the runs are saved.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Stage video moments · Day 6 / 77</dt>
+              <dd>Set up the two boards at the example hunter and forager moments.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play video sequence and Stop video sequence</dt>
+              <dd>Run the staged camera cuts and emphasis changes, or stop and return to manual controls.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>Compare runs → Results beneath the boards</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Metric table and Right − Left</dt>
+              <dd>Read each board’s stats for the day it is showing. A positive difference means the right board’s value is higher.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Comparison charts</dt>
+              <dd>Line up the runs by generation. Use the legend to toggle each run’s line, focus to expand a chart, or pin a recorded point to move both boards to that day.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+      <section class="reference-group" id="walkthrough" aria-labelledby="walkthrough-title">
+        <h2 id="walkthrough-title">About, walkthrough, and tour</h2>
+        <section class="reference-section">
+          <h3>About → Introduction and walkthrough</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Open World, Show tour, and Continue walkthrough</dt>
+              <dd>Open the field, start the short tour, or jump to the last chapter you visited.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Controls &amp; settings reference</dt>
+              <dd>Open this searchable reference. Use the section links to jump, Clear to restore the full list, or Print reference to print or save it as a PDF.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Walkthrough chapters, Back, and Next</dt>
+              <dd>Pick a chapter or move through the lessons in order. The last chapter is remembered on this browser.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Finches, Primer, and The host</dt>
+              <dd>Switch between the opening illustrations in Natural selection.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Try it in World and Open Trends</dt>
+              <dd>Open the chapter’s guided example or go to your charts.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Watch this part of the video, video title buttons, and Watch on YouTube</dt>
+              <dd>Open the matching timestamp, play a video inside About, or open it on YouTube.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Size and stride → Play race, Pause race, Race again, and Reset race</dt>
+              <dd>Run, stop, repeat, or reset the two-lane comparison of stride lengths. See the original Rust rule expands the code behind the example.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>About → Experiments</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Compare size mutation → Seed and Days per run</dt>
+              <dd>Set a shared seed and choose 100 or 600 days for the wide and narrow size mutation runs.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Run both and compare, Cancel, and Watch the experiment in the video</dt>
+              <dd>Prepare both runs and open Compare, stop preparation, or open the matching part of the source video.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Load setup</dt>
+              <dd>Open any sample experiment’s rules in Settings. You can check or edit the draft before starting.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>About or Trends → Guided World example</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Play example, Pause example, Replay example, and Example progress</dt>
+              <dd>Watch, pause, restart, or scrub through the guided scene. An extinction tile restarts the last generation when present.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Sense focus and replay stage buttons</dt>
+              <dd>Emphasize a creature’s sense range, or move between the labeled moments in a sight or family replay.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Back to walkthrough, Back to Trends, and Retry example</dt>
+              <dd>Return to the page that opened the example, or reload the scene after an error.</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="reference-section">
+          <h3>About or Run options → Show tour</h3>
+          <dl>
+            <div class="reference-entry">
+              <dt>Get started, Back, Next, and Open World</dt>
+              <dd>Begin the six-step tour, move through its chapters, and open World from the last step.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Play demo and Pause demo</dt>
+              <dd>Control the animated sample inside a tour chapter.</dd>
+            </div>
+            <div class="reference-entry">
+              <dt>Video walkthrough, Skip, and Close tour</dt>
+              <dd>Open the longer walkthrough from the first step, or exit the tour at any point.</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

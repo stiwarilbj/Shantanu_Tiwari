@@ -1,0 +1,53 @@
+import { expect, test } from '@playwright/test'
+
+test('opens the controls reference from About and finds an advanced setting', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('evolution.tour', '1'))
+  await page.goto('./')
+  await page.getByRole('link', { name: 'About', exact: true }).click()
+  await page.getByRole('link', { name: 'Controls & settings reference' }).press('Enter')
+  await expect(page).toHaveURL(/\/reference\.html$/)
+  await expect(page.getByRole('heading', { name: 'Controls & settings reference' })).toBeVisible()
+  if (process.env.PAGES_URL) {
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
+  }
+
+  const input = page.getByRole('searchbox', { name: 'Find a control or setting' })
+  const behavior = page.locator('#creature-behavior')
+  await input.fill('foraging plant memory')
+  await expect(behavior.getByRole('heading', { name: /Settings → Advanced → Creature behavior → Foraging decisions/ })).toBeVisible()
+  await expect(behavior.getByText('Plant memory (seconds)', { exact: true })).toBeVisible()
+  await expect(page.locator('#field-food')).toBeHidden()
+
+  await input.fill('zzneverfound')
+  await expect(page.getByText(/^No matches/)).toBeVisible()
+  await page.getByRole('button', { name: 'Clear', exact: true }).press('Enter')
+  await expect(input).toBeFocused()
+  await expect(input).toBeEmpty()
+  await expect(page.locator('#field-food')).toBeVisible()
+  await page.getByRole('navigation', { name: 'Reference sections' }).getByRole('link', { name: 'Compare runs' }).click()
+  await expect(page).toHaveURL(/#compare$/)
+  await expect(page.locator('#compare-title')).toBeInViewport()
+
+  await page.getByRole('link', { name: '← Evolution Simulator' }).click()
+  await expect(page.getByRole('button', { name: 'Simulation Settings' })).toBeEnabled()
+})
+
+test('reads and prints the complete reference at phone width', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 580 })
+  await page.goto('reference.html')
+  await expect(page.getByRole('heading', { name: 'Controls & settings reference' })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
+  const input = page.getByRole('searchbox', { name: 'Find a control or setting' })
+  await input.fill('prey size')
+  await expect(page.locator('#settings-basic')).toBeHidden()
+  await expect(page.getByText('Test an encounter → Hunter size and Prey size', { exact: true })).toBeVisible()
+
+  await page.evaluate(() => { window.print = () => document.body.setAttribute('data-print-opened', 'true') })
+  await page.getByRole('button', { name: 'Print reference' }).click()
+  await expect(page.locator('body')).toHaveAttribute('data-print-opened', 'true')
+  await page.emulateMedia({ media: 'print' })
+  await expect(page.locator('#settings-basic')).toBeVisible()
+  await expect(page.locator('#walkthrough')).toBeVisible()
+  await expect(input).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Print reference' })).toBeHidden()
+})

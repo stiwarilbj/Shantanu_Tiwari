@@ -8,6 +8,8 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 Watch blobs hunt, gather food, and pass on traits like size and speed. Build a species from a preset, then use the Species button in World to bring in newcomers or split a living group. Give each species its own diet, then use the meal table or replay to see what it ate.
 
+[Controls and settings reference](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/reference.html)
+
 ## [Learning](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/)
 
 ### [Place Naming Game](https://stiwarilbj.github.io/Shantanu_Tiwari/learning/places-game/)

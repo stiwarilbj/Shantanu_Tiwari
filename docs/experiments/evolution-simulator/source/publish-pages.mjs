@@ -10,9 +10,11 @@ for (const directory of generatedDirectories) {
 for (const file of ['favicon.svg', 'project-lab.css']) {
   await cp(new URL(file, build), new URL(file, site))
 }
-await rename(new URL('index.html', build), new URL('index.html', site))
+for (const file of ['index.html', 'reference.html']) {
+  await rename(new URL(file, build), new URL(file, site))
+}
 
-// Keep the previous page's assets until the new page is in place.
+// Keep the previous assets until both new pages are in place.
 for (const directory of generatedDirectories) {
   const destination = new URL(directory, site)
   const currentFiles = new Set(await readdir(new URL(directory, build)))
