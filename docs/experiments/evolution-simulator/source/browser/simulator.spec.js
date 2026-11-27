@@ -650,6 +650,49 @@ test('World continues drawing live playback after losing WebGL', async ({ page }
   expect(errors).toEqual([])
 })
 
+test('Canvas keeps the near side of the tabletop white when zooming @pages', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await page.getByRole('spinbutton', { name:'Random seed' }).fill('118')
+    await fixedDay(page, '5')
+  })
+  await quickThrough(page, 1)
+  await page.getByRole('button', { name:'Watch last day' }).click()
+  await expect(page.getByRole('slider', { name:'Replay time' })).toBeVisible()
+
+  const canvas = page.getByRole('region', { name:'Simulation field' }).locator('canvas.world-canvas')
+  const lost = await canvas.evaluate(element => {
+    const extension = element.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+    extension?.loseContext()
+    return !!extension
+  })
+  expect(lost).toBe(true)
+  await expect(page.getByText('Canvas view', { exact:true })).toBeVisible()
+
+  const nearFloor = () => canvas.evaluate(element => {
+    const ctx = element.getContext('2d')
+    // Use patches wide enough that a passing creature or pellet cannot hide the floor.
+    const size = 41, radius = (size - 1) / 2
+    return [.2, .5, .8].map(x => {
+      const pixels = ctx.getImageData(Math.floor(element.width * x) - radius,
+        Math.floor(element.height * .8) - radius, size, size).data
+      let white = 0
+      for (let i = 0; i < pixels.length; i += 4) if (pixels[i] === 255 && pixels[i+1] === 255 && pixels[i+2] === 255) white++
+      return white / (size * size)
+    })
+  })
+
+  await canvas.hover()
+  await page.mouse.wheel(0, -6500)
+  await expect.poll(async () => Math.min(...await nearFloor())).toBeGreaterThan(.8)
+
+  await page.setViewportSize({ width:390, height:844 })
+  await expect.poll(async () => Math.min(...await nearFloor())).toBeGreaterThan(.8)
+  expect(errors).toEqual([])
+})
+
 test('World suspends its hidden board and restores the current view @pages', async ({ page }) => {
   await page.addInitScript(() => {
     const activity = window.worldBoardActivity = { callbacks:0, measurements:0, paints:0 }

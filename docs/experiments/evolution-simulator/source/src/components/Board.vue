@@ -289,28 +289,34 @@ function draw3d(blobs, frame, view, { min, max }) {
   renderer.render(scene, view)
 }
 
-function project(x, y, z, view) {
-  const p = new THREE.Vector3(x, y, z).project(view)
+function screenPoint(p) {
   return { x: (p.x * .5 + .5) * width, y: (-p.y * .5 + .5) * height, depth: p.z }
 }
 
-function spotlight(blob, view) {
-  // Clip the floor circle before projection so a radius crossing the camera stays convex.
-  // Raise the close-up opening enough to light the creature's face.
-  const lift = props.camera === 'close' && blob.sense < 10 ? blob.r * 1.05 : 0
-  const rim = visionRim.map(([x, z]) => new THREE.Vector3(
-    blob.x - 250 + x * blob.sense, lift, blob.y - 250 + z * blob.sense).applyMatrix4(view.matrixWorldInverse))
+function project(x, y, z, view) {
+  return screenPoint(new THREE.Vector3(x, y, z).project(view))
+}
+
+function projectPolygon(points, view) {
+  // Clip in camera space before perspective division can flip points behind the eye.
+  const vertices = points.map(([x, y, z]) => new THREE.Vector3(x, y, z).applyMatrix4(view.matrixWorldInverse))
   const near = -view.near
   const clipped = []
-  for (let i = 0; i < rim.length; i++) {
-    const a = rim[i], b = rim[(i + 1) % rim.length]
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i], b = vertices[(i + 1) % vertices.length]
     if (a.z <= near) clipped.push(a)
     if ((a.z <= near) !== (b.z <= near)) clipped.push(a.clone().lerp(b, (near - a.z) / (b.z - a.z)))
   }
-  const hole = clipped.map(p => {
-    p.applyMatrix4(view.projectionMatrix)
-    return ((p.x + 1) * width / 2).toFixed(1) + ',' + ((1 - p.y) * height / 2).toFixed(1)
-  })
+  return clipped.map(p => screenPoint(p.applyMatrix4(view.projectionMatrix)))
+}
+
+function spotlight(blob, view) {
+  // Raise the close-up opening enough to light the creature's face.
+  const lift = props.camera === 'close' && blob.sense < 10 ? blob.r * 1.05 : 0
+  const rim = visionRim.map(([x, z]) => [
+    blob.x - 250 + x * blob.sense, lift, blob.y - 250 + z * blob.sense,
+  ])
+  const hole = projectPolygon(rim, view).map(({ x, y }) => x.toFixed(1) + ',' + y.toFixed(1))
   const backdrop = `M-42,-42H${width + 42}V${height + 42}H-42Z`
   visionMask.value?.setAttribute('d', backdrop + (hole.length ? 'M' + hole.join('L') + 'Z' : ''))
 }
@@ -342,23 +348,23 @@ function draw2d(blobs, frame, view, { min, max }) {
   ctx.fillStyle = stageColor
   ctx.fillRect(0, 0, width, height)
   const p = (x,y,z) => project(x, y, z, view)
-  const corners = s => [[-s,-s],[s,-s],[s,s],[-s,s]]
-  const top = corners(270).map(([x,z]) => p(x,-1,z)), bottom = corners(270).map(([x,z]) => p(x,-11,z))
+  const projectFace = points => projectPolygon(points, view)
+  const corners = (s, y = 0) => [[-s,y,-s],[s,y,-s],[s,y,s],[-s,y,s]]
+  const top = corners(270, -1), bottom = corners(270, -11)
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4
-    polygon([top[i],top[j],bottom[j],bottom[i]], i % 2 ? '#969696' : '#AAAAAA')
+    polygon(projectFace([top[i],top[j],bottom[j],bottom[i]]), i % 2 ? '#969696' : '#AAAAAA')
   }
-  polygon(top, '#CDCDCD')
+  polygon(projectFace(top), '#CDCDCD')
   const refugeWidth = frame.refugeWidth ?? 0
-  const field = corners(FIELD / 2).map(([x,z]) => p(x,0,z))
   const interior = FIELD / 2 - refugeWidth
-  polygon(field, refugeWidth ? homeColor : '#FFFFFF')
+  polygon(projectFace(corners(FIELD / 2)), refugeWidth ? homeColor : '#FFFFFF')
   ctx.save()
   ctx.clip()
-  if (refugeWidth) polygon(corners(interior).map(([x,z]) => p(x,0,z)), '#FFFFFF')
+  if (refugeWidth) polygon(projectFace(corners(interior)), '#FFFFFF')
   const eligible = b => !props.layers?.selected || b.id === props.selected
   if (props.layers?.homes) {
-    const points = corners(refugeWidth ? interior : legacyOutlineSize / 2).map(([x,z]) => p(x,0,z))
+    const points = projectFace(corners(refugeWidth ? interior : legacyOutlineSize / 2))
     ctx.strokeStyle = '#6C847C'
     ctx.setLineDash([4,3])
     polygonPath(points)
@@ -367,12 +373,21 @@ function draw2d(blobs, frame, view, { min, max }) {
   }
   const overheadView = view === overhead
   const simple = efficient(blobs, frame)
-  const markers = blobs.map(b => ({ b, q: p(b.x-250,0,b.y-250), t: p(b.x-250,b.r*2.35,b.y-250) }))
-  const plants = frame.plants.map(plant => {
+  const inDepthRange = ({ depth }) => depth >= -1 && depth <= 1
+  const markers = []
+  for (const b of blobs) {
+    const q = p(b.x-250,0,b.y-250), t = p(b.x-250,b.r*2.35,b.y-250)
+    if (inDepthRange(q) && inDepthRange(t)) markers.push({ b, q, t })
+  }
+  const plants = []
+  for (const plant of frame.plants) {
     const x = plant.x-250, z = plant.y-250
-    const q = p(x,0,z), t = p(x,2.2,z), edge = p(x+2,2.2,z)
-    return { plant, q, t, r:Math.max(1,Math.min(8,Math.hypot(t.x-edge.x,t.y-edge.y))) }
-  })
+    const q = p(x,0,z), t = p(x,2.2,z)
+    if (!inDepthRange(q) || !inDepthRange(t)) continue
+    const edge = p(x+2,2.2,z)
+    const r = Math.max(1, Math.min(8, Math.hypot(t.x-edge.x, t.y-edge.y)))
+    plants.push({ plant, q, t, r })
+  }
   if (!simple) plants.forEach(({q,r}) => softShadow(q.x+r*.38,q.y+r*.08,r*1.65,r*(overheadView?1.15:.54)))
   markers.forEach(({b,q,t}) => {
     const r = Math.max(1.2, overheadView ? b.r * width/(overhead.right-overhead.left) : Math.hypot(t.x-q.x,t.y-q.y) / 2.15)
