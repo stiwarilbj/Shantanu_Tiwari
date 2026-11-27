@@ -24,9 +24,14 @@ const ageDemoRestore=ref(null)
 const ageWalkthrough=ref(null)
 let ageDemoController
 const ageDemoPair=computed(()=>ageDemoVisible.value ? ageDemoRuns.value[ageDemoPhase.value] ?? null : null)
-const activeRun=computed(()=>ageDemoPair.value?.[0] ?? lab.run)
+// Keep the rendered rows stable while Quick Sim is committing days offscreen.
+const displayedRun=computed(previous=>props.active || !previous ? lab.run : previous)
+const activeRun=computed(()=>ageDemoPair.value?.[0] ?? displayedRun.value)
 const trendSubhead=computed(()=>{
-  if (!ageDemoVisible.value) return `${lab.run.setup.name} · Seed ${lab.run.setup.seed} · Through Day ${lab.run.summaries.length}${lab.batch?' · Simulating':''}`
+  if (!ageDemoVisible.value) {
+    const { setup, summaries } = displayedRun.value
+    return `${setup.name} · Seed ${setup.seed} · Through Day ${summaries.length}${lab.batch?' · Simulating':''}`
+  }
   if (ageDemoPair.value) return `Age walkthrough · ${activeRun.value.setup.name} · Seed ${activeRun.value.setup.seed} · Through Day ${activeRun.value.summaries.length}`
   if (ageDemoProgress.value) return `Age walkthrough · Preparing ${ageDemoProgress.value.days}-day reference runs`
   return ageDemoError.value ? 'Age walkthrough · Reference preparation failed' : 'Age walkthrough · Reference runs'
@@ -455,8 +460,8 @@ onBeforeUnmount(()=>ageDemoController?.abort())
       </p>
       <div v-if="hidden.length && !ageDemoVisible" class="restore-plots"><button v-for="key in hidden" :key="key" class="secondary" @click="toggleHidden(key)">+ {{ options[key].title }}</button>
         <button class="link" @click="hidden=[]">Restore all</button></div>
-      <div v-if="!ageDemoVisible && !rows.length" class="notice" role="status">{{ lab.completed?'Choose a different range.':'Complete Day 1 to see trends.' }}
-        <button v-if="!lab.completed" class="secondary" @click="emit('watch',1)">Watch World</button></div>
+      <div v-if="!ageDemoVisible && !rows.length" class="notice" role="status">{{ displayedRun.summaries.length?'Choose a different range.':'Complete Day 1 to see trends.' }}
+        <button v-if="!displayedRun.summaries.length" class="secondary" @click="emit('watch',1)">Watch World</button></div>
       <div v-if="pinned && !ageDemoVisible" ref="pinSummary" class="pinned-summary">
         <div id="pinned-day-details"><strong>Day {{ pin }} · Pinned</strong><small>{{ pinnedScopeName }} · {{ pinned.population }} blobs at {{ cohort }} · {{ pinned.births }} births · {{ pinned.deaths }} deaths</small></div>
         <button class="secondary" @click="lab.modal='table'">View table</button><button class="secondary" @click="watchSight(pin)">Show sense circles</button>
@@ -486,19 +491,19 @@ onBeforeUnmount(()=>ageDemoController?.abort())
       <template v-if="!ageDemoVisible || ageDemoPair" v-for="section in sectionOrder" :key="section">
         <div v-if="section==='compact'" class="compact-plots walkthrough-plots" :class="{'spotlight-layout':focused==='age'}">
           <TrendPlot v-for="key in basic.filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]"
-            compact :spotlight="focused==='age' && focused===key" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations"
+            compact :visible="active" :spotlight="focused==='age' && focused===key" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations"
             @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
         </div>
         <section v-else-if="section==='overview'" id="trends-overview" class="overview">
           <button class="secondary overview-mode" :aria-pressed="separate" @click="separate=!separate">{{ separate?'Combined scales':'Separate scales' }}</button>
           <div v-if="separate" class="compact-plots" :class="{'spotlight-layout':focused==='age'}">
             <TrendPlot v-for="key in [...basic,'deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="{...options[key],series:options[key].series.filter(s=>s.primary),hideable:false}"
-              :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
+              :visible="active" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" :spotlight="focused==='age' && focused===key" @focus="focus(key)" @pin="pin=$event" @peak="pinPeak" @watch="watchPlot($event)" @range="customRange"/>
           </div>
-          <TrendPlot v-else v-bind="options.overview" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" @focus="focus('overview')" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
+          <TrendPlot v-else v-bind="options.overview" :visible="active" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" @focus="focus('overview')" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
         </section>
         <div v-else class="secondary-plots">
-          <TrendPlot v-for="key in ['births','food','deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]" :rows="rows" :future-rows="futureRows" :pin="pin"
+          <TrendPlot v-for="key in ['births','food','deathAge'].filter(key=>!hidden.includes(key))" :key="key" v-bind="options[key]" :visible="active" :rows="rows" :future-rows="futureRows" :pin="pin"
             :scope="scopeName" :annotations="annotations" @hide="toggleHidden(key)" @focus="focus(key)" @pin="pin=$event" @watch="watchPlot($event)" @range="customRange"/>
         </div>
       </template>
@@ -506,7 +511,7 @@ onBeforeUnmount(()=>ageDemoController?.abort())
     <Teleport to="body">
       <dialog ref="focusDialog" class="focus-dialog" aria-label="Focused chart" @cancel.prevent="focused=null">
         <ForecastStatus v-if="focused && focused!=='age'" :forecasts="[forecast, partnerForecast]"/>
-        <TrendPlot v-if="focused && focused!=='age'" v-bind="options[focused]" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" focus
+        <TrendPlot v-if="focused && focused!=='age'" v-bind="options[focused]" :visible="active" :rows="rows" :future-rows="futureRows" :pin="pin" :scope="scopeName" :annotations="annotations" focus
           @focus="focused=null" @pin="pin=$event" @peak="pinPeak" @watch="focused=null; watchPlot($event)" @range="customRange"/>
       </dialog>
     </Teleport>

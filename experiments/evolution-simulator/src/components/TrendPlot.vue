@@ -7,12 +7,15 @@ import { format } from '../engine/stats.js'
 
 Chart.register(LineController,LineElement,PointElement,BarController,BarElement,LinearScale,CategoryScale,Tooltip,Filler)
 const props = defineProps({ id:String, title:String, rows:Array, futureRows:{ type:Array, default:() => [] }, series:Array, unit:String, color:String, min:Number, max:Number,
-  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean, describeDay:Function })
+  pin:Number, peakDay:Number, focus:Boolean, spotlight:Boolean, right:Boolean, hideable:Boolean, legend:Boolean, guide:Number, scope:String, annotations:Array, compact:Boolean, embedded:Boolean,
+  describeDay:Function, visible:{ type:Boolean, default:true } })
 const emit = defineEmits(['hide','focus','pin','peak','watch','range'])
 const canvas = ref(), hovered = ref(null)
 const predictedIndex = ref(null), showPredictionReading = ref(false)
-let chart, brush, ignoreClick = false
+let chart, renderedInputs, brush, ignoreClick = false
 const hidden = ref([])
+const datasetInputs = computed(() => [props.rows, props.series, props.right, props.guide, hidden.value, props.futureRows])
+const visibleInputs = () => props.visible ? [datasetInputs.value, props.pin, props.annotations] : null
 const keys = computed(() => props.series.filter(s=>s.key!==false))
 const active = computed(() =>
   [hovered.value, props.pin].find(day => day != null && props.rows.some(row => row.day === day)) ?? null)
@@ -203,7 +206,6 @@ function isTouch(event) {
     event?.type.startsWith('touch') || matchMedia('(pointer:coarse)').matches
 }
 function update() {
-  if(!chart) return
   const history = props.rows.length
   chart.data.labels=[...props.rows.map(r=>r.day), ...predictionDays.value]
   chart.data.datasets=props.series.map(s=>({
@@ -310,20 +312,24 @@ function create() {
       }
     }
   })
-  update()
 }
-onMounted(create)
+function refreshChart(inputs) {
+  if (!inputs || !canvas.value) return
+  if (!chart) create()
+  const [dataset, pin, annotations] = inputs
+  const [previousDataset, previousPin, previousAnnotations] = renderedInputs ?? []
+  renderedInputs = inputs
+  if (props.embedded && pin == null && previousPin != null) hovered.value=null
+  if (dataset !== previousDataset) {
+    predictedIndex.value=null
+    showPredictionReading.value=false
+    brush=null
+    update()
+  } else if (pin !== previousPin || annotations !== previousAnnotations) chart.draw()
+}
+onMounted(() => refreshChart(visibleInputs()))
 onBeforeUnmount(()=>chart?.destroy())
-watch(()=>[props.rows,props.series,props.right,props.guide,hidden.value,projections.value],()=>{
-  predictedIndex.value=null
-  showPredictionReading.value=false
-  brush=null
-  update()
-})
-watch(()=>[props.pin,props.annotations],([pin],[previous])=>{
-  if (props.embedded && pin == null && previous != null) hovered.value=null
-  chart?.draw()
-})
+watch(visibleInputs, refreshChart)
 function downloadChart() {
   const source = canvas.value
   const image = document.createElement('canvas')

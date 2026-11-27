@@ -4001,6 +4001,65 @@ test('canceling Quick Sim leaves a finished replay at dusk', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled()
 })
 
+test('Trends catches up on the first frame after a hidden Quick Sim batch @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('evolution-simulator:graph-predictions', JSON.stringify({ enabled: false }))
+    window.populationDraws = 0
+    const { clearRect } = CanvasRenderingContext2D.prototype
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas.matches('.walkthrough-plots #chart-population canvas')) window.populationDraws++
+      return clearRect.apply(this, args)
+    }
+  })
+  await openSimulator(page)
+  await startRun(page, '40')
+  await quickThrough(page, 3)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 3')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  const trends = page.getByRole('link', { name: 'Trends', exact: true })
+  await trends.click()
+  const species = page.getByLabel('Filter By Species')
+  const range = page.getByRole('combobox', { name: 'Range', exact: true })
+  const mean = page.locator('.walkthrough-plots #chart-speed').getByRole('button', { name: 'Mean', exact: true })
+  await species.selectOption('blue')
+  await range.selectOption('100')
+  await mean.press('Enter')
+  const population = page.locator('.walkthrough-plots #chart-population canvas')
+  await population.press('Home')
+  await expect(page.getByText('Day 1 · Pinned', { exact: true })).toBeVisible()
+  const firstPlot = await population.evaluate(canvas => {
+    window.populationCanvas = canvas
+    return canvas.toDataURL()
+  })
+
+  await page.getByRole('link', { name: 'World', exact: true }).press('Enter')
+  await expect(population).toBeHidden()
+  const drawsWhileHidden = await page.evaluate(() => window.populationDraws)
+  await quickThrough(page, 30)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 30')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  expect(await page.evaluate(() => window.populationDraws)).toBe(drawsWhileHidden)
+
+  await trends.evaluate(link => {
+    window.trendsFirstFrame = new Promise(resolve => {
+      link.addEventListener('click', () => requestAnimationFrame(() => {
+        const canvas = document.querySelector('.walkthrough-plots #chart-population canvas')
+        resolve({ sameCanvas: canvas === window.populationCanvas, drawn: canvas.toDataURL() })
+      }), { once: true })
+    })
+  })
+  await trends.press('Enter')
+  const frame = await page.evaluate(() => window.trendsFirstFrame)
+  expect(frame.sameCanvas).toBe(true)
+  expect(frame.drawn).not.toBe(firstPlot)
+  await expect(species).toHaveValue('blue')
+  await expect(range).toHaveValue('100')
+  await expect(mean).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByText('Day 1 · Pinned', { exact: true })).toBeVisible()
+  await population.press('End')
+  await expect(page.getByText('Day 30 · Pinned', { exact: true })).toBeVisible()
+})
+
 test('Quick Sim batch results open Trends to the completed days @pages', async ({ page }) => {
   await installBatchHold(page)
   await openSimulator(page)
