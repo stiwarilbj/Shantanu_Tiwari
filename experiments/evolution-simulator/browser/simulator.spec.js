@@ -54,13 +54,22 @@ async function savedManualProgress(page) {
     open.onerror = () => reject(open.error)
     open.onsuccess = () => {
       const db = open.result
-      const transaction = db.transaction('runs', 'readonly')
-      const get = transaction.objectStore('runs').get(localStorage.getItem('evolution.active'))
+      const id = localStorage.getItem('evolution.active')
+      const transaction = db.transaction([...db.objectStoreNames], 'readonly')
+      const get = transaction.objectStore('runs').get(id)
+      let history
+      get.onsuccess = () => {
+        if (get.result?.historyRevision) {
+          history = transaction.objectStore('runHistory').getAllKeys(IDBKeyRange.bound([id, 0], [id, Infinity]))
+        }
+      }
       transaction.onabort = () => { db.close(); reject(transaction.error) }
       transaction.oncomplete = () => {
         db.close()
         const run = get.result
-        resolve(run && { tick: run.partial?.tick ?? null, days: run.summaries.map(row => row.day) })
+        const days = history ? history.result.filter(key => key[2] === 'summaries').map(key => key[1]) :
+          run?.summaries.map(row => row.day)
+        resolve(run && { tick: run.partial?.tick ?? null, days })
       }
     }
   }))
@@ -3796,7 +3805,9 @@ test('replay stops at the next live day and the saved results survive a reload',
   await page.reload()
   await expect(page.getByText(/Browser test run .* Through Day 3/)).toBeVisible()
   await expect(page.locator('.trends canvas').first()).toBeVisible()
-  await page.getByRole('link', { name: 'World', exact: true }).click()
+  const world = page.getByRole('link', { name: 'World', exact: true })
+  await world.click()
+  await expect(world).toHaveAttribute('aria-current', 'page')
   await quickThrough(page, 10)
   await page.getByRole('button', { name: 'Watch last day' }).click()
   await expect(runOptions).toHaveText('Day 10 / 10 · Replay')

@@ -1,14 +1,18 @@
 let database
-const archiveStores = ['runs', 'runSummaries']
+const libraryStores = ['runs', 'runSummaries']
+const historyStore = 'runHistory'
+const archiveStores = [...libraryStores, historyStore]
 const migrationBatchSize = 8
+const savedHistories = new WeakMap()
 
 function db() {
   database ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open('evolution-simulator', 2)
+    const request = indexedDB.open('evolution-simulator', 3)
     let blocked = false
     request.onupgradeneeded = event => {
       if (event.oldVersion === 0) request.result.createObjectStore('runs', { keyPath: 'id' })
-      request.result.createObjectStore('runSummaries', { keyPath: 'id' })
+      if (event.oldVersion < 2) request.result.createObjectStore('runSummaries', { keyPath: 'id' })
+      request.result.createObjectStore(historyStore, { keyPath: ['runId', 'day', 'kind'] })
     }
     request.onblocked = () => {
       blocked = true
@@ -55,17 +59,39 @@ export function summarizeRun(run) {
   }
 }
 
-export const readRun = id => execute('runs', 'readonly', tx => {
+const historyRange = id => IDBKeyRange.bound([id, 0], [id, Infinity])
+
+function rememberHistory(run, revision) {
+  const { summaries, checkpoints } = run
+  // The opening checkpoint stays the same object across snapshots of a run.
+  if (checkpoints.length) savedHistories.set(checkpoints[0], { revision, summaries, checkpoints })
+}
+
+export const readRun = id => execute(['runs', historyStore], 'readonly', tx => {
   const request = tx.objectStore('runs').get(id)
-  return () => request.result
+  let history
+  request.onsuccess = () => {
+    if (request.result?.historyRevision) history = tx.objectStore(historyStore).getAll(historyRange(id))
+  }
+  return () => {
+    if (!history) return request.result
+    const { historyRevision, ...run } = request.result
+    run.summaries = []
+    run.checkpoints = []
+    for (const { kind, value } of history.result) run[kind].push(value)
+    rememberHistory(run, historyRevision)
+    return run
+  }
 })
 
-export const readLibrary = () => execute(archiveStores, 'readonly', tx => {
+const libraryEntry = ({ historyRevision, ...entry }) => entry
+
+export const readLibrary = () => execute(libraryStores, 'readonly', tx => {
   const summaries = tx.objectStore('runSummaries').getAll()
   const ids = tx.objectStore('runs').getAllKeys()
   return () => {
     const indexed = new Set(summaries.result.map(run => run.id))
-    return { summaries: summaries.result, missing: ids.result.filter(id => !indexed.has(id)) }
+    return { summaries: summaries.result.map(libraryEntry), missing: ids.result.filter(id => !indexed.has(id)) }
   }
 })
 
@@ -74,16 +100,24 @@ export const readLibrary = () => execute(archiveStores, 'readonly', tx => {
 export async function indexLegacyRuns(ids) {
   const indexed = []
   for (let start = 0; start < ids.length; start += migrationBatchSize) {
-    await execute(archiveStores, 'readwrite', tx => {
+    await execute(libraryStores, 'readwrite', tx => {
       const runs = tx.objectStore('runs')
       const summaries = tx.objectStore('runSummaries')
       for (const id of ids.slice(start, start + migrationBatchSize)) {
-        const request = runs.get(id)
+        // A save in another tab may already have indexed or migrated this run.
+        const request = summaries.get(id)
         request.onsuccess = () => {
-          if (!request.result) return
-          const summary = summarizeRun(request.result)
-          summaries.put(summary)
-          indexed.push(summary)
+          if (request.result) {
+            indexed.push(libraryEntry(request.result))
+            return
+          }
+          const legacy = runs.get(id)
+          legacy.onsuccess = () => {
+            if (!legacy.result) return
+            const summary = summarizeRun(legacy.result)
+            summaries.put(summary)
+            indexed.push(summary)
+          }
         }
       }
     })
@@ -91,17 +125,56 @@ export async function indexLegacyRuns(ids) {
   return indexed
 }
 
+function isPrefix(previous, current) {
+  return previous === current ||
+    previous.length <= current.length && previous.every((row, index) => row === current[index])
+}
+
 function writeRuns(...runs) {
   return execute(archiveStores, 'readwrite', tx => {
-    const summaries = runs.map(summarizeRun)
-    for (const run of runs) tx.objectStore('runs').put(run)
-    for (const summary of summaries) tx.objectStore('runSummaries').put(summary)
-    return () => summaries
+    const records = tx.objectStore('runs')
+    const catalog = tx.objectStore('runSummaries')
+    const history = tx.objectStore(historyStore)
+    const entries = runs.map(summarizeRun)
+    const revisions = []
+    for (const [index, run] of runs.entries()) {
+      const { summaries, checkpoints, ...record } = run
+      const request = catalog.get(run.id)
+      request.onsuccess = () => {
+        const storedRevision = request.result?.historyRevision
+        const previous = savedHistories.get(checkpoints[0])
+        // Only append to the exact history we read or last committed. A different
+        // tab can have saved a divergent history under the same run ID.
+        const append = previous && previous.revision === storedRevision &&
+          isPrefix(previous.summaries, summaries) && isPrefix(previous.checkpoints, checkpoints)
+        if (storedRevision && !append) history.delete(historyRange(run.id))
+        const summaryStart = append ? previous.summaries.length : 0
+        const checkpointStart = append ? previous.checkpoints.length : 0
+        for (let i = summaryStart; i < summaries.length; i++) {
+          const value = summaries[i]
+          history.put({ runId: run.id, day: value.day, kind: 'summaries', value })
+        }
+        for (let i = checkpointStart; i < checkpoints.length; i++) {
+          const value = checkpoints[i]
+          history.put({ runId: run.id, day: value.day, kind: 'checkpoints', value })
+        }
+        const revision = append && summaryStart === summaries.length && checkpointStart === checkpoints.length
+          ? storedRevision : crypto.randomUUID()
+        revisions[index] = revision
+        records.put({ ...record, historyRevision: revision })
+        catalog.put({ ...entries[index], historyRevision: revision })
+      }
+    }
+    return () => {
+      runs.forEach((run, index) => rememberHistory(run, revisions[index]))
+      return entries
+    }
   })
 }
 
 export const saveRun = async run => (await writeRuns(run))[0]
 export const saveRunPair = (left, right) => writeRuns(left, right)
 export const deleteRun = id => execute(archiveStores, 'readwrite', tx => {
-  for (const store of archiveStores) tx.objectStore(store).delete(id)
+  for (const store of libraryStores) tx.objectStore(store).delete(id)
+  tx.objectStore(historyStore).delete(historyRange(id))
 })
