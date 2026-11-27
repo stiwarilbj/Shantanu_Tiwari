@@ -968,11 +968,32 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .species-presets { margin-block: 8px; }
 .species-presets > button[aria-pressed=true] { border-color: var(--rail); color: var(--cream); }
 .species-management { justify-content: center; }
-.species-starting-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-block: 10px; }
+.species-starting-fields, .species-trait-options > .species-trait-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-block: 10px;
+}
+.species-trait-fields { display: contents; }
+.species-trait-options { grid-column: 1 / -1; }
+.species-trait-options summary { cursor: pointer; width: fit-content; padding-block: 4px; }
 .species-creation { padding: 12px; margin-block: 10px; border: 1px solid var(--line); border-radius: 7px; }
 .species-creation > h3 { margin: 0; }
+.species-create-actions { display: flex; justify-content: center; gap: 8px; margin-block: 4px; }
 .world-species-button { margin-right: 4px; min-width: 66px; }
 .task-dialog.species-dialog { width: min(575px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.species-dialog[open]:has(> form) { display: flex; flex-direction: column; overflow: hidden; }
+.species-dialog > header, .species-dialog > p { flex: none; }
+.species-dialog > form { display: flex; flex-direction: column; min-height: 0; }
+.species-editor-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 6px;
+  padding-inline: 4px;
+  margin-inline: -4px;
+}
+.species-dialog > form > footer { flex: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--subtle); }
 .species-workflow { min-width: 0; border: 0; padding: 0; margin: 0; }
 .species-trait-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
 .species-trait-row > input { width: 92px; }

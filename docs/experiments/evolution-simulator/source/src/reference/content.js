@@ -95,7 +95,7 @@ export const groups = [
         ['Apply adjustment and Cancel', 'Apply records the change at the paused step. Cancel closes the draft. The change is visible in replays.'],
       ]],
       ['World → Species', [
-        ['Introduce species', 'Create a new species and release its founders into the paused generation. Set Name, Color, Blobs to introduce, Energy, Speed, Size, and Sense Range. Use a starting preset if you want set values for the traits.'],
+        ['Introduce species', 'Choose a name, color, preset, and how many blobs to release. Open Customize traits for individual values, then use Add to field to release the new species at the paused step.'],
         ['Split living blobs and Source species', 'Move selected creatures from an existing species into a new one. They keep their IDs, positions, age, energy, meals, and family history.'],
         ['Pick blobs, Number to move, and Find by ID', 'Use Seeded sample to pick a repeatable number of blobs or Choose by ID to select specific creatures.'],
         ['Edit species and Species to edit', 'Change an existing species’ name or color and optionally adjust its living traits.'],
@@ -115,14 +115,15 @@ export const groups = [
     sections: [
       ['Simulator header → Settings → Basic → Blob Creatures', [
         ['Species tabs', 'Pick which species to edit. A tab shows its founder count or Off.'],
-        ['New species and Duplicate', 'Start a blank species draft with preset traits or copy the currently selected species into a new draft.'],
+        ['New species and Duplicate', 'Start with a suggested name, color, and the Balanced preset, or copy the selected species.'],
         ['Species actions → Move left, Move right, Remove, and Undo', 'Reorder species in the setup, remove one from the draft, or restore the last removal.'],
         ['Name, Color, and Enabled', 'Choose a species label and swatch. Turning Enabled off leaves it in the setup without placing its founders.'],
         ['Hue', 'Shift the selected species’ color while keeping its lightness and saturation. Use the Color swatch to start from another shade.'],
-        ['Founders', 'Set the initial number of blobs for this species, from 10 to 1,000. The live introduction form starts at one blob.'],
+        ['Founders', 'Set the number of blobs of this species at the start of a run, from 10 to 1,000. A live introduction can start with as few as one blob.'],
         ['Energy', 'Set each founder’s energy budget from 10 to 1,000. The card estimates travel speed and how long that budget lasts. Energy and food reset at dawn.'],
         ['Speed, Size, and Sense Range', 'Set each starting trait from 1 to 100. Speed changes movement, size affects hunting and sometimes stride, and sense range changes how far blobs can detect nearby things.'],
         ['Balanced, Fast, Sturdy, and Wide sight', 'Fill in starting traits using a preset when creating a species. Fast raises speed, Sturdy raises size, and Wide sight raises sense range.'],
+        ['Customize traits', 'Open the extra fields to change energy, speed, size, or sense range one at a time.'],
         ['Add to setup and Cancel', 'Confirm a pending species or discard it. Then use Evolve! when the whole setup is ready.'],
         ['Reproduction and Inheritance & mutation', 'Open the matching advanced settings directly from Basic.'],
       ]],

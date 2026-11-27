@@ -19,6 +19,7 @@ const props = defineProps({
 const swatches = { speed: '#9A5A57', size: '#44877C', sense: '#468298' }
 const endurance = computed(() => props.species.energy / cost(props.species, props.rules))
 const readout = computed(() => TRAITS.every(key => props.species[key] >= 1) && Number.isFinite(endurance.value))
+const customTraitIssue = computed(() => ['energy', ...TRAITS].some(key => props.issue[props.species.id + '.' + key]))
 
 const hueDraft = shallowRef()
 const visibleColor = computed(() => speciesDisplayColor(props.species))
@@ -76,13 +77,21 @@ function changeHue(event) {
           {{ name }}
         </button>
       </div>
+      <small v-if="presets" class="quiet">
+        Speed {{ species.speed }} · Size {{ species.size }} · Sense range {{ species.sense }}
+      </small>
       <div class="species-starting-fields">
         <NumberField :id="species.id+'.count'" v-model="species.count" :label="live ? 'Blobs to introduce' : 'Founders'"
           :min="live ? 1 : 10" :max="1000" compact :error="issue[species.id+'.count']"/>
-        <NumberField :id="species.id+'.energy'" v-model="species.energy" label="Energy"
-          :min="10" :max="1000" :pace="100" tint="#8F8048" compact :error="issue[species.id+'.energy']"/>
-        <NumberField v-for="key in TRAITS" :key="key" :id="species.id+'.'+key" v-model="species[key]"
-          :label="SPECIES_TRAIT_LABELS[key]" :min="1" :max="100" :tint="swatches[key]" compact :error="issue[species.id+'.'+key]"/>
+        <component :is="presets ? 'details' : 'div'" :class="presets ? 'species-trait-options' : 'species-trait-fields'">
+          <summary v-if="presets">Customize traits <span v-if="customTraitIssue" class="issue">· Check values</span></summary>
+          <div class="species-trait-fields">
+            <NumberField :id="species.id+'.energy'" v-model="species.energy" label="Energy"
+              :min="10" :max="1000" :pace="100" tint="#8F8048" compact :error="issue[species.id+'.energy']"/>
+            <NumberField v-for="key in TRAITS" :key="key" :id="species.id+'.'+key" v-model="species[key]"
+              :label="SPECIES_TRAIT_LABELS[key]" :min="1" :max="100" :tint="swatches[key]" compact :error="issue[species.id+'.'+key]"/>
+          </div>
+        </component>
       </div>
       <small v-if="readout" class="quiet">
         {{ travel(species, rules).toFixed(0) }} units/s · {{ endurance.toFixed(1) }} s of movement on starting energy

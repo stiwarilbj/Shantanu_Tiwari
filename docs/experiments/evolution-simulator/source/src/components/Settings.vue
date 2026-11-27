@@ -30,7 +30,7 @@ const breeding = computed(() => draft.advanced?.breeding !== false)
 const canBreed = computed(() => breedingCanProduceOffspring(draft))
 const spreadKey = standardDeviation ? 'standardDeviation' : 'variance'
 const dialog = ref(), tab = ref(draft.species[0].id), savedSpecies = ref(null)
-const newDraft = ref(null), newDiet = ref(null)
+const newDraft = ref(null), newDiet = ref(null), newSpeciesButton = ref(null)
 const web = computed({
   get: () => draft.foodWeb ?? EMPTY_FOOD_WEB,
   set: value => { draft.foodWeb = value },
@@ -138,7 +138,11 @@ const foraging = computed({
 function add(source) {
   newDraft.value = newSpecies(draft.species, draft.version, source)
   newDiet.value = source ? copyDiet(dietFor(web.value, source.id), source.id, newDraft.value.id) : null
-  nextTick(() => document.getElementById(newDraft.value?.id + '.name')?.focus())
+  nextTick(() => {
+    const name = document.getElementById(newDraft.value?.id + '.name')
+    name?.focus()
+    name?.select()
+  })
 }
 function confirmSpecies() {
   if (!newDraft.value || Object.keys(creationIssue.value).length) return
@@ -150,7 +154,14 @@ function confirmSpecies() {
   }
   tab.value = candidate.id
   newDraft.value = null
+  if (currentPage.value !== 'basic') showPage('basic')
   nextTick(() => document.getElementById(candidate.id + '.name')?.focus())
+}
+function cancelSpecies() {
+  newDraft.value = null
+  newDiet.value = null
+  if (currentPage.value !== 'basic') showPage('basic')
+  nextTick(() => newSpeciesButton.value?.focus())
 }
 function remove() {
   if (draft.species.length<2) return
@@ -248,7 +259,10 @@ function speciesForError(key) {
 }
 
 async function apply() {
-  if (newDraft.value) return
+  if (newDraft.value) {
+    confirmSpecies()
+    return
+  }
   if (applying.value) return
   actionIssue.value = {}
   const { errors, setup } = checkedDraft.value
@@ -317,7 +331,7 @@ onMounted(()=>dialog.value.showModal())
                 </button>
               </div>
               <div v-if="fork==null" class="species-presets species-management">
-                <button class="secondary" type="button" :disabled="!!newDraft" @click="add()"><Plus :size="15"/> New species</button>
+                <button ref="newSpeciesButton" class="primary" type="button" :disabled="!!newDraft" @click="add()"><Plus :size="15"/> New species</button>
                 <button class="secondary" type="button" :disabled="!!newDraft" @click="add(selected)"><Copy :size="15"/> Duplicate</button>
                 <details class="species-actions"><summary>Species actions</summary>
                   <button type="button" @click="reorder(-1)">Move left</button><button type="button" @click="reorder(1)">Move right</button>
@@ -328,10 +342,6 @@ onMounted(()=>dialog.value.showModal())
               <div v-if="newDraft" class="species-creation">
                 <h3>New species</h3>
                 <SpeciesFields :species="newDraft" :rules="draft" :issue="creationIssue" starting presets/>
-                <div class="species-presets">
-                  <button type="button" class="secondary" @click="newDraft=null">Cancel</button>
-                  <button type="button" class="primary" :disabled="!!Object.keys(creationIssue).length" @click="confirmSpecies">Add to setup</button>
-                </div>
               </div>
               <SpeciesFields v-else-if="fork==null" :species="selected" :rules="draft" :issue="issue" starting/>
             </section>
@@ -591,12 +601,18 @@ onMounted(()=>dialog.value.showModal())
       </div>
       <footer class="settings-footer">
         <div v-if="titleErrors.length" class="settings-errors issue" tabindex="-1" role="alert"><p>Review the setup</p><ul><li v-for="error in titleErrors" :key="error.key">{{ error.message }}</li></ul></div>
-        <p>{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} {{ draft.foodSeasons?.enabled ? 'base plants' : 'plants' }} per founder</p>
+        <p v-if="!newDraft">{{ draft.species.filter(s=>s.enabled).length }} enabled species · {{ total }} founders · {{ total ? (draft.food/total).toFixed(2) : '—' }} {{ draft.foodSeasons?.enabled ? 'base plants' : 'plants' }} per founder</p>
         <p v-if="(lab.draftChanged || !!newDraft) && fork==null" class="quiet">Draft has changes <button type="button" class="link" @click="discarding=true">Discard changes</button></p>
         <p v-if="discarding">Restore the setup you opened? <button type="button" class="secondary" @click="discard">Discard draft</button> <button type="button" class="link" @click="discarding=false">Keep editing</button></p>
         <p v-if="lab.branchPreparing!=null" class="quiet" role="status">Preparing branch from Day {{ lab.branchPreparing }}…</p>
-        <button type="submit" class="primary evolve" :disabled="!!newDraft || applying">{{ fork==null ? 'Evolve!' : 'Create branch' }}</button>
-        <small class="quiet">by natural selection</small>
+        <div v-if="newDraft" class="species-create-actions">
+          <button type="button" class="secondary" @click="cancelSpecies">Cancel</button>
+          <button type="submit" class="primary" :disabled="!!Object.keys(creationIssue).length">Add to setup</button>
+        </div>
+        <template v-else>
+          <button type="submit" class="primary evolve" :disabled="applying">{{ fork==null ? 'Evolve!' : 'Create branch' }}</button>
+          <small class="quiet">by natural selection</small>
+        </template>
       </footer>
     </form>
   </dialog>

@@ -73,9 +73,8 @@ const action = computed(() => {
 })
 const issue = computed(() => action.value ? speciesActionIssue(action.value, rules.value, frame.value?.blobs) : '')
 const preview = computed(() => {
-  if (!definition.value || issue.value) return []
+  if (!definition.value || issue.value || kind.value === 'introduce') return []
   return TRAITS.map(key => {
-    if (kind.value === 'introduce') return [key, definition.value[key], definition.value[key]]
     let min = Infinity, max = -Infinity
     for (const blob of chosen.value) {
       const after = speciesTraitValue(blob, key, traits.value, rules.value)
@@ -156,7 +155,8 @@ onMounted(() => {
     <header><h2 id="world-species-title">Species</h2></header>
     <p v-if="frame" class="quiet">Day {{ frame.day }} · {{ format(frame.time) }} s{{ lab.replay ? ' · Replay' : ' · Paused' }}</p>
     <template v-if="lab.replay">
-      <p>Open the live day to change species, or branch from a completed generation to try a different food web.</p>
+      <p v-if="lab.canEnterLive">Go back to the live day to add or edit species. The field will stay paused while you set them up.</p>
+      <p v-else>Branch from a completed generation to add or edit species in a new run.</p>
       <FoodWebSettings v-if="webAvailable" :model-value="currentWeb" :rules="rules"
         :species="rules.species" :starting-day="frame.day" readonly/>
       <footer><button type="button" class="secondary" @click="close">Close</button>
@@ -175,82 +175,86 @@ onMounted(() => {
       <footer><button type="button" class="secondary" @click="close">Close</button></footer>
     </template>
     <form v-else novalidate @submit.prevent="apply">
-      <fieldset class="species-workflow" :disabled="lab.adjustingTraits || !lab.canAdjustSpecies">
-        <div class="species-presets" role="group" aria-label="Species action">
-          <button v-for="[key, label] in [['introduce', 'Introduce species'], ['split', 'Split living blobs'], ['edit', 'Edit species']]" :key="key"
-            type="button" class="secondary" :aria-pressed="kind === key" @click="choose(key)">{{ label }}</button>
-          <button v-if="webAvailable" type="button" class="secondary" :aria-pressed="kind === 'food-web'"
-            @click="choose('food-web')">Edit food web</button>
-        </div>
-        <template v-if="kind === 'food-web'">
-          <p class="quiet">Generation {{ frame.day }} · Step {{ step }}</p>
-          <FoodWebSettings v-model="webDraft" :rules="rules" :species="rules.species" :starting-day="frame.day"/>
-        </template>
-        <label v-else-if="kind !== 'introduce' && choices.length" class="dialog-field">
-          {{ kind === 'split' ? 'Source species' : 'Species to edit' }}
-          <select v-model="target" @change="resetTarget">
-            <option v-for="item in choices" :key="item.id" :value="item.id">{{ item.name }} · {{ livingCounts.get(item.id) ?? 0 }} living</option>
-          </select>
-        </label>
-        <p v-if="kind === 'split' && !choices.length">There are no living blobs to split.</p>
-        <template v-else-if="definition">
-          <p v-if="kind === 'split'" class="quiet">Selected blobs keep their IDs, positions, food, energy, age, and lineage.</p>
-          <SpeciesFields :species="definition" :rules="rules" :starting="kind === 'introduce'" presets live/>
-          <details v-if="webAvailable && kind !== 'edit'" class="new-species-diet">
-            <summary>Food web diet</summary>
-            <p v-if="!currentWeb.enabled" class="quiet">This diet applies when the food web is enabled.</p>
-            <DietFields v-model="newDiet" :eater="definition" :species="rules.species"/>
-          </details>
-          <template v-if="kind === 'split'">
-            <label class="dialog-field">Pick blobs
-              <select v-model="selection"><option value="sample">Seeded sample</option><option value="ids">Choose by ID</option></select>
-            </label>
-            <label v-if="selection === 'sample'" class="dialog-field">Number to move
-              <input v-model.number="count" type="number" min="1" :max="available.length" step="1">
-            </label>
-            <fieldset v-else class="group-picker">
-              <legend>Choose living blobs</legend>
-              <label class="blob-search">Find by ID <input v-model="query" type="search" placeholder="e.g. #12" @keydown.enter.prevent></label>
-              <p class="quiet">{{ ids.length }} selected</p>
-              <div class="picker-rows">
-                <label v-for="blob in searchResults.slice(0, 30)" :key="blob.id" class="picker-row">
-                  <input v-model="ids" type="checkbox" :value="blob.id"> #{{ blob.id }}
-                  <small>{{ blob.home ? 'In refuge' : 'Active' }}</small>
-                </label>
+      <div class="species-editor-body">
+        <fieldset class="species-workflow" :disabled="lab.adjustingTraits || !lab.canAdjustSpecies">
+          <div class="species-presets" role="group" aria-label="Species action">
+            <button v-for="[key, label] in [['introduce', 'Introduce species'], ['split', 'Split living blobs'], ['edit', 'Edit species']]" :key="key"
+              type="button" class="secondary" :aria-pressed="kind === key" @click="choose(key)">{{ label }}</button>
+            <button v-if="webAvailable" type="button" class="secondary" :aria-pressed="kind === 'food-web'"
+              @click="choose('food-web')">Edit food web</button>
+          </div>
+          <template v-if="kind === 'food-web'">
+            <p class="quiet">Generation {{ frame.day }} · Step {{ step }}</p>
+            <FoodWebSettings v-model="webDraft" :rules="rules" :species="rules.species" :starting-day="frame.day"/>
+          </template>
+          <label v-else-if="kind !== 'introduce' && choices.length" class="dialog-field">
+            {{ kind === 'split' ? 'Source species' : 'Species to edit' }}
+            <select v-model="target" @change="resetTarget">
+              <option v-for="item in choices" :key="item.id" :value="item.id">{{ item.name }} · {{ livingCounts.get(item.id) ?? 0 }} living</option>
+            </select>
+          </label>
+          <p v-if="kind === 'split' && !choices.length">There are no living blobs to split.</p>
+          <template v-else-if="definition">
+            <p v-if="kind === 'split'" class="quiet">Selected blobs keep their IDs, positions, food, energy, age, and lineage.</p>
+            <SpeciesFields :species="definition" :rules="rules" :starting="kind === 'introduce'" presets live/>
+            <details v-if="webAvailable && kind !== 'edit'" class="new-species-diet">
+              <summary>Food web diet</summary>
+              <p v-if="!currentWeb.enabled" class="quiet">This diet applies when the food web is enabled.</p>
+              <DietFields v-model="newDiet" :eater="definition" :species="rules.species"/>
+            </details>
+            <template v-if="kind === 'split'">
+              <label class="dialog-field">Pick blobs
+                <select v-model="selection"><option value="sample">Seeded sample</option><option value="ids">Choose by ID</option></select>
+              </label>
+              <label v-if="selection === 'sample'" class="dialog-field">Number to move
+                <input v-model.number="count" type="number" min="1" :max="available.length" step="1">
+              </label>
+              <fieldset v-else class="group-picker">
+                <legend>Choose living blobs</legend>
+                <label class="blob-search">Find by ID <input v-model="query" type="search" placeholder="e.g. #12" @keydown.enter.prevent></label>
+                <p class="quiet">{{ ids.length }} selected</p>
+                <div class="picker-rows">
+                  <label v-for="blob in searchResults.slice(0, 30)" :key="blob.id" class="picker-row">
+                    <input v-model="ids" type="checkbox" :value="blob.id"> #{{ blob.id }}
+                    <small>{{ blob.home ? 'In refuge' : 'Active' }}</small>
+                  </label>
+                </div>
+                <p v-if="!searchResults.length" class="quiet">No matching IDs.</p>
+                <p v-else-if="searchResults.length > 30" class="quiet">Showing 30 of {{ searchResults.length }}. Search for an exact ID to narrow the list.</p>
+              </fieldset>
+            </template>
+            <fieldset v-if="kind !== 'introduce' && chosen.length" class="group-picker">
+              <legend>Living traits · optional</legend>
+              <label class="dialog-field">Change type
+                <select v-model="traitMode"><option value="adjust">Add or subtract points</option><option value="set">Set exact values</option></select>
+              </label>
+              <div v-for="key in TRAITS" :key="key" class="species-trait-row">
+                <label class="picker-row"><input v-model="checked" type="checkbox" :value="key">{{ SPECIES_TRAIT_LABELS[key] }}</label>
+                <input v-if="checked.includes(key)" v-model.number="values[key]" type="number" :aria-label="SPECIES_TRAIT_LABELS[key] + ' value'"
+                  :min="traitMode === 'adjust' ? -MAX_TRAIT_CHANGE : key === 'sense' ? 0 : 0.01" :max="MAX_TRAIT_CHANGE" step="0.01">
               </div>
-              <p v-if="!searchResults.length" class="quiet">No matching IDs.</p>
-              <p v-else-if="searchResults.length > 30" class="quiet">Showing 30 of {{ searchResults.length }}. Search for an exact ID to narrow the list.</p>
             </fieldset>
           </template>
-          <fieldset v-if="kind !== 'introduce' && chosen.length" class="group-picker">
-            <legend>Living traits · optional</legend>
-            <label class="dialog-field">Change type
-              <select v-model="traitMode"><option value="adjust">Add or subtract points</option><option value="set">Set exact values</option></select>
-            </label>
-            <div v-for="key in TRAITS" :key="key" class="species-trait-row">
-              <label class="picker-row"><input v-model="checked" type="checkbox" :value="key">{{ SPECIES_TRAIT_LABELS[key] }}</label>
-              <input v-if="checked.includes(key)" v-model.number="values[key]" type="number" :aria-label="SPECIES_TRAIT_LABELS[key] + ' value'"
-                :min="traitMode === 'adjust' ? -MAX_TRAIT_CHANGE : key === 'sense' ? 0 : 0.01" :max="MAX_TRAIT_CHANGE" step="0.01">
-            </div>
-          </fieldset>
-        </template>
-      </fieldset>
-      <p v-if="lab.traitAdjustmentError" role="alert" class="issue">{{ lab.traitAdjustmentError }}</p>
-      <p v-else-if="lab.adjustingTraits || !lab.canAdjustSpecies" role="status">{{ lab.adjustingTraits ? 'Applying changes…' : 'Confirming the paused tick…' }}</p>
-      <p v-else-if="issue" role="status" class="quiet">{{ issue }}</p>
-      <div v-else-if="action && kind !== 'food-web'" class="trait-preview">
-        <strong>{{ total }} {{ total === 1 ? 'blob' : 'blobs' }} · Day {{ frame.day }} at {{ format(frame.time) }} s</strong>
-        <details v-if="nextIds.length">
-          <summary>{{ nextIds.length === 1 ? '#' + nextIds[0] : 'View ' + nextIds.length + ' creature IDs' }}</summary>
-          <p class="species-id-list">{{ nextIds.map(id => '#' + id).join(', ') }}</p>
-        </details>
-        <p v-if="preview.length" class="quiet">
-          {{ preview.map(([key, min, max]) => SPECIES_TRAIT_LABELS[key] + ' ' + format(min) + (min === max ? '' : '–' + format(max))).join(' · ') }}
-        </p>
+        </fieldset>
+        <p v-if="lab.traitAdjustmentError" role="alert" class="issue">{{ lab.traitAdjustmentError }}</p>
+        <p v-else-if="lab.adjustingTraits || !lab.canAdjustSpecies" role="status">{{ lab.adjustingTraits ? 'Applying changes…' : 'Confirming the paused tick…' }}</p>
+        <p v-else-if="issue" role="status" class="quiet">{{ issue }}</p>
+        <div v-else-if="action && kind !== 'food-web'" class="trait-preview">
+          <strong>{{ total }} {{ total === 1 ? 'blob' : 'blobs' }} · Day {{ frame.day }} at {{ format(frame.time) }} s</strong>
+          <details v-if="nextIds.length">
+            <summary>{{ nextIds.length === 1 ? '#' + nextIds[0] : 'View ' + nextIds.length + ' creature IDs' }}</summary>
+            <p class="species-id-list">{{ nextIds.map(id => '#' + id).join(', ') }}</p>
+          </details>
+          <p v-if="preview.length" class="quiet">
+            {{ preview.map(([key, min, max]) => SPECIES_TRAIT_LABELS[key] + ' ' + format(min) + (min === max ? '' : '–' + format(max))).join(' · ') }}
+          </p>
+        </div>
       </div>
       <footer>
         <button type="button" class="secondary" :disabled="lab.adjustingTraits" @click="close">{{ kind === 'food-web' ? 'Discard' : 'Cancel' }}</button>
-        <button type="submit" class="primary" :disabled="!lab.canAdjustSpecies || !action || !!issue">Apply changes</button>
+        <button type="submit" class="primary" :disabled="!lab.canAdjustSpecies || !action || !!issue">
+          {{ kind === 'introduce' ? 'Add to field' : 'Apply changes' }}
+        </button>
       </footer>
     </form>
   </dialog>

@@ -231,7 +231,7 @@ defineExpose({ select, overhead })
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @fallback="fallback=true"/>
       <div class="view-tools">
-        <button ref="speciesButton" type="button" class="secondary world-species-button"
+        <button ref="speciesButton" type="button" class="secondary world-species-button" title="Add or edit blob species" aria-haspopup="dialog"
           :disabled="!lab.canChangeSpecies && !lab.replay" @click="lab.openSpecies()">Species</button>
         <button class="icon" aria-label="Layers" title="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
         <button class="icon" aria-label="Follow creature" title="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
