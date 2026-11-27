@@ -1,1 +1,0 @@
-import{u as e}from"./index-BQskfINQ.js";var t=e(`minus`,[[`path`,{d:`M5 12h14`,key:`1ays0h`}]]);export{t};
