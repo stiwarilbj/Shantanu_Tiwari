@@ -1,11 +1,10 @@
 <script setup>
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { ChevronDown, X } from 'lucide-vue-next'
 import { useLab } from './store.js'
 import { randomSeed, validate } from './engine/config.js'
 import { setupFromLink } from './export.js'
 import { guidedExamples, lessons } from './guide.js'
-import World from './components/World.vue'
 const Trends=defineAsyncComponent(()=>import('./components/Trends.vue'))
 const Settings=defineAsyncComponent(()=>import('./components/Settings.vue'))
 const About=defineAsyncComponent(()=>import('./components/About.vue'))
@@ -28,7 +27,31 @@ const comparison = ref(readComparison(initialQuery))
 const example = ref(initialPage==='viewer' ? knownExample(initialQuery.get('example')) : null)
 const lesson = ref(knownLesson(initialQuery.get('lesson')) ?? 'opening')
 const lastLesson = ref(readWalkthroughProgress())
-const comparisonVersion = ref(0), visited = ref({ viewer:true,[initialPage]:true })
+const comparisonVersion = ref(0), visited = ref({ [initialPage]:true })
+const World = shallowRef()
+const worldActive = computed(() => page.value === 'viewer' && !example.value)
+const worldVisited = ref(false)
+const worldLoadFailed = ref(false)
+let worldImport
+const worldLoadError = 'Could not open World. Reload the page to try again.'
+function loadWorld() {
+  return worldImport ??= import('./components/World.vue').then(({ default:component }) => {
+    World.value = component
+    worldLoadFailed.value = false
+    if (lab.error === worldLoadError) lab.error = ''
+    return true
+  }, () => {
+    worldImport = undefined
+    worldLoadFailed.value = true
+    lab.error = worldLoadError
+    return false
+  })
+}
+watch(worldActive, active => {
+  if (!active) return
+  worldVisited.value = true
+  void loadWorld()
+}, { immediate:true })
 const batchRange = ref(null)
 const scrolls = new Map()
 let navigating = false, routeRequest = 0, retryNavigation, sharedSetupHash
@@ -112,9 +135,11 @@ function beginNavigation() {
   navigating = false
   return ++routeRequest
 }
-function go(view, guided = null) {
+async function go(view, guided = null) {
+  const token = beginNavigation()
+  // Keep the current view visible during the first World download.
+  if (view === 'viewer' && !guided && !World.value && (!await loadWorld() || token !== routeRequest)) return
   const changed = view !== page.value || guided !== example.value
-  beginNavigation()
   if (guided) lab.stopPlayback()
   example.value = guided
   if (view==='about' && lesson.value!=='opening') rememberLesson(lesson.value)
@@ -143,6 +168,8 @@ async function applyAddress(hash = location.hash, startup = false) {
   const match = hash.match(runAddress)
   if (!match || !lab.run) return
   const query = new URLSearchParams(match[4])
+  const guided = match[3] === 'viewer' ? knownExample(query.get('example')) : null
+  const loadingWorld = match[3] === 'viewer' && !guided && !World.value ? loadWorld() : null
   navigating = true
   try {
     if (!startup && match[1]!==lab.run.id) {
@@ -161,12 +188,12 @@ async function applyAddress(hash = location.hash, startup = false) {
       }
     }
     else if (day>lab.completed && lab.replay) lab.goLive()
-    if (!current()) return
+    if ((loadingWorld && !await loadingWorld) || !current()) return
     if (!startup && match[3]==='compare') {
       comparison.value = readComparison(query)
       comparisonVersion.value++
     }
-    example.value = match[3]==='viewer' ? knownExample(query.get('example')) : null
+    example.value = guided
     if (example.value) lab.stopPlayback()
     if (match[3]==='about' || example.value) {
       const chapter = knownLesson(query.get('lesson'))
@@ -188,6 +215,7 @@ function handlePopState() { void applyAddress() }
 async function watchDay(day, id, { sense = false, atEnd = false } = {}) {
   const token = beginNavigation()
   const current = () => token === routeRequest
+  const loadingWorld = World.value ? null : loadWorld()
   navigating = true
   lab.modal = null
   try {
@@ -195,17 +223,19 @@ async function watchDay(day, id, { sense = false, atEnd = false } = {}) {
       if (current() && lab.replayFailure) retryNavigation = { failure: lab.replayFailure, retry: () => watchDay(day, id, { sense, atEnd }) }
       return
     }
-    if (!current()) return
+    if ((loadingWorld && !await loadingWorld) || !current()) return
     if (day > lab.completed && lab.replay) lab.goLive()
-    if (id != null && lab.frame?.blobs.some(blob => blob.alive && blob.id === id)) world.value?.select(id)
+    const selectCreature = id != null && lab.frame?.blobs.some(blob => blob.alive && blob.id === id)
     const changed = page.value !== 'viewer' || example.value !== null
     example.value = null
     show('viewer')
     if (changed) history.pushState(null,'',address())
     else history.replaceState(null,'',address())
-    if (sense) {
+    if (selectCreature || sense) {
       await nextTick()
-      if (current()) world.value?.overhead(sense==='cohort')
+      if (!current()) return
+      if (selectCreature) world.value?.select(id)
+      if (sense) world.value?.overhead(sense==='cohort')
     }
   } finally {
     if (current()) navigating = false
@@ -259,10 +289,11 @@ async function openRun(id, view) {
   }
   const token = beginNavigation()
   const current = () => token === routeRequest
+  const loadingWorld = view === 'viewer' && !World.value ? loadWorld() : null
   navigating = true
   try {
     const opened = await lab.switchRun(id, current)
-    if (!current()) return
+    if ((opened && loadingWorld && !await loadingWorld) || !current()) return
     if (opened) {
       example.value = null
       show(view)
@@ -345,7 +376,9 @@ onUnmounted(() => {
   </Teleport>
   <div id="main-surface" ref="mainSurface" :class="{ 'reading-surface':page!=='viewer' || example }" tabindex="-1" :inert="!ready">
     <template v-if="lab.run">
-      <World v-show="page==='viewer' && !example" :active="page==='viewer' && !example" ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
+      <component :is="World" v-if="worldVisited && World" v-show="worldActive" :active="worldActive"
+        ref="world" @reroll="reroll" @fullscreen-change="fullscreenSurface=$event"/>
+      <p v-if="worldActive && !World" class="startup" role="status">{{ worldLoadFailed ? 'World is unavailable' : 'Opening the lab…' }}</p>
       <GuidedWorld v-if="page==='viewer' && example" :example="example" @exit="go(example==='sight-comparison'?'stats':'about')"/>
       <Trends v-if="visited.stats" v-show="page==='stats'" :active="page==='stats'" :batch-range="batchRange"
         @watch="watchDay" @example="go('viewer',$event)" @restart="settings(lab.run.setup)" @reroll="reroll"/>
