@@ -129,6 +129,7 @@ export const useLab = defineStore('lab', () => {
     return frame.value?.time ? 'Paused' : 'Ready'
   })
   let writer, ticket = 0, cache = new Map(), track, epoch = 0, finishConnection
+  const pendingTracks = new Map()
   let runRequest = 0, request = 0, batchViewRequest = 0
   let playThroughRequest = null
   let requestedDawn = false, autoPrepare = false, restorePlay = false, adjustmentTimer
@@ -511,8 +512,14 @@ export const useLab = defineStore('lab', () => {
       cache.set(key, result)
       return Promise.resolve(result)
     }
-    const runCache = cache
-    return new Promise((resolve, reject) => {
+    const pendingTrack = pendingTracks.get(key)
+    if (pendingTrack) {
+      // A run switch can replace the finished cache while this replay is still building.
+      pendingTrack.cache = cache
+      return pendingTrack.promise
+    }
+    const entry = { cache }
+    entry.promise = new Promise((resolve, reject) => {
       const start = [...value.checkpoints].reverse().find(c => c.day < day)
       if (!start) throw new Error('This day has no opening checkpoint.')
       const job = createWorker()
@@ -539,10 +546,7 @@ export const useLab = defineStore('lab', () => {
         if (data.type === 'error') { fail(data.message); return }
         cleanup()
         try {
-          const result = prepareTrack(data.track)
-          runCache.set(key, result)
-          while (runCache.size > 3) runCache.delete(runCache.keys().next().value)
-          resolve(result)
+          resolve(prepareTrack(data.track))
         } catch (error) { reject(error) }
       }
       watchForProgress()
@@ -550,7 +554,14 @@ export const useLab = defineStore('lab', () => {
         job.postMessage({ type: 'replay', id, setup: value.setup, records: value.revisions, traitAdjustments: value.traitAdjustments,
           speciesActions: value.speciesActions, start: start.day + 1, checkpoint: start, day })
       } catch { stopped() }
-    })
+    }).then(result => {
+      const runCache = entry.cache
+      runCache.set(key, result)
+      while (runCache.size > 3) runCache.delete(runCache.keys().next().value)
+      return result
+    }).finally(() => { pendingTracks.delete(key) })
+    pendingTracks.set(key, entry)
+    return entry.promise
   }
 
   async function checkpointAt(value, day) {

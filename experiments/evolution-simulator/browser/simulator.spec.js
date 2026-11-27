@@ -161,15 +161,19 @@ async function addFoodPoint(page, day, plants) {
   await row.getByRole('spinbutton', { name: 'Plants', exact: true }).fill(String(plants))
 }
 
-async function delayReplays(page) {
-  await page.addInitScript(() => {
+async function delayReplays(page, { runName, day } = {}) {
+  await page.addInitScript(({ runName, day }) => {
     const NativeWorker = window.Worker
     const jobs = new Map()
     const received = []
-    window.replayTest = { jobs, received }
+    const started = []
+    window.replayTest = { jobs, received, started }
     window.Worker = class extends NativeWorker {
       postMessage(data) {
-        if (data.type !== 'replay') return super.postMessage(data)
+        if (data.type !== 'replay' || (runName && data.setup.name !== runName) || (day && data.day !== day)) {
+          return super.postMessage(data)
+        }
+        started.push(data.day)
         const receive = event => {
           if (event.data.type === 'replay-progress') return
           received.push(event.data.day ?? data.day)
@@ -189,7 +193,11 @@ async function delayReplays(page) {
         })
       }
     }
-  })
+  }, { runName, day })
+}
+
+function replayStarts(page, day) {
+  return page.evaluate(day => window.replayTest.started.filter(started => started === day).length, day)
 }
 
 async function finishReplay(page, day, action = 'release') {
@@ -4050,8 +4058,8 @@ test('stopping early reports the saved boundary and allows another batch', async
   await expect(batchStatus(page, 'Saved through')).toHaveText(`Day ${lastDay + 1}`)
 })
 
-test('a stale replay cannot change the current day, page, or history', async ({ page }) => {
-  await delayReplays(page)
+test('rapid timeline clicks share pending replays without changing the current day, page, or history @pages', async ({ page }) => {
+  await delayReplays(page, { runName: 'Browser test run' })
   await openSimulator(page)
   await startRun(page)
   await quickThrough(page, 3)
@@ -4060,6 +4068,13 @@ test('a stale replay cannot change the current day, page, or history', async ({ 
   await dayTile(page, 2).click()
   await expect(page.getByText('Building replay for Day 2…')).toBeVisible()
   await dayTile(page, 1).click()
+  await expect(page.getByText('Building replay for Day 1…')).toBeVisible()
+  await dayTile(page, 2).click()
+  await expect(page.getByText('Building replay for Day 2…')).toBeVisible()
+  await dayTile(page, 1).click()
+  await expect(page.getByText('Building replay for Day 1…')).toBeVisible()
+  expect(await replayStarts(page, 1)).toBe(1)
+  expect(await replayStarts(page, 2)).toBe(1)
   await finishReplay(page, 1)
   await finishReplay(page, 2)
   await expect(dayTile(page, 1)).toHaveAttribute('aria-current', 'true')
@@ -4453,6 +4468,55 @@ test('Compare keeps the working board visible and retries only the failed replay
   await progress.fill('0.5')
   await expect(leftBoard.getByRole('heading')).toHaveText(/Day 1.*5\.0 s/)
   await expect(rightBoard.getByRole('heading')).toHaveText(/Day 2.*5\.0 s/)
+})
+
+test('comparison boards share an unfinished replay and Retry starts fresh @pages', async ({ page }) => {
+  await delayReplays(page, { runName: 'Left archive', day: 2 })
+  await openSimulator(page)
+  for (const name of ['Right archive', 'Left archive']) {
+    await startRun(page, '10', () => page.getByLabel('Run name').fill(name))
+    await quickThrough(page, 2)
+    await expect(batchStatus(page, 'Saved through')).toHaveText('Day 2')
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
+  }
+
+  await dayTile(page, 1).click()
+  await expect(dayTile(page, 1)).toHaveAttribute('aria-current', 'true')
+  await openRunLibrary(page)
+  const archived = page.getByRole('dialog', { name: 'Run Library' }).locator('article').filter({ hasText: 'Right archive' })
+  await archived.getByRole('button', { name: 'Compare', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Play comparison' })).toBeEnabled()
+  const leftRun = page.getByRole('combobox', { name: 'Left run', exact: true })
+  const rightRun = page.getByRole('combobox', { name: 'Right run', exact: true })
+  const leftId = await leftRun.inputValue()
+  const rightId = await rightRun.inputValue()
+  const left = page.getByRole('region', { name: 'Left board controls' })
+  const right = page.getByRole('region', { name: 'Right board controls' })
+
+  const leftDay = left.getByRole('spinbutton', { name: 'Left day' })
+  await leftDay.fill('2')
+  await leftDay.press('Tab')
+  await expect(left.getByRole('status')).toHaveText('Loading Day 2…')
+  expect(await replayStarts(page, 2)).toBe(1)
+  await leftRun.selectOption(rightId)
+  await rightRun.selectOption(leftId)
+  const rightDay = right.getByRole('spinbutton', { name: 'Right day' })
+  await rightDay.fill('2')
+  await rightDay.press('Tab')
+  await expect(right.getByRole('status')).toHaveText('Loading Day 2…')
+  expect(await replayStarts(page, 2)).toBe(1)
+
+  await finishReplay(page, 2, 'fail')
+  await expect(right.getByRole('alert')).toContainText('Could not open Day 2 on the right.')
+  await expect(left.getByRole('alert')).toHaveCount(0)
+  const leftBoard = page.getByRole('region', { name: 'Left run' }).getByRole('heading')
+  await expect(leftBoard).toHaveText(/Right archive.*Day 2/)
+  await right.getByRole('button', { name: 'Retry right replay' }).click()
+  await finishReplay(page, 2)
+  expect(await replayStarts(page, 2)).toBe(2)
+  await expect(page.getByRole('region', { name: 'Right run' }).getByRole('heading')).toHaveText(/Left archive.*Day 2/)
+  await expect(leftBoard).toHaveText(/Right archive.*Day 2/)
+  await expect(page.getByRole('button', { name: 'Play comparison' })).toBeEnabled()
 })
 
 test('Compare keeps the shared day valid and Close view changes the board framing', async ({ page }) => {
