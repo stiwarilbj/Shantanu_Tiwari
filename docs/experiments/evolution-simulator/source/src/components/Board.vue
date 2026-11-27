@@ -2,6 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { PALETTE } from '../engine/config.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
 import CreatureThought from './CreatureThought.vue'
@@ -17,6 +18,7 @@ const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
 const stageColor = '#242424'
+const starterBlueDisplay = '#365E85'
 const blobDisplayScale = 1.15
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
@@ -192,7 +194,7 @@ function paintColor(b, min, max) {
     const stop = (max === min ? .5 : clamp((b.speed - min) / (max - min), 0, 1)) * (speedPalette.length - 1)
     const index = Math.min(Math.floor(stop), speedPalette.length - 2)
     color.copy(speedPalette[index]).lerp(speedPalette[index+1], stop-index)
-  } else color.set(colors.get(b.species) ?? '#406780')
+  } else color.set(colors.get(b.species) ?? starterBlueDisplay)
   if (props.dim && props.scope !== 'all' && b.species !== props.scope) color.lerp(mutedBody, .72)
   if (!b.alive) color.lerp(deadBody, .52)
   return color
@@ -684,7 +686,13 @@ function setupRenderer() {
   reduced.addEventListener('change', redraw)
   updateVisibility()
 }
-watch(() => props.species, list => { for (const s of list ?? []) colors.set(s.id,s.color); dirty = true }, { immediate:true })
+watch(() => props.species, list => {
+  for (const species of list ?? []) {
+    const starterBlue = species.id === 'blue' && species.color === PALETTE[0]
+    colors.set(species.id, starterBlue ? starterBlueDisplay : species.color)
+  }
+  dirty = true
+}, { immediate:true })
 watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,props.scope,props.speedRange], () => { dirty = true }, { deep:true })
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })
