@@ -5524,6 +5524,53 @@ test('species editor introduces, splits, and renames blobs at the paused tick @p
   }
 })
 
+test('species hue updates the swatch and replays at the edited tick @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page)
+    const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+    const hue = settings.getByRole('slider', { name: 'Hue', exact: true })
+    const color = settings.getByLabel('Color', { exact: true })
+    await expect(hue).toHaveValue('210')
+    await expect(color).toHaveValue('#365e85')
+    await hue.press('Home')
+    await expect(color).toHaveValue('#853636')
+    await hue.press('ArrowRight')
+    await expect(hue).toHaveAttribute('aria-valuetext', '1 degree')
+    await expect(color).toHaveValue('#853736')
+    await color.fill('#808080')
+    await expect(hue).toBeDisabled()
+    await color.fill('#853636')
+    await expect(hue).toBeEnabled()
+    await expect(hue).toHaveValue('0')
+  })
+
+  await stepTo(page, 0.1)
+  await page.getByRole('button', { name: 'Species', exact: true }).click()
+  const editor = page.getByRole('dialog', { name: 'Species', exact: true })
+  await editor.getByRole('button', { name: 'Edit species', exact: true }).click()
+  const color = editor.getByLabel('Color', { exact: true })
+  await expect(color).toHaveValue('#853636')
+  await editor.getByRole('slider', { name: 'Hue', exact: true }).fill('120')
+  await expect(color).toHaveValue('#368536')
+  await editor.getByRole('button', { name: 'Apply changes', exact: true }).click()
+  await expect(editor.getByRole('status')).toContainText('Updated Blue')
+  await editor.getByRole('button', { name: 'Done', exact: true }).click()
+  await page.reload()
+  await page.getByRole('button', { name: 'Follow creature' }).click()
+  const swatch = page.getByRole('button', { name: /^Current creature details/ }).locator('i')
+  await expect(swatch).toHaveCSS('background-color', 'rgb(54, 133, 54)')
+
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  const replay = page.getByRole('slider', { name: 'Replay time' })
+  await replay.fill('0')
+  await expect(swatch).toHaveCSS('background-color', 'rgb(133, 54, 54)')
+  await replay.fill('0.1')
+  await expect(swatch).toHaveCSS('background-color', 'rgb(54, 133, 54)')
+})
+
 test('species editor fits a phone and can return to live after a replay @pages', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, viewport: { width: 375, height: 620 }, isMobile: true, hasTouch: true })
   try {

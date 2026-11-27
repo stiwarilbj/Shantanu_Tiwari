@@ -2,9 +2,9 @@
 import { onMounted, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { PALETTE } from '../engine/config.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
+import { speciesDisplayColor, starterBlueDisplay } from '../species-colors.js'
 import CreatureThought from './CreatureThought.vue'
 
 const props = defineProps({
@@ -18,7 +18,6 @@ const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
 const stageColor = '#242424'
-const starterBlueDisplay = '#365E85'
 const blobDisplayScale = 1.15
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
@@ -687,10 +686,7 @@ function setupRenderer() {
   updateVisibility()
 }
 watch(() => props.species, list => {
-  for (const species of list ?? []) {
-    const starterBlue = species.id === 'blue' && species.color === PALETTE[0]
-    colors.set(species.id, starterBlue ? starterBlueDisplay : species.color)
-  }
+  for (const species of list ?? []) colors.set(species.id, speciesDisplayColor(species))
   dirty = true
 }, { immediate:true })
 watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,props.scope,props.speedRange], () => { dirty = true }, { deep:true })

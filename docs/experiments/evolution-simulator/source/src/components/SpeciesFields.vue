@@ -1,8 +1,10 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
+import { Color, SRGBColorSpace } from 'three'
 import { TRAITS } from '../engine/config.js'
 import { cost, travel } from '../engine/geometry.js'
 import { SPECIES_PRESETS, SPECIES_TRAIT_LABELS } from '../engine/species-actions.js'
+import { speciesDisplayColor } from '../species-colors.js'
 import NumberField from './NumberField.vue'
 
 const props = defineProps({
@@ -17,6 +19,30 @@ const props = defineProps({
 const swatches = { speed: '#9A5A57', size: '#44877C', sense: '#468298' }
 const endurance = computed(() => props.species.energy / cost(props.species, props.rules))
 const readout = computed(() => TRAITS.every(key => props.species[key] >= 1) && Number.isFinite(endurance.value))
+
+const hueDraft = shallowRef()
+const visibleColor = computed(() => speciesDisplayColor(props.species))
+const hsl = computed(() => {
+  const draft = hueDraft.value
+  if (draft?.species === props.species && draft.hex === props.species.color) return draft
+  return new Color(visibleColor.value).getHSL({}, SRGBColorSpace)
+})
+const hue = computed(() => Math.round(hsl.value.h * 360) % 360)
+
+function pickColor(event) {
+  hueDraft.value = undefined
+  props.species.color = event.target.value
+}
+
+function changeHue(event) {
+  const { s, l } = hsl.value
+  const h = event.target.valueAsNumber / 360
+  const hex = new Color().setHSL(h, s, l, SRGBColorSpace).getHexString(SRGBColorSpace)
+  const color = '#' + hex
+  // Keep the original saturation and lightness across steps to avoid rounding drift.
+  hueDraft.value = { species: props.species, hex: color, h, s, l }
+  props.species.color = color
+}
 </script>
 
 <template>
@@ -27,11 +53,19 @@ const readout = computed(() => TRAITS.every(key => props.species[key] >= 1) && N
           :aria-invalid="!!issue[species.id+'.name'] || undefined">
       </label>
       <label>Color
-        <input :id="species.id+'.color'" v-model="species.color" type="color"
-          :aria-invalid="!!issue[species.id+'.color'] || undefined">
+        <input :id="species.id+'.color'" :value="visibleColor" type="color"
+          :aria-invalid="!!issue[species.id+'.color'] || undefined" @input="pickColor">
+      </label>
+      <label class="species-hue">Hue
+        <input type="range" min="0" max="359" :value="hue" :disabled="hsl.s === 0"
+          :aria-valuetext="hue + (hue === 1 ? ' degree' : ' degrees')"
+          :aria-describedby="hsl.s === 0 ? species.id + '.hue-help' : undefined"
+          @input="changeHue">
+        <span aria-hidden="true">{{ hsl.s === 0 ? '—' : hue + '°' }}</span>
       </label>
       <label v-if="starting && !live" class="picker-row"><input v-model="species.enabled" type="checkbox"> Enabled</label>
     </div>
+    <small v-if="hsl.s === 0" :id="species.id + '.hue-help'" class="quiet">Pick a color other than gray, black, or white to adjust its hue.</small>
     <p v-if="issue[species.id+'.name'] || issue[species.id+'.color']" class="issue">
       {{ issue[species.id+'.name'] || issue[species.id+'.color'] }}
     </p>

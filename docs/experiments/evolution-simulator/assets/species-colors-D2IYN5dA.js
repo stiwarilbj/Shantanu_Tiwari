@@ -1,0 +1,1 @@
+import{wt as e}from"./simulation-DV9INmyP.js";import{u as t}from"./index-CT3VKCPS.js";var n=t(`plus`,[[`path`,{d:`M5 12h14`,key:`1ays0h`}],[`path`,{d:`M12 5v14`,key:`s699le`}]]),r=`#365E85`;function i(t){return t.id===`blue`&&t.color===e[0]?r:t.color}export{r as n,n as r,i as t};

@@ -9,6 +9,7 @@ import { breedingCanProduceOffspring, endsWhenSettled, FOOD_WEB_RULE_VERSION, LE
 import { copyDiet, dietFor, EMPTY_FOOD_WEB, setDiet } from '../engine/food-web.js'
 import { newSpecies, runSpecies } from '../engine/species-actions.js'
 import { cost, walkthroughStepCost } from '../engine/geometry.js'
+import { speciesDisplayColor } from '../species-colors.js'
 import AgingSettings from './AgingSettings.vue'
 import FoodWebSettings from './FoodWebSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
@@ -311,7 +312,7 @@ onMounted(()=>dialog.value.showModal())
               <h2>Blob Creatures</h2>
               <div class="species-tabs" aria-label="Edit species">
                 <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
-                  :aria-pressed="selected.id===s.id" :aria-description="s.count + ' founders'" :style="{'--species':s.color}" @click="tab=s.id">
+                  :aria-pressed="selected.id===s.id" :aria-description="s.count + ' founders'" :style="{'--species':speciesDisplayColor(s)}" @click="tab=s.id">
                   <i></i>{{ s.name }}<small v-if="s.enabled" aria-hidden="true">{{ s.count }} founders</small><small v-else>Off</small>
                 </button>
               </div>
@@ -538,7 +539,7 @@ onMounted(()=>dialog.value.showModal())
               <h3>Inheritance &amp; mutation</h3>
               <div class="species-tabs" aria-label="Edit species">
                 <button v-for="s in draft.species" :key="s.id" type="button" class="secondary species-tab"
-                  :aria-pressed="selected.id === s.id" :style="{'--species':s.color}" @click="tab = s.id">
+                  :aria-pressed="selected.id === s.id" :style="{'--species':speciesDisplayColor(s)}" @click="tab = s.id">
                   <i></i>{{ s.name }}<small v-if="!s.enabled">Off</small>
                 </button>
               </div>
