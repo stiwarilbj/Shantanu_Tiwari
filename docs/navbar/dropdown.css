@@ -3,6 +3,7 @@
   --dropdown-hover: #d3e3f8;
   --dropdown-divider-color: #bdcfe8;
   --dropdown-divider: 1px solid var(--dropdown-divider-color);
+  --dropdown-link-padding: clamp(1.125rem, 2vw, 1.25rem);
   --dropdown-shadow: 0 16px 30px -14px rgb(29 61 117 / 38%), 0 4px 12px -6px rgb(29 61 117 / 18%);
 }
 
@@ -71,21 +72,13 @@
   .site-nav .nav-panel-links a {
     justify-content: center;
     min-block-size: 3rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem var(--dropdown-link-padding);
     text-align: center;
   }
 
-  /* Include the left inset and share the space between labels across their links. */
+  /* Keep the panel's leading inset inside the first link's hit area. */
   .site-nav .nav-panel-links li:first-child > a {
-    padding-inline-start: calc(0.75rem + var(--nav-link-padding));
-  }
-
-  .site-nav .nav-panel-links li + li > a {
-    padding-inline-start: 0.875rem;
-  }
-
-  .site-nav .nav-panel-links li:not(:last-child) > a {
-    padding-inline-end: 0.875rem;
+    padding-inline-start: calc(var(--dropdown-link-padding) + var(--nav-link-padding));
   }
 
   :where(.site-nav) .nav-links:has(.category-link[aria-expanded="true"]:hover) {
