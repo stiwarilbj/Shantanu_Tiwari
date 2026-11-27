@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             groups: [
               { name: 'three-core', test: /three\/build\/three\.core\.js$/ },
+              { name: 'three-renderer', test: /three\/build\/three\.module\.js$/ },
               { name: 'simulation', test: /\/src\/(engine\/|(?:archive|store|track)\.js$)/ },
             ],
           },
