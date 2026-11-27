@@ -64,7 +64,7 @@ small{font-size:.84em}
 .run-status{color:var(--muted);display:flex;align-items:center;justify-content:center;gap:4px;font:12px var(--mono);white-space:nowrap;min-height:32px;padding:3px 4px}
 .run-status:hover{color:var(--ink)}
 .pop{position:absolute;z-index:8;background:#111110f7;border:1px solid var(--line);border-radius:6px;box-shadow:0 10px 26px #0005;color:var(--cream);padding:7px}
-.pop>button:not(.icon,.rate-value,.legend-toggle){display:flex;align-items:center;justify-content:space-between;text-align:left;padding:8px 10px;width:100%;border-radius:4px;min-height:34px}
+.pop>button:not(.icon,.legend-toggle){display:flex;align-items:center;justify-content:space-between;text-align:left;padding:8px 10px;width:100%;border-radius:4px;min-height:34px}
 .pop>button:hover:not(:disabled){background:#233430;color:var(--ink)}
 .pop>label{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:5px 8px;white-space:nowrap}
 .run-menu{top:46px;left:50%;transform:translateX(-50%);min-width:214px;text-align:left}
@@ -90,7 +90,8 @@ small{font-size:.84em}
 .world-hud{position:absolute;top:83px;left:27px;display:grid;gap:3px;padding:8px 10px;background:#151514cc;border:1px solid #3c3b35;border-radius:5px;color:var(--muted);font:12px var(--mono)}
 .world-hud span{display:flex;justify-content:space-between;gap:18px}.world-hud b{color:var(--cream);font-weight:400}
 .creature-flower{position:absolute;top:67px;right:23px;width:min(152px,25vw);display:grid;justify-items:center;gap:4px;transition:right .18s}
-.creature-flower.layers-open,.creature-flower.rate-open{right:144px}
+.creature-flower.layers-open{right:144px}
+.creature-flower.rate-open{right:252px}
 .creature-flower>svg{width:100%}
 .creature-caption{min-height:28px;color:var(--cream);font:12px var(--mono);text-align:center;white-space:nowrap;text-shadow:0 1px 2px #111,0 0 3px #111}
 .creature-caption:hover{color:var(--focus)}
@@ -132,16 +133,25 @@ small{font-size:.84em}
 .player-actions .icon{width:32px;height:34px;min-height:34px}
 .quick{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding-inline:5px;color:var(--cream);font:12px var(--mono)}
 .quick svg,.quick:hover:not(:disabled){color:var(--focus)}
-.rate-panel{right:23px;bottom:59px;width:103px;display:flex;flex-direction:column;align-items:center;gap:5px;font:11px var(--mono)}
-.rate-panel>label{padding:4px 0}
-.rate-scale{display:grid;grid-template-columns:24px 33px;gap:5px}
-.rate-panel input{writing-mode:vertical-lr;direction:rtl;width:24px;height:clamp(45px,calc(100cqh - 162px),192px);margin:2px 0}
-.rate-panel span{color:var(--quiet)}.rate-value{color:var(--focus);padding:4px 9px;border:1px solid var(--line);border-radius:4px}
-.rate-ticks{display:flex;flex-direction:column;justify-content:space-between;padding-block:3px;pointer-events:none}
-.rate-ticks span{display:flex;align-items:center;gap:4px;white-space:nowrap}
-.rate-ticks span::before{content:'';width:5px;height:1px;background:#69675e}
-.rate-ticks span.normal{color:var(--focus)}.rate-ticks span.normal::before{background:var(--focus)}
-.rate-value:hover{background:#1e302d;border-color:#66968a}
+.rate-trigger{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:54px;min-height:34px;white-space:nowrap;
+  padding:0 5px;border:1px solid var(--line);border-radius:5px;background:var(--dock);color:var(--cream);font:12px var(--mono)}
+.rate-trigger:hover,.rate-trigger[aria-expanded=true]{color:var(--focus);border-color:#66968a}
+.rate-panel{right:23px;bottom:59px;width:216px;max-width:calc(100% - 22px);padding:8px 10px;font:12px var(--mono)}
+.rate-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.rate-presets{display:flex;gap:5px}
+.rate-presets button{flex:1;min-width:0;min-height:34px;padding:0;border:1px solid var(--line);border-radius:4px}
+.rate-presets button:hover,.rate-presets button[aria-pressed=true]{background:#1e302d;color:var(--focus);border-color:#66968a}
+.rate-panel input{display:block;width:100%;height:26px;margin:5px 0 0}
+.rate-ticks{display:flex;justify-content:space-between;padding:0 3px;color:var(--quiet);pointer-events:none}
+@container (height < 245px){
+  .rate-panel{padding:4px 7px}
+  .rate-heading{position:absolute;inset:5px 5px auto auto;margin:0}
+  .rate-heading label{display:none}
+  .rate-presets{margin-right:32px}
+  .rate-presets button{min-height:30px}
+  .rate-panel input{height:23px;margin-top:1px}
+  .rate-ticks{font-size:10px}
+}
 .player-menu{right:63px;bottom:60px;min-width:165px}
 .details{position:absolute;z-index:6;top:69px;left:24px;bottom:65px;width:min(292px,calc(100% - 48px));overflow:auto;padding:8px 13px 14px;border:1px solid var(--line);border-radius:6px;background:#131313f7;box-shadow:0 12px 32px #0005;font-size:14px;color:var(--muted)}
 .details header{display:flex;align-items:center;justify-content:space-between;color:var(--cream);font:15px var(--mono)}
@@ -742,7 +752,8 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .layer-name{display:inline;font-size:13px}.layer:hover .layer-tip,.layer:focus-visible .layer-tip{display:none}
   .layer-panel>.icon:not(.layer){height:27px}
   .world-hud{top:58px;left:11px;font-size:10px;gap:1px;padding:6px}
-  .creature-flower{top:115px;right:12px;width:100px}.creature-flower.layers-open{right:161px}.creature-flower.rate-open{right:124px}
+  .creature-flower{top:115px;right:12px;width:100px}.creature-flower.layers-open{right:161px}
+  .creature-flower.rate-open{right:min(235px,calc(100% - 105px))}
   .creature-caption{font-size:11px}
   .thought-caption{left:auto;right:0;transform:none}
   .speed-key{right:11px;bottom:46px;width:110px}
@@ -829,6 +840,7 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
   .view-menu-button svg{width:16px}
   .stats-heading h2{font-size:12px}
   .player .icon{width:28px}.player-actions .icon{width:28px}
+  .rate-trigger svg{display:none}
 }
 @media(max-height:500px){
   .settings-body.is-advanced{overflow:auto;overscroll-behavior:contain;scroll-padding-block:6px;scrollbar-color:#514f48 #171716}

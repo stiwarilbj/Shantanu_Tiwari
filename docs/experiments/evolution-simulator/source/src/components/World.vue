@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Copy, Ellipsis,
+import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { STATES } from '../engine/simulation.js'
@@ -19,6 +19,7 @@ const props = defineProps({ active: Boolean })
 const lab = useLab()
 const emit = defineEmits(['reroll', 'fullscreen-change'])
 const board = ref(), surface = ref(), fullscreenActive = ref(false), playbackActions = ref()
+const speedButton = ref()
 const tool = ref(null), camera = ref('board'), quality = ref('auto'), details = ref(false)
 const copyState = shallowRef(null)
 const eventFilter = ref('all')
@@ -98,9 +99,9 @@ const cohort = computed(() => {
 })
 const fraction = computed(() => lab.dayEnded ? 1 : lab.displayDuration ? (lab.frame?.time ?? 0) / lab.displayDuration : 0)
 const transportLabel = computed(() => lab.playing ? 'Pause' : lab.replay && lab.dayEnded ? 'Replay day' : 'Play')
-const playbackSpeed = computed(() => 2 ** ((lab.rate - 6) / 2))
-const rateText = computed(() => Number(playbackSpeed.value.toFixed(3))+'×')
-const liveRate = computed(() => !lab.replay && lab.playing && !lab.loading && !lab.batch ? playbackSpeed.value : null)
+const ratePresets = [[6, '1×'], [8, '2×'], [10, '4×'], [12, '8×']]
+const rateText = computed(() => Number(lab.playbackSpeed.toFixed(3))+'×')
+const liveRate = computed(() => !lab.replay && lab.playing && !lab.loading && !lab.batch ? lab.playbackSpeed : null)
 const events = computed(() => (lab.frame?.events ?? []).filter(e => e.time <= (lab.frame?.time ?? 0) + 1e-9))
 const creatureEvents = computed(() => events.value.filter(e => e.id===lab.selected || e.target===lab.selected && e.type==='prey' ||
   e.type==='birth' && (e.parent===lab.selected || e.secondParent===lab.selected)))
@@ -123,6 +124,11 @@ function follow() {
   else details.value = true
 }
 function toggle(name) { tool.value = tool.value === name ? null : name }
+function closeSpeedControls() {
+  if (tool.value !== 'rate') return
+  tool.value = null
+  speedButton.value?.focus()
+}
 function toggleLayer(key) {
   layers.value[key]=!layers.value[key]
   if (key==='sense') layers.value.cohortSense=false
@@ -290,16 +296,22 @@ defineExpose({ select, overhead })
       <div class="player-actions">
         <button class="quick" :disabled="!!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch ? 'quick-progress' : 'quick'"><FastForward :size="15" fill="currentColor"/>{{ quickLabel }}</button>
         <button ref="playbackActions" class="icon" aria-label="Playback actions" title="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
-        <button class="icon" aria-label="Viewing speed" :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" @click="toggle('rate')"><Clock :size="21"/></button>
+        <button ref="speedButton" type="button" class="rate-trigger" aria-label="Viewing speed" :aria-description="'Current speed '+rateText"
+          :title="'Viewing speed · '+rateText" :aria-expanded="tool==='rate'" :aria-controls="tool==='rate' ? 'speed-controls' : undefined"
+          @click="toggle('rate')" @keydown.esc="closeSpeedControls">
+          {{ rateText }} <ChevronDown :size="12" aria-hidden="true"/>
+        </button>
       </div>
-      <div v-if="tool==='rate'" class="pop rate-panel">
-        <label for="play-rate">Viewing speed</label>
-        <div class="rate-scale">
-          <input id="play-rate" v-model.number="lab.rate" type="range" min="0" max="12" aria-label="Viewing speed multiplier" :aria-valuetext="rateText" orient="vertical">
-          <div class="rate-ticks" aria-hidden="true"><span>8×</span><span :class="{ normal:lab.rate===6 }">1×</span><span>⅛×</span></div>
+      <div v-if="tool==='rate'" id="speed-controls" class="pop rate-panel" @keydown.esc.stop="closeSpeedControls">
+        <div class="rate-heading">
+          <label for="play-rate">Viewing speed</label>
+          <button type="button" class="icon compact" aria-label="Close speed controls" @click="closeSpeedControls"><X :size="16" aria-hidden="true"/></button>
         </div>
-        <button class="rate-value" title="Reset to 1×" :aria-label="'Reset to 1×; viewing speed '+rateText" @click="lab.rate=6">{{ rateText }}</button>
-        <button class="icon compact" aria-label="Close speed controls" @click="tool=null"><ChevronDown :size="16"/></button>
+        <div class="rate-presets" role="group" aria-label="Speed presets">
+          <button v-for="[value, label] in ratePresets" :key="value" type="button" :aria-pressed="lab.rate===value" @click="lab.rate=value">{{ label }}</button>
+        </div>
+        <input id="play-rate" v-model.number="lab.rate" type="range" min="0" max="12" aria-label="Viewing speed multiplier" :aria-valuetext="rateText">
+        <div class="rate-ticks" aria-hidden="true"><span>⅛×</span><span>1×</span><span>8×</span></div>
       </div>
       <div v-if="tool==='player'" class="pop player-menu">
         <button :disabled="!canAdvanceDay" @click="endDay">{{ lab.replay ? 'Go to end' : 'Finish Day' }}</button>

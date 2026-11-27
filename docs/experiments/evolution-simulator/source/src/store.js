@@ -84,6 +84,7 @@ export const useLab = defineStore('lab', () => {
   const frame = shallowRef(null), liveFrame = shallowRef(null)
   const viewing = ref(1), replay = ref(false), playing = ref(false)
   const rate = ref(6), through = ref(false), scope = ref('all')
+  const playbackSpeed = computed(() => 2 ** ((rate.value - 6) / 2))
   const replayDay = ref(null), replayFailure = shallowRef(null)
   const loading = computed(() => replayDay.value != null)
   const batch = shallowRef(null), saved = ref(0), error = ref('')
@@ -745,7 +746,7 @@ export const useLab = defineStore('lab', () => {
     previous = now
     if (requestedDawn && liveFrame.value?.time === 0) requestedDawn = false
     if (playing.value && !loading.value && !requestedDawn) {
-      const delta = elapsed * 2 ** ((rate.value - 6) / 2)
+      const delta = elapsed * playbackSpeed.value
       if (replay.value && track) {
         cursor = Math.min(track.duration, cursor + delta)
         if (now - renderAt >= 16 || cursor === track.duration) {
@@ -973,7 +974,7 @@ export const useLab = defineStore('lab', () => {
     }
   }
 
-  return { run, library, libraryLoading, libraryError, loadRun, frame, viewing, liveFrame, liveDay, replay, playing, rate, through, scope, loading, batch, saved,
+  return { run, library, libraryLoading, libraryError, loadRun, frame, viewing, liveFrame, liveDay, replay, playing, rate, playbackSpeed, through, scope, loading, batch, saved,
     canChangeSpecies, canAdjustSpecies, recordedChangesAhead, openSpecies, changeSpecies, speciesResult,
     canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,

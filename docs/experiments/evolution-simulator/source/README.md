@@ -6,7 +6,7 @@ Watch blobs look for food, hunt, and have babies. Small changes in speed, size, 
 
 ## Try it
 
-- **World** plays one day at a time. Pick a blob to follow it, or use **Quick Sim** to jump ahead. If the last blob dies, select the extinction tile to watch the ending.
+- **World** shows the simulation as it happens. Use the **1×** button to watch live days and replays up to eight times faster, or use **Quick Sim** to jump ahead. Pick a blob to follow it, or select the extinction tile to watch the ending.
 - **Adjust living traits** pauses the day so you can change speed, size, or sense range for a group you choose. Under **Playback actions → Adjust living traits**, pick one or more species, search for individual blobs, or narrow the group to blobs in the field or in refuge. Check the preview before applying, then use **Creature Details** in replay to see when the change happened.
 - In **Settings**, start with a preset or duplicate a species, then set its name, color, founder count, traits, and energy.
 - Use **World → Species** to pause a live day and introduce new blobs, split a living group by ID or seeded sample, or edit a species. The preview shows which blobs will change. Replays show when they arrived or moved, and JSON exports carry that history with the run.

@@ -322,6 +322,20 @@ test.describe('short touch viewports', () => {
     await page.getByRole('button', { name: 'Quick Sim', exact: true }).tap()
     await expect(page.getByRole('dialog', { name: 'Quick Sim' })).toBeVisible()
   })
+
+  test('viewing speed is reachable on a narrow touch screen @pages', async ({ page }) => {
+    const speed = page.getByRole('button', { name:'Viewing speed', exact:true })
+    const [transport, actions] = await Promise.all(
+      [page.locator('.player'), page.locator('.player-actions')].map(locator => locator.boundingBox()))
+    expect(transport.x + transport.width).toBeLessThan(actions.x)
+
+    await speed.tap()
+    await page.getByRole('button', { name:'2×', exact:true }).tap()
+    await expect(speed).toHaveText('2×')
+    await expect(page.getByRole('slider', { name:'Viewing speed multiplier' })).toBeInViewport()
+    await page.getByRole('button', { name:'Close speed controls' }).tap()
+    await expect(speed).toHaveAttribute('aria-expanded', 'false')
+  })
 })
 
 test('playback actions stay below the run controls in a short split screen @pages', async ({ page }) => {
