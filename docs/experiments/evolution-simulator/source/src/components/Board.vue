@@ -17,6 +17,8 @@ const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
 const stageColor = '#242424'
+const blobDisplayScale = 1.15
+const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(stageColor)
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
@@ -236,7 +238,7 @@ function draw3d(blobs, frame, view, { min, max }) {
   bodyIds = []
   const close = props.follow && chosen?.alive
   for (const [i, b] of blobs.entries()) {
-    const x = b.x - 250, z = b.y - 250, r = Math.max(.25, b.r)
+    const x = b.x - 250, z = b.y - 250, r = displayRadius(b)
     const moving = b.alive && b.state < 5 && frame.time > 0 && (frame.duration == null || frame.time < frame.duration)
     const bob = bodyBob(b, frame)
     const born = b.state === 7
@@ -265,16 +267,20 @@ function draw3d(blobs, frame, view, { min, max }) {
   })
   sight.forEach((b,i)=>write(vision, i, '#E4F5FE', b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
   indicators.forEach((b, i) => {
+    const r = displayRadius(b)
     if (energy.count) {
       color.copy(energyLow).lerp(energyFull, b.energy / b.capacity)
-      write(energy, i, color, b.x - 250, .06, b.y - 250, b.r * 1.5, b.r * 1.5, 1, -Math.PI / 2)
+      write(energy, i, color, b.x - 250, .06, b.y - 250, r * 1.5, r * 1.5, 1, -Math.PI / 2)
     }
     if (credit.count) for (let j = 0; j < b.credits; j++) {
       write(credit, pips++, j < b.preyCredits ? '#D38C80' : '#A1C33F',
-        b.x - 250 - b.r * 1.7 + j * 2.6, .1, b.y - 250 + b.r * 1.5, 1.15, 1.15, 1, -Math.PI / 2)
+        b.x - 250 - r * 1.7 + j * 2.6, .1, b.y - 250 + r * 1.5, 1.15, 1.15, 1, -Math.PI / 2)
     }
   })
-  outlines.forEach((b,i)=>write(ring, i, b===chosen?'#33786D':'#C92922', b.x-250, .14, b.y-250, b.r*1.53, b.r*1.53, 1, -Math.PI/2))
+  outlines.forEach((b, i) => {
+    const r = displayRadius(b) * 1.53
+    write(ring, i, b === chosen ? '#33786D' : '#C92922', b.x - 250, .14, b.y - 250, r, r, 1, -Math.PI / 2)
+  })
   const refugeWidth = frame.refugeWidth ?? 0
   const interior = FIELD - 2 * refugeWidth
   refugeSurface.visible = refugeWidth > 0
@@ -312,7 +318,7 @@ function projectPolygon(points, view) {
 
 function spotlight(blob, view) {
   // Raise the close-up opening enough to light the creature's face.
-  const lift = props.camera === 'close' && blob.sense < 10 ? blob.r * 1.05 : 0
+  const lift = props.camera === 'close' && blob.sense < 10 ? displayRadius(blob) * 1.05 : 0
   const rim = visionRim.map(([x, z]) => [
     blob.x - 250 + x * blob.sense, lift, blob.y - 250 + z * blob.sense,
   ])
@@ -372,12 +378,14 @@ function draw2d(blobs, frame, view, { min, max }) {
     ctx.setLineDash([])
   }
   const overheadView = view === overhead
+  const overheadScale = width / (overhead.right - overhead.left)
   const simple = efficient(blobs, frame)
   const inDepthRange = ({ depth }) => depth >= -1 && depth <= 1
   const markers = []
   for (const b of blobs) {
-    const q = p(b.x-250,0,b.y-250), t = p(b.x-250,b.r*2.35,b.y-250)
-    if (inDepthRange(q) && inDepthRange(t)) markers.push({ b, q, t })
+    const bodyRadius = displayRadius(b)
+    const q = p(b.x-250,0,b.y-250), t = p(b.x-250,bodyRadius*2.35,b.y-250)
+    if (inDepthRange(q) && inDepthRange(t)) markers.push({ b, q, t, bodyRadius })
   }
   const plants = []
   for (const plant of frame.plants) {
@@ -389,11 +397,12 @@ function draw2d(blobs, frame, view, { min, max }) {
     plants.push({ plant, q, t, r })
   }
   if (!simple) plants.forEach(({q,r}) => softShadow(q.x+r*.38,q.y+r*.08,r*1.65,r*(overheadView?1.15:.54)))
-  markers.forEach(({b,q,t}) => {
-    const r = Math.max(1.2, overheadView ? b.r * width/(overhead.right-overhead.left) : Math.hypot(t.x-q.x,t.y-q.y) / 2.15)
+  markers.forEach(({ b, q, t, bodyRadius }) => {
+    const radius = overheadView ? bodyRadius * overheadScale : Math.hypot(t.x-q.x,t.y-q.y) / 2.15
+    const r = Math.max(1.2 * blobDisplayScale, radius)
     if (props.layers?.sense && b.sense > 0 && eligible(b) && (!props.layers.cohortSense || inSightCohort(b))) {
       const unit = p(b.x-250,2.35,b.y-250)
-      const scale = overheadView ? width/(overhead.right-overhead.left) : Math.hypot(unit.x-q.x,unit.y-q.y)/2.15
+      const scale = overheadView ? overheadScale : Math.hypot(unit.x-q.x,unit.y-q.y)/2.15
       const senseRadius = b.sense * scale
       ellipse(q.x,q.y,senseRadius,senseRadius*(overheadView ? 1 : .36),'#E4F5FE')
     }
@@ -410,7 +419,7 @@ function draw2d(blobs, frame, view, { min, max }) {
   screenBlobs = []
   const objects = [...markers, ...plants]
   objects.sort((a,b) => b.q.depth-a.q.depth)
-  for (const { b, plant, q, t, r: pelletRadius } of objects) {
+  for (const { b, plant, q, t, bodyRadius, r: pelletRadius } of objects) {
     if (plant) {
       const r = pelletRadius
       const gradient = ctx.createRadialGradient(t.x-r*.3,t.y-r*.4,0,t.x,t.y,r*1.15)
@@ -421,7 +430,8 @@ function draw2d(blobs, frame, view, { min, max }) {
     }
     const x = q.x, y = q.y
     const stretch = overheadView ? 0 : bodyBob(b, frame)
-    const h = Math.max(3,overheadView ? b.r * width/(overhead.right-overhead.left)/.42 : Math.hypot(t.x-x,t.y-y) * (1-stretch)), r = h*.42
+    const height = overheadView ? bodyRadius * overheadScale / .42 : Math.hypot(t.x-x,t.y-y) * (1-stretch)
+    const h = Math.max(3 * blobDisplayScale, height), r = h*.42
     const fill = paintColor(b,min,max).clone()
     const grad = ctx.createLinearGradient(x-r,y-h,x+r,y)
     grad.addColorStop(0,'#'+fill.clone().lerp(new THREE.Color('#EAF1F0'),.22).getHexString())
@@ -429,7 +439,7 @@ function draw2d(blobs, frame, view, { min, max }) {
     grad.addColorStop(1,'#'+fill.multiplyScalar(.54).getHexString())
     if (props.camera === 'overhead') ellipse(x,y,r,r,grad)
     else {
-      const face = p(b.x-250+b.r*Math.cos(b.angle),0,b.y-250+b.r*Math.sin(b.angle))
+      const face = p(b.x-250+bodyRadius*Math.cos(b.angle),0,b.y-250+bodyRadius*Math.sin(b.angle))
       const side = clamp((face.x-x) / r, -1, 1)
       ctx.save()
       ctx.translate(x,y)
@@ -553,7 +563,7 @@ function draw(now, revealed = false) {
       dirty = false
     }
     if (follow) {
-      const p = project(blob.x-250,blob.r*2.6+4,blob.y-250,view)
+      const p = project(blob.x-250,displayRadius(blob)*2.6+4,blob.y-250,view)
       cloud.value?.place(p.x>28 && p.x<width-28 && p.y>92 && p.y<height-88 ? p : null)
       if (props.layers?.vision) spotlight(blob, view)
     }
