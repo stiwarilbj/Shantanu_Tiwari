@@ -1619,7 +1619,6 @@ function restoreGame(preferences, savedRound) {
 
 function loadGameState() {
     const preferences = storage.read('preferences');
-    loadScoreHistories();
     const savedRound = storage.read('round');
     if (!legacyStorage || (preferences && savedRound)) {
         restoreGame(preferences, savedRound);
