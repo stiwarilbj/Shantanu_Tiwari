@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { renderNavbar } from '../../docs/navbar/render.mjs'
+import { renderNavbar } from '../../../navbar/render.mjs'
 
 const worldModule = fileURLToPath(new URL('./src/components/World.vue', import.meta.url))
 
@@ -49,7 +49,6 @@ function preloadWorldEntrance(html, { bundle }) {
 
 export default defineConfig(({ mode }) => {
   const projectLab = mode === 'project-lab'
-  const pages = new URL('../../docs/', import.meta.url)
 
   return {
     base: './',
@@ -83,7 +82,7 @@ export default defineConfig(({ mode }) => {
     build: {
       license: { fileName: 'licenses/dependencies.md' },
       ...(projectLab ? {
-        outDir: fileURLToPath(new URL('experiments/evolution-simulator/', pages)),
+        outDir: '.pages-build',
         emptyOutDir: true,
       } : {}),
       rolldownOptions: {

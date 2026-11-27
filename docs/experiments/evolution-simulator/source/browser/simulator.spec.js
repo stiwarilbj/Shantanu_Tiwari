@@ -234,7 +234,7 @@ test('the production build runs a new experiment and shows its charts @pages', a
     if (isAppRequest(failed.url())) problems.push(failed.url())
   })
   if (process.env.PAGES_URL) {
-    const built = await readFile(new URL('../../../docs/experiments/evolution-simulator/index.html', import.meta.url), 'utf8')
+    const built = await readFile(new URL('../../index.html', import.meta.url), 'utf8')
     const entry = built.match(/<script type="module"[^>]* src="([^"]+)"/)?.[1]
     expect(entry).toBeTruthy()
     await expect.poll(async () => (await request.get('./')).text(), { timeout: 45000 }).toContain(entry)

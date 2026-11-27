@@ -33,4 +33,4 @@ npm run dev
 
 Run `npm test` for the simulation checks and `npm run build` for a standalone build. To run the browser suite, install Chromium with `npx playwright install chromium` and run `npm run test:browser` after building.
 
-From this folder, run `npm run build:pages` to refresh the published files in `docs/experiments/evolution-simulator` at the repo root. Commit the source changes and the refreshed build together.
+The source lives in `docs/experiments/evolution-simulator/source`. Run `npm run build:pages` here to refresh the published files in the parent folder. Commit the source changes and the refreshed build together.
