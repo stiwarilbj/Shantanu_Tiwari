@@ -20,6 +20,8 @@ test('opens the controls reference from About and finds an advanced setting', as
 
   await input.fill('board appearance food size')
   await expect(page.locator('#styles').getByText('Food size', { exact: true })).toBeVisible()
+  await input.fill('species colors')
+  await expect(page.locator('#styles').getByText('Species color picker', { exact: true })).toBeVisible()
 
   await input.fill('zzneverfound')
   await expect(page.getByText(/^No matches/)).toBeVisible()

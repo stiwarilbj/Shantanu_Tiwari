@@ -8,7 +8,7 @@ import { foodSupplyForDay, rulesFor, usesWalkthroughForaging } from '../engine/c
 import { DECISION, tracksForagingDecisions } from '../engine/foraging-decisions.js'
 import { format, runSpeedRange } from '../engine/stats.js'
 import { cost, edgePoint, homePoints, radius, refugeDistance, travel, walkthroughStepCost } from '../engine/geometry.js'
-import { speciesDisplayColor } from '../species-colors.js'
+import { boardSpeciesColor } from '../species-colors.js'
 import Board from './Board.vue'
 import Flower from './Flower.vue'
 import Ribbon from './Ribbon.vue'
@@ -226,7 +226,7 @@ defineExpose({ select, overhead })
 <template>
   <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead', 'is-replay':replayCanSeek }" tabindex="-1" @keydown="shortcuts">
     <section class="stage" aria-label="Simulation field">
-      <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :layers="layers" :selected="lab.selected"
+      <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :style-run="lab.run.id" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
         @select="select" @stop-follow="lab.following=false" @fallback="fallback=true"/>
@@ -269,7 +269,7 @@ defineExpose({ select, overhead })
         :class="{ 'layers-open':tool==='layers', 'rate-open':tool==='rate' }">
         <Flower :values="visible" :bounds="cohort" individual compact/>
         <button class="creature-caption" :aria-label="'Current creature details · '+species?.name+' · #'+visible.id" @click="details=true">
-          <i :style="{background:species && speciesDisplayColor(species)}"></i>{{ species?.name }} · #{{ visible.id }}
+          <i :style="{background:species && boardSpeciesColor(species, lab.run.id)}"></i>{{ species?.name }} · #{{ visible.id }}
         </button>
         <button class="vision-toggle" type="button" :aria-pressed="layers.vision" @click="layers.vision=!layers.vision"
           aria-description="Dim the area beyond this creature’s sense range"><Aperture :size="14"/> Sense focus</button>

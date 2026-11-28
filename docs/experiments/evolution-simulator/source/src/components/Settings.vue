@@ -4,12 +4,12 @@ import { ChevronLeft, ChevronRight, CircleX, Copy, Dices, Plus, Check } from 'lu
 import { useLab } from '../store.js'
 import { breedingCanProduceOffspring, endsWhenSettled, FOOD_WEB_RULE_VERSION, LEGACY_RULE_VERSION, MAX_SEED, mutationEnabled,
   mutationProducesSpread, SETTLED_RULE_VERSION, TRAITS,
-  randomSeed, usesAgingRules, usesHabitatRules, usesReproductionRules,
+  randomSeed, rulesFor, usesAgingRules, usesHabitatRules, usesReproductionRules,
   usesOptionalRules, usesStandardDeviation, usesTerritoryRules, usesWalkthroughForaging, validate } from '../engine/config.js'
 import { copyDiet, dietFor, EMPTY_FOOD_WEB, setDiet } from '../engine/food-web.js'
-import { newSpecies, runSpecies } from '../engine/species-actions.js'
+import { newSpecies, runSpecies, speciesWithEdits } from '../engine/species-actions.js'
 import { cost, walkthroughStepCost } from '../engine/geometry.js'
-import { speciesDisplayColor } from '../species-colors.js'
+import { boardSpeciesColor, speciesDisplayColor } from '../species-colors.js'
 import AgingSettings from './AgingSettings.vue'
 import FoodWebSettings from './FoodWebSettings.vue'
 import ForagingSettings from './ForagingSettings.vue'
@@ -18,7 +18,7 @@ import NumberField from './NumberField.vue'
 import SpeciesFields from './SpeciesFields.vue'
 import StartingTerritories from './StartingTerritories.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
-import { boardStyles, boardStyleRange, defaultBoardStyles, setBoardStyles } from '../board-styles.js'
+import { boardStyles, boardStyleRange, defaultBoardStyles, setBoardStyles, setSpeciesColorOverride } from '../board-styles.js'
 
 const lab = useLab()
 const draft = lab.draft
@@ -59,10 +59,15 @@ const categories = [
   { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting', foodWeb: 'Species food web' } },
   { label: 'Life cycle', topics: { reproduction: 'Reproduction', inheritance: 'Inheritance & mutation', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
-  { label: 'Styles', topics: { boardStyles: 'Board appearance' } },
+  { label: 'Styles', topics: { boardStyles: 'Board appearance', speciesColors: 'Species colors' } },
 ]
 const category = computed(() => categories.find(item => Object.hasOwn(item.topics, group.value)))
 const styleLabels = { blobSize: 'Blob size', foodSize: 'Food size' }
+const appearanceSpecies = computed(() => {
+  const { setup, revisions } = lab.run
+  const frame = lab.frame
+  return speciesWithEdits(rulesFor(setup, revisions, frame?.day ?? lab.viewing).species, frame?.speciesEdits)
+})
 const forecastCycles = ref(String(forecastPreferences.cycles))
 const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
 function commitForecastCycles(event) {
@@ -527,6 +532,18 @@ onMounted(()=>dialog.value.showModal())
               </div>
               <div class="advanced-actions">
                 <button type="button" class="secondary" @click="setBoardStyles(defaultBoardStyles)">Reset styles</button>
+              </div>
+            </div>
+            <div v-else-if="group === 'speciesColors'" class="advanced-block">
+              <p class="quiet">Choose display colors for this run and its replays. Changes apply immediately and are saved in this browser. Color by speed uses its own palette.</p>
+              <div v-for="species in appearanceSpecies" :key="species.id" class="board-species-color">
+                <label>
+                  <span>{{ species.name }}</span>
+                  <input type="color" :aria-label="species.name + ' display color'" :value="boardSpeciesColor(species, lab.run.id)"
+                    @input="setSpeciesColorOverride(lab.run.id, species.id, $event.target.value)">
+                </label>
+                <button type="button" class="secondary" :aria-label="'Reset ' + species.name + ' color'"
+                  @click="setSpeciesColorOverride(lab.run.id, species.id, null)">Reset</button>
               </div>
             </div>
             <div v-else-if="group === 'reproduction'" class="advanced-block">

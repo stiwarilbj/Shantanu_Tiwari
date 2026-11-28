@@ -553,6 +553,10 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .board-style-scale{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;color:var(--cream)}
 .board-style-scale span{font-family:var(--mono)}
 .board-style-scale input{grid-column:1 / -1;width:100%;min-height:36px;margin:0}
+.board-species-color{display:flex;align-items:center;gap:10px;padding-top:8px;border-top:1px solid var(--subtle)}
+.board-species-color label{display:flex;flex:1;min-width:0;align-items:center;justify-content:space-between;gap:10px;overflow-wrap:anywhere;color:var(--cream)}
+.board-species-color input{flex:none;width:44px;height:36px;padding:2px}
+.board-species-color button{min-height:36px}
 .advanced-actions{display:flex;gap:8px}
 .advanced-block .number-shell{grid-template-columns:minmax(0,1fr) minmax(60px,32%) 65px}
 .advanced-block .number-shell input{min-width:0}

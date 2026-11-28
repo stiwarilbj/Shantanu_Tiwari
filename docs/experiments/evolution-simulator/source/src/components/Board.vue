@@ -1,17 +1,17 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { boardStyles, defaultBoardStyles } from '../board-styles.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
-import { speciesDisplayColor, starterBlueDisplay } from '../species-colors.js'
+import { boardSpeciesColor, starterBlueDisplay } from '../species-colors.js'
 import CreatureThought from './CreatureThought.vue'
 
 const props = defineProps({
   frame: Object, species: Array, layers: Object, selected: Number, follow: Boolean, camera: String,
   scope: String, dim: Boolean, quality: String, speedRange: Object, tabletop: Boolean,
-  playbackRun: String, liveRate: Number, liveFinished: Boolean,
+  styleRun: String, playbackRun: String, liveRate: Number, liveFinished: Boolean,
   active: { type: Boolean, default: true }
 })
 const emit = defineEmits(['select', 'fallback', 'stop-follow'])
@@ -725,10 +725,11 @@ function setupRenderer() {
   reduced.addEventListener('change', redraw)
   updateVisibility()
 }
-watch(() => props.species, list => {
-  for (const species of list ?? []) colors.set(species.id, speciesDisplayColor(species))
-  dirty = true
-}, { immediate:true })
+watchEffect(() => {
+  colors.clear()
+  for (const species of props.species ?? []) colors.set(species.id, boardSpeciesColor(species, props.styleRun))
+  redraw()
+})
 watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,props.scope,props.speedRange], () => { dirty = true }, { deep:true })
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })

@@ -475,7 +475,7 @@ watch(sequence,active=>{ if(active) nextTick(()=>sequenceStopButton.value?.focus
       <div class="paired-boards" :class="{ 'reveal-boards':reveal }" :style="{ '--divider':divider+'%' }">
         <section v-for="(run,index) in runs" :key="run.id" :aria-label="names[index]"
           :class="[index===0 ? 'run-left' : 'run-right', { 'quiet-board':emphasis!=='both' && emphasis!==(index===0 ? 'left' : 'right') }]">
-          <Board v-show="frames[index]" :ref="element=>boards[index]=element" :active="!!frames[index]" :frame="frames[index]" :species="boardSpecies[index]" :layers="layers"
+          <Board v-show="frames[index]" :ref="element=>boards[index]=element" :active="!!frames[index]" :frame="frames[index]" :species="boardSpecies[index]" :style-run="run.id" :layers="layers"
             :camera="cameras[index]" :scope="scope" :dim="scope!=='all'" :selected="selections[index]" :follow="selections[index]!=null" @select="selections[index]=$event"/>
           <h2>{{ run.setup.name }} <small>Day {{ days[index] }} · Seed {{ run.setup.seed }} · {{ format(frames[index]?.time,1) }} s</small></h2>
         </section>

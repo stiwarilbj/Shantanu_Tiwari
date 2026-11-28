@@ -23,14 +23,35 @@ const styles = reactive({
   foodSize: validSize(saved.foodSize) ? saved.foodSize : defaultBoardStyles.foodSize,
 })
 export const boardStyles = readonly(styles)
+const validColor = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+const colorKey = (runId, speciesId) => JSON.stringify([runId, speciesId])
+const speciesColors = reactive(Object.fromEntries(
+  Object.entries(saved.speciesColors ?? {}).filter(([key, value]) => key.startsWith('[') && validColor(value))
+))
+
+function saveStyles() {
+  try {
+    globalThis.localStorage?.setItem(storageKey, JSON.stringify({ ...styles, speciesColors }))
+  } catch {
+    // The controls still work for this session if storage is unavailable.
+  }
+}
 
 export function setBoardStyles(update) {
   for (const key of Object.keys(defaultBoardStyles)) {
     if (validSize(update[key])) styles[key] = update[key]
   }
-  try {
-    globalThis.localStorage?.setItem(storageKey, JSON.stringify(styles))
-  } catch {
-    // The controls still work for this session if storage is unavailable.
-  }
+  saveStyles()
+}
+
+export function speciesColorOverride(runId, speciesId) {
+  return runId == null ? undefined : speciesColors[colorKey(runId, speciesId)]
+}
+
+export function setSpeciesColorOverride(runId, speciesId, color) {
+  const key = colorKey(runId, speciesId)
+  if (color === null) delete speciesColors[key]
+  else if (validColor(color)) speciesColors[key] = color.toLowerCase()
+  else return
+  saveStyles()
 }
