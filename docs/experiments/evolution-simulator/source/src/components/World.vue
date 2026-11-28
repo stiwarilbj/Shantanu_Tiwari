@@ -248,12 +248,17 @@ defineExpose({ select, overhead })
         <button class="icon" aria-label="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
         <button class="icon view-menu-button" data-world-tool aria-label="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
       </div>
-      <div v-if="tool==='layers'" class="layer-panel pop" data-world-tool>
-        <button class="icon" aria-label="Close layers" @click="tool=null"><ChevronUp :size="20"/></button>
-        <button v-for="[key,Icon,label,tip] in layerNames" :key="key" class="icon layer" :aria-label="label" :aria-pressed="layers[key]" @click="toggleLayer(key)">
-          <component :is="Icon" :size="22"/><span class="layer-name">{{ label }}</span><span class="layer-tip">{{ label }}<small>{{ key==='sense' && layers.cohortSense ? 'Show living creatures in the species filter' : tip }}</small></span>
+      <div v-if="tool==='layers'" class="layer-panel pop" role="group" aria-label="Layer controls" data-world-tool>
+        <button type="button" class="icon" @click="tool=null">
+          <ChevronUp aria-hidden="true"/><span class="layer-label">Close layers</span>
         </button>
-        <button class="icon" aria-label="More layer options" @click="toggle('layer-options')"><ChevronDown :size="17"/></button>
+        <button v-for="[key,Icon,label,tip] in layerNames" :key="key" class="icon layer" :aria-label="label" :aria-pressed="layers[key]" @click="toggleLayer(key)">
+          <component :is="Icon" aria-hidden="true"/><span class="layer-label">{{ label }}</span>
+          <span class="layer-tip" aria-hidden="true">{{ label }}<small>{{ key==='sense' && layers.cohortSense ? 'Show living creatures in the species filter' : tip }}</small></span>
+        </button>
+        <button type="button" class="icon" @click="toggle('layer-options')">
+          <ChevronDown aria-hidden="true"/><span class="layer-label">More layer options</span>
+        </button>
       </div>
       <div v-if="tool==='view' || tool==='layer-options'" class="pop view-menu" data-world-tool>
         <template v-if="tool==='view'">
