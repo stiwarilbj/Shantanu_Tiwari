@@ -73,6 +73,7 @@ export const groups = [
         ['Previous day and Next day', 'Move one generation back or forward when that day is available.'],
         ['Play, Pause, and Replay day', 'Start or pause live play or a replay. At the end of a replay, the same button restarts that day.'],
         ['Play through generations', 'Keep going into the next day when the current one ends.'],
+        ['Add generations', 'At the last scheduled day, use the button above the playback controls to give the same run more days. Select Add and play to start the next unfinished day.'],
         ['Viewing speed', 'Open the clock or multiplier button beside Quick Sim. Pick 1×, 2×, 4×, or 8×, or use the slider for a speed from ⅛× to 8×. This changes playback speed for live days and replays.'],
         ['Replay time', 'The clock shows seconds elapsed and the day’s total length when known. Drag the bar or use the arrow keys to seek in a recorded day. During live play it shows progress through the day.'],
         ['Previous frame and Next frame', 'While a replay is paused, move backward or forward by one recorded frame.'],
@@ -335,7 +336,7 @@ export const groups = [
         ['Generation table and Advanced stats', 'Open the spreadsheet-style history or deeper statistics for survival, traits, and meals.'],
         ['Download', 'Opens export options with the current date range.'],
         ['Run again and Reroll seed', 'Open another run with the same settings, or start from the same setup with a different seed.'],
-        ['More Generations and Quick Sim', 'Increase the run limit or simulate several days as a batch.'],
+        ['Add generations and Quick Sim', 'Add days to this run or simulate several days as a batch. Add and play returns you to World and starts the next unfinished day.'],
         ['Trends and Trait Space', 'Switch between charts across generations and a view of individual creatures and their traits. Watch World opens the field if there are no results yet.'],
       ]],
       ['Trends → Chart options', [
@@ -412,7 +413,8 @@ export const groups = [
         ['Progress and Hide progress', 'See the completed count and batch progress. Hide the dialog while a batch keeps running.'],
         ['Stop after this day', 'Let the generation underway finish, then stop the batch. Completed days stay saved.'],
         ['New Quick Sim, View batch results, and Watch last day', 'Start another batch, filter Trends to the days this batch finished, or open the last day it completed.'],
-        ['More Generations → Additional days and Extend', 'Add days to an existing run up to the run limit.'],
+        ['More Generations → Additional generations', 'Choose how many days to add to this run, up to Day 1,000. The field starts at 10 or the remaining capacity, whichever is smaller.'],
+        ['More Generations → Add and play, Add only, or Add and prepare', 'Start the next unfinished day in World, extend the schedule only, or prepare the added days in the background for a run set up that way. Earlier generations stay in the run.'],
       ]],
       ['Simulator header → Run options → Branch here', [
         ['Branch after day', 'Choose a completed generation to keep in the new run. Later changes start on the next day.'],

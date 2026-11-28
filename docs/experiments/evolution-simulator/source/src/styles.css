@@ -123,6 +123,7 @@ small{font-size:.84em}
 .speed-key div{display:flex;justify-content:space-between;color:var(--muted)}
 .stage-note{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);text-align:center;padding:12px 17px;background:#171717ed;border:1px solid var(--line);border-radius:6px;color:var(--cream);font-family:var(--mono);z-index:3}
 .stage-note strong,.stage-note span{display:block}.stage-note span{color:var(--muted);margin-top:7px;font-size:13px}
+.continue-run{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);z-index:4;white-space:nowrap}
 .player{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);display:flex;align-items:center;gap:3px;z-index:4}
 .transport{display:flex;align-items:center}
 .player .icon{width:34px;height:34px;min-height:34px;color:var(--cream)}

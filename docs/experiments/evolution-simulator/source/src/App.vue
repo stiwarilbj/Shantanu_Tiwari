@@ -147,6 +147,7 @@ async function go(view, guided = null) {
   menu.value = false
   if (changed) history.pushState(null,'',address())
   else if (lab.run) history.replaceState(null,'',address())
+  return true
 }
 function changeLesson(id) {
   lesson.value = id
@@ -271,6 +272,13 @@ function task(key) {
   menu.value=false
   lab.modal=key
 }
+async function extendAndPlay(days) {
+  const runId = lab.run.id
+  if (!await go('viewer') || lab.run.id !== runId || lab.modal !== 'extend') return
+  if (!lab.extend(days, { playLive: true })) return
+  await nextTick()
+  mainSurface.value?.focus({ preventScroll: true })
+}
 function openBatchResults(range) {
   lab.modal = null
   batchRange.value = range
@@ -389,7 +397,8 @@ onUnmounted(() => {
       <Tour v-if="lab.modal==='tour'" @close="lab.modal=null" @world="lab.modal=null; go('viewer')"
         @walkthrough="lab.modal=null; lesson='opening'; go('about')"/>
       <RunDialog v-else-if="lab.modal && !['traits', 'species'].includes(lab.modal) && !lab.settings" @compare="compare" @watch="watchDay"
-        @resume="openRun($event, 'viewer')" @results="openRun($event, 'stats')" @batch-results="openBatchResults"/>
+        @resume="openRun($event, 'viewer')" @results="openRun($event, 'stats')" @batch-results="openBatchResults"
+        @extend-and-play="extendAndPlay"/>
     </template>
     <p v-else class="startup" role="status">Opening the lab…</p>
   </div>

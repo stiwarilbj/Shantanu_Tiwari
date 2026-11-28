@@ -10,8 +10,8 @@ import AdvancedStats from './AdvancedStats.vue'
 import GenerationTable from './GenerationTable.vue'
 
 const lab=useLab()
-const emit=defineEmits(['compare','watch','resume','results','batch-results'])
-const dialog=ref(), mode=ref('additional'), amount=ref(10), target=ref(1), extension=ref(25)
+const emit=defineEmits(['compare','watch','resume','results','batch-results','extend-and-play'])
+const dialog=ref(), mode=ref('additional'), amount=ref(10), target=ref(1), extension=ref(10)
 const message=ref(''), search=ref(''), file=ref(), removeId=ref(null), renameId=ref(null), newName=ref('')
 const actionsId=ref(null)
 const end=ref(lab.completed), start=ref(1), exportScope=ref(lab.scope), exportKind=ref('csv'), branchDay=ref(Math.max(1,Math.min(lab.viewing,lab.latestBranchDay)))
@@ -22,6 +22,8 @@ const branchFood = computed({
 })
 const startProgress=ref(lab.completed), endProgress=ref(lab.completed), resumeLive=ref(false)
 const remaining=computed(()=>MAX_RUN_DAYS-lab.run.setup.days)
+const validExtension=computed(()=>Number.isInteger(extension.value)&&extension.value>=1&&extension.value<=remaining.value)
+const extendedLimit=computed(()=>lab.run.setup.days+extension.value)
 const nextDay = computed(() => lab.completed + 1)
 const quickCapacity=computed(()=>Math.max(0,MAX_RUN_DAYS-lab.completed))
 const finish=computed(()=>mode.value==='absolute'?target.value:lab.completed+amount.value)
@@ -83,7 +85,7 @@ watch(()=>lab.modal,key=>{
     lab.targetDay=null
   }
   if(key==='quick-progress' && lab.batch) { startProgress.value=lab.batch.start; endProgress.value=lab.batch.target }
-  if(key==='extend') extension.value=Math.min(25,remaining.value)
+  if(key==='extend') extension.value=Math.min(10,remaining.value)
   if(key==='download') {
     start.value = lab.downloadRange?.start ?? 1
     end.value = lab.downloadRange?.end ?? lab.completed
@@ -218,18 +220,31 @@ onMounted(()=>dialog.value.showModal())
       <footer><button class="secondary" @click="close">{{ lab.batch?'Hide progress':'Close' }}</button>
         <button v-if="lab.batch" class="primary" :disabled="lab.batch.stopping" @click="lab.stopBatch">Stop after this day</button>
         <template v-else>
-          <button v-if="lab.canEnterLive" class="secondary" @click="lab.modal='quick'">New Quick Sim</button>
+          <button v-if="lab.canQuickSim" class="secondary" @click="lab.modal='quick'">New Quick Sim</button>
           <button v-if="lab.completed>startProgress" class="secondary" @click="emit('batch-results',{from:startProgress+1,to:lab.completed})">View batch results</button>
           <button v-if="lab.completed" class="primary" @click="emit('watch',lab.completed, null, { atEnd:!!lab.extinctDay })">Watch last day</button>
         </template>
       </footer>
     </template>
     <template v-else-if="lab.modal==='extend'">
-      <p>Add days to the existing run.</p><dl class="pair-readout"><dt>Current limit</dt><dd>Day {{ lab.run.setup.days }}</dd><dt>New limit</dt><dd>Day {{ lab.run.setup.days+(Number(extension)||0) }}</dd></dl>
-      <label class="dialog-field">Additional days <input v-model.number="extension" type="number" min="1" :max="remaining"></label>
+      <p>Keep this run and schedule more generations after Day {{ lab.run.setup.days }}.</p>
+      <label class="dialog-field">Additional generations
+        <input v-model.number="extension" type="number" min="1" :max="remaining">
+      </label>
+      <p v-if="validExtension" class="quiet">
+        The run will go through Day {{ extendedLimit }}. Play continues from Day {{ nextDay }}.
+      </p>
+      <p v-else-if="remaining > 0" class="issue">Enter a whole number from 1 to {{ remaining }}.</p>
       <p v-if="lab.extinctDay" class="quiet">The population went extinct on Day {{ lab.extinctDay }}.</p>
-      <p v-else class="quiet">{{ remaining }} days available before Day 1,000.<template v-if="lab.batch"> Stop or finish the current job before extending.</template></p>
-      <footer><button class="secondary" @click="close">Cancel</button><button class="primary" :disabled="!lab.workerReady||!!lab.batch||!!lab.extinctDay||!Number.isInteger(extension)||extension<1||extension>remaining" @click="lab.extend(lab.run.setup.days+extension)">Extend</button></footer>
+      <p v-else-if="remaining === 0" class="quiet">The run has reached its limit of {{ MAX_RUN_DAYS }} generations.</p>
+      <p v-else-if="lab.batch" class="quiet">Stop or finish the current batch before extending.</p>
+      <footer>
+        <button class="secondary" @click="close">Cancel</button>
+        <button class="secondary" :disabled="!lab.canExtend || !validExtension" @click="lab.extend(extendedLimit)">
+          {{ lab.run.setup.mode==='prepare' ? 'Add and prepare' : 'Add only' }}
+        </button>
+        <button class="primary" :disabled="!lab.canExtend || !validExtension" @click="emit('extend-and-play', extendedLimit)">Add and play</button>
+      </footer>
     </template>
     <template v-else-if="lab.modal==='download'">
       <div class="split-options"><button class="secondary" :aria-pressed="exportKind==='csv'" @click="exportKind='csv'">CSV results</button>

@@ -109,6 +109,8 @@ export const useLab = defineStore('lab', () => {
     completed.value < (run.value?.setup.days ?? 0))
   const canQuickSim = computed(() => workerReady.value && !batch.value && !extinctDay.value &&
     !adjustingTraits.value && completed.value < MAX_RUN_DAYS)
+  const atScheduleEnd = computed(() => completed.value >= (run.value?.setup.days ?? Infinity))
+  const canExtend = computed(() => canQuickSim.value && (run.value?.setup.days ?? Infinity) < MAX_RUN_DAYS)
   const canChangeSpecies = computed(() => canEnterLive.value && !replay.value && !loading.value &&
     frame.value?.day > completed.value && !dayEnded.value)
   const recordedChangesAhead = computed(() => canChangeSpecies.value && historyAhead(run.value, frame.value))
@@ -124,7 +126,7 @@ export const useLab = defineStore('lab', () => {
     if (batch.value?.stopping) return 'Stopping batch'
     if (!replay.value && batch.value) return 'Simulating'
     if (!replay.value && extinctDay.value) return 'Extinct'
-    if (!replay.value && completed.value >= (run.value?.setup.days ?? Infinity)) return 'Finished'
+    if (!replay.value && atScheduleEnd.value) return 'Finished'
     if (replay.value) return 'Replay'
     if (workerError.value) return 'Simulation unavailable'
     if (playing.value) return 'Live'
@@ -644,7 +646,7 @@ export const useLab = defineStore('lab', () => {
     if (playThroughRequest === request) cancelReplay()
   }
 
-  function goLive(restart = false) {
+  function goLive({ restart = false, resume = false } = {}) {
     if (!canEnterLive.value) return
     cancelReplay()
     stopPlayback()
@@ -659,8 +661,9 @@ export const useLab = defineStore('lab', () => {
     if (liveFrame.value?.day > completed.value) {
       frame.value = liveFrame.value
       viewing.value = liveFrame.value.day
-    }
+    } else if (resume) requestedDawn = true
     writer.postMessage({ type: 'dawn', restart })
+    if (resume) playing.value = true
   }
 
   function prepareOrLive() {
@@ -748,7 +751,7 @@ export const useLab = defineStore('lab', () => {
   function moveDay(delta) {
     const day = viewing.value + delta
     if (day >= 1 && day <= completed.value) void openDay(day)
-    else if (delta === 1 && viewing.value === completed.value) goLive(true)
+    else if (delta === 1 && viewing.value === completed.value) goLive({ restart: true })
   }
 
   function animate(now) {
@@ -817,11 +820,13 @@ export const useLab = defineStore('lab', () => {
     persist()
   }
 
-  function extend(days) {
-    if (!workerReady.value || batch.value || extinctDay.value || days <= run.value.setup.days || days > MAX_RUN_DAYS) return
+  function extend(days, { playLive = false } = {}) {
+    if (!canExtend.value || !Number.isInteger(days) || days <= run.value.setup.days || days > MAX_RUN_DAYS) return false
     extendRunLimit(days)
     modal.value = null
-    if (run.value.setup.mode === 'prepare') simulate(days, 'Preparing')
+    if (playLive) goLive({ resume: true })
+    else if (run.value.setup.mode === 'prepare') simulate(days, 'Preparing')
+    return true
   }
 
   function openSettings(setup, from = null) {
@@ -996,7 +1001,8 @@ export const useLab = defineStore('lab', () => {
     canChangeSpecies, canAdjustSpecies, recordedChangesAhead, openSpecies, changeSpecies, speciesResult,
     canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
-    canEnterLive, canQuickSim, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
+    canEnterLive, canQuickSim, canExtend, atScheduleEnd, canMoveNext, selected, following, settings, draft, modal,
+    completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
     stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
     remove, toggleBookmark, getTrack, checkpointAt, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
 })

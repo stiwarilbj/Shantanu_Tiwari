@@ -4201,6 +4201,58 @@ test('Quick Sim defaults to ten, extends its run when needed, and keeps the boar
   expect(errors).toEqual([])
 })
 
+test('adding generations plays on from the last scheduled day and keeps the run history @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await fixedDay(page, '2')
+    await page.getByRole('spinbutton', { name: 'Random seed' }).fill('118')
+    await page.getByRole('spinbutton', { name: 'Food' }).fill('1000')
+  })
+  await quickThrough(page, 10)
+  const done = page.getByRole('dialog', { name: 'Simulation complete' })
+  await expect(done.getByRole('button', { name: 'New Quick Sim' })).toBeEnabled()
+  await done.getByRole('button', { name: 'Watch last day' }).click()
+
+  const options = page.getByRole('button', { name: 'Run options' })
+  await expect(options).toHaveText('Day 10 / 10 · Replay')
+  const runId = await page.evaluate(() => localStorage.getItem('evolution.active'))
+  const board = page.getByRole('region', { name: 'Simulation field' })
+  const before = await board.boundingBox()
+  const add = page.getByRole('button', { name: 'Add generations', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'More Generations' })
+  const count = dialog.getByRole('spinbutton', { name: 'Additional generations' })
+  const play = dialog.getByRole('button', { name: 'Add and play' })
+  await add.focus()
+  await add.press('Enter')
+  await expect(count).toHaveValue('10')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+  await page.getByRole('link', { name: 'Trends', exact: true }).click()
+  await add.click()
+  await count.fill('0')
+  await expect(play).toBeDisabled()
+  await count.fill('2')
+  await expect(dialog.getByText('The run will go through Day 12. Play continues from Day 11.')).toBeVisible()
+  await play.click()
+  await expect(page.getByRole('link', { name: 'World', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(options).toHaveText('Day 11 / 12 · Live')
+  await expect(options).toHaveText('Day 12 / 12 · Finished', { timeout: 15000 })
+  await expect.poll(() => savedManualProgress(page)).toEqual({ tick: null, days: Array.from({ length: 12 }, (_, i) => i + 1) })
+  expect(await page.evaluate(() => localStorage.getItem('evolution.active'))).toBe(runId)
+  const after = await board.boundingBox()
+  expect(after.width).toBeCloseTo(before.width, 0)
+  expect(after.height).toBeCloseTo(before.height, 0)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(add).toBeVisible()
+  await add.click()
+  await expect(play).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await page.reload()
+  await expect(options).toHaveText('Day 12 / 12 · Replay')
+  await expect(add).toBeVisible()
+})
+
 test('manual live steps survive reload and worker retry', async ({ page }) => {
   await page.addInitScript(() => {
     const NativeWorker = window.Worker

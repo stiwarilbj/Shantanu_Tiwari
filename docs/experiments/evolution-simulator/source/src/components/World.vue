@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Ellipsis,
-  Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
+  Eye, FastForward, Layers, Pause, Play, Plus, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
 import { boardStyles, defaultBoardColors } from '../board-styles.js'
 import { STATES } from '../engine/simulation.js'
@@ -283,6 +283,10 @@ defineExpose({ select, overhead })
         <div v-else><span>{{ format(speedRange.min) }}</span><span>{{ format(speedRange.max) }}</span></div>
       </div>
       <div v-if="lab.loading" class="stage-note" role="status">Building replay for Day {{ lab.replayDay }}…</div>
+      <button v-if="lab.atScheduleEnd && lab.canExtend && lab.viewing===lab.completed && !lab.loading"
+        type="button" class="primary continue-run" aria-haspopup="dialog" @click="lab.modal='extend'">
+        <Plus :size="16" aria-hidden="true"/> Add generations
+      </button>
       <div class="player">
         <div class="transport" role="group" aria-label="Day playback">
           <button class="icon" aria-label="Previous day" :disabled="lab.viewing<=1 || lab.loading" @click="lab.moveDay(-1)"><ChevronLeft :size="19"/></button>

@@ -397,7 +397,8 @@ onBeforeUnmount(()=>ageDemoController?.abort())
         <button class="secondary" :disabled="ageDemoVisible" :aria-description="ageDemoVisible ? 'Close the age walkthrough to download your run' : undefined" @click="downloadVisibleDays"><Download :size="17"/> Download</button>
         <button class="icon" aria-label="Run again" :disabled="ageDemoVisible" @click="emit('restart')"><RotateCcw :size="17"/></button>
         <button class="icon" aria-label="Reroll seed" :disabled="ageDemoVisible" @click="emit('reroll')"><Dices :size="17"/></button>
-        <button v-if="!lab.extinctDay" class="icon" aria-label="More Generations" :disabled="ageDemoVisible" @click="lab.modal='extend'"><Layers :size="17"/></button>
+        <button v-if="lab.canExtend" type="button" class="secondary" aria-haspopup="dialog"
+          :disabled="ageDemoVisible" @click="lab.modal='extend'"><Layers :size="17" aria-hidden="true"/> Add generations</button>
         <button class="secondary" :disabled="ageDemoVisible || !!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch?'quick-progress':'quick'"><FastForward :size="17"/> {{ lab.batch?'Progress':'Quick Sim' }}</button>
       </div>
     </div>

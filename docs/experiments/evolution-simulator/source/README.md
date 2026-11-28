@@ -9,6 +9,7 @@ Watch blobs look for food, hunt, and have babies as small changes in speed, size
 ## Try it
 
 - **World** shows the simulation as it happens. Use the **1×** button to watch live days and replays up to eight times faster, or use **Quick Sim** to jump ahead. Pick a blob to follow it, or select the extinction tile to watch the ending.
+- At the last scheduled day, choose **Add generations → Add and play** to keep the same run going. It starts with 10 extra days, and you can change that number before continuing.
 - **Adjust living traits** pauses the day so you can change speed, size, or sense range for a group you choose. Under **Playback actions → Adjust living traits**, pick one or more species, search for individual blobs, or narrow the group to blobs in the field or in refuge. Check the preview before applying, then use **Creature Details** in replay to see when the change happened.
 - In **Settings → Basic → Blob Creatures**, choose **New species** or **Duplicate**. Pick a starting preset or open **Customize traits**, then choose **Add to setup**.
 - Use **World → Species → Add to field** to release a new species during a paused day. You can also split a living group or edit a species from the same window. Replays show when blobs arrived or changed, and JSON exports carry that history with the run.
