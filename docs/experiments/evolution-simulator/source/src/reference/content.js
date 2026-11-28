@@ -32,7 +32,7 @@ export const groups = [
       ['World → Simulation field', [
         ['White playing surface', 'This is where blobs move, look for plants, and hunt when the rules allow it. The gray sides below the surface and the dark space outside the board are scenery.'],
         ['Refuge border', 'In runs with a refuge strip, the light-gray border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.'],
-        ['Green plant pellets', 'Each green dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout.'],
+        ['Plant pellets', 'Each dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout. Set their display color in Board appearance.'],
         ['Blob color and size', 'Body color shows species by default. Set your own colors under Settings → Advanced → Styles → Species colors. Color by speed uses a separate palette. Board appearance scales every blob on screen. Open Creature Details for the exact Size trait.'],
         ['Faded or tipped-over blob', 'After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.'],
         ['Camera and selection', 'Drag to rotate the angled view. Scroll or pinch to zoom. Select a blob to follow it, or select empty field to clear the selection. You can also pick a blob by ID in View options → Creatures. Use Fit board if you lose your bearings.'],
@@ -304,7 +304,8 @@ export const groups = [
       ['Settings → Advanced → Styles → Board appearance', [
         ['Blob size', 'Scale how large blobs look on the board from 50–200%. The default is 115%. Their Size trait, spotting range, and movement stay the same.'],
         ['Food size', 'Scale how large food pellets look on the board from 50–200%. The default is 75%. The same rules still decide when a blob can eat.'],
-        ['Reset styles', 'Restore both display sizes. These controls update every board immediately and save your choices in this browser.'],
+        ['Food color', 'Choose the color of food pellets on any board, including replays. The default is green.'],
+        ['Reset styles', 'Restore both display sizes and the default food color. These controls update every board immediately and save your choices in this browser.'],
       ]],
       ['Settings → Advanced → Styles → Species colors', [
         ['Species color picker', 'Choose a display color for each species in this run. It also appears in replays and is saved in this browser. The run’s setup and the Color by speed palette stay the same.'],

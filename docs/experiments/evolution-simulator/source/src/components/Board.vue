@@ -20,6 +20,8 @@ const followedBlob = shallowRef(null)
 const hovered = ref(null)
 const stageColor = '#242424'
 let blobDisplayScale, pelletDisplayScale, pelletHeight, minPelletRadius
+const pelletColor = new THREE.Color()
+let pelletHighlight, pelletShade
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(stageColor)
@@ -265,7 +267,7 @@ function draw3d(blobs, frame, view, { min, max }) {
   }
   frame.plants.forEach((p, i) => {
     const x = p.x - 250, z = p.y - 250
-    write(pellets, i, '#83A51E', x, pelletHeight, z, pelletDisplayScale)
+    write(pellets, i, pelletColor, x, pelletHeight, z, pelletDisplayScale)
     if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8 * pelletDisplayScale, .045, z + .35 * pelletDisplayScale,
       3.2 * pelletDisplayScale, 2.3 * pelletDisplayScale, 1, -Math.PI / 2)
   })
@@ -427,8 +429,8 @@ function draw2d(blobs, frame, view, { min, max }) {
     if (plant) {
       const r = pelletRadius
       const gradient = ctx.createRadialGradient(t.x-r*.3,t.y-r*.4,0,t.x,t.y,r*1.15)
-      gradient.addColorStop(0,'#A9BA4D')
-      gradient.addColorStop(1,'#647D22')
+      gradient.addColorStop(0, pelletHighlight)
+      gradient.addColorStop(1, pelletShade)
       ellipse(t.x,t.y,r,r,gradient)
       continue
     }
@@ -734,11 +736,15 @@ watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,pro
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })
 watch(() => props.active, updateVisibility, { flush:'post' })
-watch(boardStyles, ({ blobSize, foodSize }) => {
+watch(boardStyles, ({ blobSize, foodSize, foodColor }) => {
   blobDisplayScale = blobSize / 100
   pelletDisplayScale = foodSize / 100
   pelletHeight = 2.2 * pelletDisplayScale
   minPelletRadius = foodSize / defaultBoardStyles.foodSize
+  pelletColor.set(foodColor)
+  const defaultGreen = foodColor === defaultBoardStyles.foodColor
+  pelletHighlight = defaultGreen ? '#A9BA4D' : '#' + pelletColor.clone().lerp(new THREE.Color('#fff'), .23).getHexString()
+  pelletShade = defaultGreen ? '#647D22' : '#' + pelletColor.clone().multiplyScalar(.55).getHexString()
   redraw()
 }, { immediate:true })
 onMounted(setupRenderer)

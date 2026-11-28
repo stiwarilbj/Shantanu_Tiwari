@@ -530,13 +530,20 @@ onMounted(()=>dialog.value.showModal())
                   :aria-valuetext="boardStyles[key] + '%'" aria-describedby="board-styles-help"
                   @input="setBoardStyles({ [key]: $event.target.valueAsNumber })">
               </div>
+              <div class="board-color">
+                <label>
+                  <span>Food color</span>
+                  <input type="color" :value="boardStyles.foodColor" aria-describedby="board-styles-help"
+                    @input="setBoardStyles({ foodColor: $event.target.value })">
+                </label>
+              </div>
               <div class="advanced-actions">
                 <button type="button" class="secondary" @click="setBoardStyles(defaultBoardStyles)">Reset styles</button>
               </div>
             </div>
             <div v-else-if="group === 'speciesColors'" class="advanced-block">
               <p class="quiet">Choose display colors for this run and its replays. Changes apply immediately and are saved in this browser. Color by speed uses its own palette.</p>
-              <div v-for="species in appearanceSpecies" :key="species.id" class="board-species-color">
+              <div v-for="species in appearanceSpecies" :key="species.id" class="board-color">
                 <label>
                   <span>{{ species.name }}</span>
                   <input type="color" :aria-label="species.name + ' display color'" :value="boardSpeciesColor(species, lab.run.id)"
