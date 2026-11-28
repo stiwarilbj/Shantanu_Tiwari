@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { boardStyles, defaultBoardStyles } from '../board-styles.js'
+import { boardStyles, defaultBoardColors, defaultBoardStyles } from '../board-styles.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
 import { boardSpeciesColor, starterBlueDisplay } from '../species-colors.js'
@@ -18,13 +18,19 @@ const emit = defineEmits(['select', 'fallback', 'stop-follow'])
 const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
-const stageColor = '#242424'
 let blobDisplayScale, pelletDisplayScale, pelletHeight, minPelletRadius
 const pelletColor = new THREE.Color()
 let pelletHighlight, pelletShade
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(stageColor)
+scene.background = new THREE.Color()
+const surfaceMaterial = new THREE.MeshBasicMaterial()
+const refugeMaterial = new THREE.MeshBasicMaterial()
+const outlineMaterial = new THREE.LineDashedMaterial({ dashSize: 7, gapSize: 5, transparent: true, opacity: .65 })
+const baseFaces = [0x9c9c9c, 0xaaaaaa, 0xcdcdcd, 0x888888, 0xa3a3a3, 0xaaaaaa]
+  .map(shade => ({ shade, material: new THREE.MeshBasicMaterial() }))
+const neutralBaseLight = new THREE.Color(defaultBoardColors.baseColor).r
+let canvasBase
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
 const overhead = new THREE.OrthographicCamera(-350, 350, 350, -350, 1, 4500)
 overhead.up.set(0, 0, -1)
@@ -42,7 +48,6 @@ const cast = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 const radiusGeometry = new THREE.CircleGeometry(1, 32)
-const homeColor = '#E5E5E5'
 const legacyOutlineSize = FIELD - 16
 const meshKinds = {}
 let renderer, canvas, ctx, orbit, resize, raf = null, down, previousFrame, height = 0, width = 0, dirty = true
@@ -74,15 +79,14 @@ function makeContactShadow() {
 }
 
 function placeBoard() {
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(540, 10, 540),
-    ['#9C9C9C','#AAAAAA','#CDCDCD','#888888','#A3A3A3','#AAAAAA'].map(fill => new THREE.MeshBasicMaterial({ color:fill })))
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(540, 10, 540), baseFaces.map(face => face.material))
   slab.position.y = -6
   scene.add(slab)
   const plane = new THREE.PlaneGeometry(FIELD, FIELD)
-  refugeSurface = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: homeColor }))
+  refugeSurface = new THREE.Mesh(plane, refugeMaterial)
   refugeSurface.rotation.x = -Math.PI / 2
   refugeSurface.position.y = -0.8
-  tabletop = new THREE.Mesh(plane, new THREE.MeshBasicMaterial({ color: '#ffffff' }))
+  tabletop = new THREE.Mesh(plane, surfaceMaterial)
   tabletop.rotation.x = -Math.PI / 2
   tabletop.position.y = -0.7
   scene.add(refugeSurface, tabletop)
@@ -93,8 +97,7 @@ function placeBoard() {
   const corners = new THREE.PlaneGeometry(legacyOutlineSize, legacyOutlineSize)
   const edgeGeometry = new THREE.EdgesGeometry(corners)
   corners.dispose()
-  refugeOutline = new THREE.LineSegments(edgeGeometry,
-    new THREE.LineDashedMaterial({ color: '#6C847C', dashSize: 7, gapSize: 5, transparent: true, opacity: .65 }))
+  refugeOutline = new THREE.LineSegments(edgeGeometry, outlineMaterial)
   refugeOutline.rotation.x = -Math.PI / 2
   refugeOutline.position.y = 0.05
   refugeOutline.computeLineDistances()
@@ -357,7 +360,8 @@ function softShadow(x,y,rx,ry) {
 }
 
 function draw2d(blobs, frame, view, { min, max }) {
-  ctx.fillStyle = stageColor
+  const { backdropColor, surfaceColor, refugeColor, refugeOutlineColor } = boardStyles
+  ctx.fillStyle = backdropColor
   ctx.fillRect(0, 0, width, height)
   const p = (x,y,z) => project(x, y, z, view)
   const projectFace = points => projectPolygon(points, view)
@@ -365,19 +369,19 @@ function draw2d(blobs, frame, view, { min, max }) {
   const top = corners(270, -1), bottom = corners(270, -11)
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4
-    polygon(projectFace([top[i],top[j],bottom[j],bottom[i]]), i % 2 ? '#969696' : '#AAAAAA')
+    polygon(projectFace([top[i],top[j],bottom[j],bottom[i]]), canvasBase[i % 2])
   }
-  polygon(projectFace(top), '#CDCDCD')
+  polygon(projectFace(top), canvasBase[2])
   const refugeWidth = frame.refugeWidth ?? 0
   const interior = FIELD / 2 - refugeWidth
-  polygon(projectFace(corners(FIELD / 2)), refugeWidth ? homeColor : '#FFFFFF')
+  polygon(projectFace(corners(FIELD / 2)), refugeWidth ? refugeColor : surfaceColor)
   ctx.save()
   ctx.clip()
-  if (refugeWidth) polygon(projectFace(corners(interior)), '#FFFFFF')
+  if (refugeWidth) polygon(projectFace(corners(interior)), surfaceColor)
   const eligible = b => !props.layers?.selected || b.id === props.selected
   if (props.layers?.homes) {
     const points = projectFace(corners(refugeWidth ? interior : legacyOutlineSize / 2))
-    ctx.strokeStyle = '#6C847C'
+    ctx.strokeStyle = refugeOutlineColor
     ctx.setLineDash([4,3])
     polygonPath(points)
     ctx.stroke()
@@ -713,7 +717,7 @@ function setupRenderer() {
     renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false, powerPreference:'high-performance' })
     renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.localClippingEnabled = true
-    renderer.setClearColor(stageColor)
+    renderer.setClearColor(boardStyles.backdropColor)
     canvas = renderer.domElement
     canvas.addEventListener('webglcontextlost', useCanvasFallback, { once:true })
   } catch {
@@ -736,7 +740,21 @@ watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,pro
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })
 watch(() => props.active, updateVisibility, { flush:'post' })
-watch(boardStyles, ({ blobSize, foodSize, foodColor }) => {
+watchEffect(() => {
+  const { backdropColor, surfaceColor, refugeColor, refugeOutlineColor, baseColor } = boardStyles
+  scene.background.set(backdropColor)
+  surfaceMaterial.color.set(surfaceColor)
+  refugeMaterial.color.set(refugeColor)
+  outlineMaterial.color.set(refugeOutlineColor)
+  // Tint the original face shading so the base keeps its depth.
+  const base = new THREE.Color(baseColor)
+  const tint = shade => base.clone().multiplyScalar(new THREE.Color(shade).r / neutralBaseLight)
+  for (const { shade, material } of baseFaces) material.color.copy(tint(shade))
+  canvasBase = [0xaaaaaa, 0x969696, 0xcdcdcd].map(shade => '#' + tint(shade).getHexString())
+  redraw()
+})
+watchEffect(() => {
+  const { blobSize, foodSize, foodColor } = boardStyles
   blobDisplayScale = blobSize / 100
   pelletDisplayScale = foodSize / 100
   pelletHeight = 2.2 * pelletDisplayScale
@@ -746,7 +764,7 @@ watch(boardStyles, ({ blobSize, foodSize, foodColor }) => {
   pelletHighlight = defaultGreen ? '#A9BA4D' : '#' + pelletColor.clone().lerp(new THREE.Color('#fff'), .23).getHexString()
   pelletShade = defaultGreen ? '#647D22' : '#' + pelletColor.clone().multiplyScalar(.55).getHexString()
   redraw()
-}, { immediate:true })
+})
 onMounted(setupRenderer)
 onBeforeUnmount(() => {
   stopDrawing()

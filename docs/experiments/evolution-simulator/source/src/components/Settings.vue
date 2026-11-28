@@ -18,7 +18,7 @@ import NumberField from './NumberField.vue'
 import SpeciesFields from './SpeciesFields.vue'
 import StartingTerritories from './StartingTerritories.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
-import { boardStyles, boardStyleRange, defaultBoardStyles, setBoardStyles, setSpeciesColorOverride } from '../board-styles.js'
+import { boardStyles, boardStyleRange, defaultBoardColors, defaultBoardStyles, setBoardStyles, setSpeciesColorOverride } from '../board-styles.js'
 
 const lab = useLab()
 const draft = lab.draft
@@ -59,10 +59,14 @@ const categories = [
   { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting', foodWeb: 'Species food web' } },
   { label: 'Life cycle', topics: { reproduction: 'Reproduction', inheritance: 'Inheritance & mutation', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
-  { label: 'Styles', topics: { boardStyles: 'Board appearance', speciesColors: 'Species colors' } },
+  { label: 'Styles', topics: { boardStyles: 'Board appearance', boardColors: 'Board colors', speciesColors: 'Species colors' } },
 ]
 const category = computed(() => categories.find(item => Object.hasOwn(item.topics, group.value)))
 const styleLabels = { blobSize: 'Blob size', foodSize: 'Food size' }
+const boardColorLabels = {
+  surfaceColor: 'Playing surface', refugeColor: 'Refuge border', baseColor: 'Board base',
+  backdropColor: 'Backdrop', refugeOutlineColor: 'Refuge outline',
+}
 const appearanceSpecies = computed(() => {
   const { setup, revisions } = lab.run
   const frame = lab.frame
@@ -539,6 +543,18 @@ onMounted(()=>dialog.value.showModal())
               </div>
               <div class="advanced-actions">
                 <button type="button" class="secondary" @click="setBoardStyles(defaultBoardStyles)">Reset styles</button>
+              </div>
+            </div>
+            <div v-else-if="group === 'boardColors'" class="advanced-block">
+              <p class="quiet">These colors apply to all boards and are saved in this browser. The dashed refuge outline appears when Show refuges is on.</p>
+              <div v-for="(label, key) in boardColorLabels" :key="key" class="board-color">
+                <label>
+                  <span>{{ label }}</span>
+                  <input type="color" :value="boardStyles[key]" @input="setBoardStyles({ [key]: $event.target.value })">
+                </label>
+              </div>
+              <div class="advanced-actions">
+                <button type="button" class="secondary" @click="setBoardStyles(defaultBoardColors)">Reset board colors</button>
               </div>
             </div>
             <div v-else-if="group === 'speciesColors'" class="advanced-block">

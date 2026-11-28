@@ -30,8 +30,8 @@ export const groups = [
     title: 'Reading the board',
     sections: [
       ['World → Simulation field', [
-        ['White playing surface', 'This is where blobs move, look for plants, and hunt when the rules allow it. The gray sides below the surface and the dark space outside the board are scenery.'],
-        ['Refuge border', 'In runs with a refuge strip, the light-gray border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.'],
+        ['Playing surface', 'This is where blobs move, look for plants, and hunt when the rules allow it. Change the surface, sides, and space around the board under Settings → Advanced → Styles → Board colors.'],
+        ['Refuge border', 'In runs with a refuge strip, the border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.'],
         ['Plant pellets', 'Each dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout. Set their display color in Board appearance.'],
         ['Blob color and size', 'Body color shows species by default. Set your own colors under Settings → Advanced → Styles → Species colors. Color by speed uses a separate palette. Board appearance scales every blob on screen. Open Creature Details for the exact Size trait.'],
         ['Faded or tipped-over blob', 'After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.'],
@@ -306,6 +306,12 @@ export const groups = [
         ['Food size', 'Scale how large food pellets look on the board from 50–200%. The default is 75%. The same rules still decide when a blob can eat.'],
         ['Food color', 'Choose the color of food pellets on any board, including replays. The default is green.'],
         ['Reset styles', 'Restore both display sizes and the default food color. These controls update every board immediately and save your choices in this browser.'],
+      ]],
+      ['Settings → Advanced → Styles → Board colors', [
+        ['Playing surface and Refuge border', 'Recolor the playable field and the home strip around it. The size and rules of the refuge stay the same.'],
+        ['Board base and Backdrop', 'Choose colors for the rim and sides of the board and for the space around it.'],
+        ['Refuge outline', 'Set the color of the dashed boundary shown when Layers → More layer options → Show refuges is on.'],
+        ['Reset board colors', 'Restore the tabletop palette. Food and species colors keep their settings.'],
       ]],
       ['Settings → Advanced → Styles → Species colors', [
         ['Species color picker', 'Choose a display color for each species in this run. It also appears in replays and is saved in this browser. The run’s setup and the Color by speed palette stay the same.'],

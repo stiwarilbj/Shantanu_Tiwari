@@ -5507,6 +5507,58 @@ test('board styles persist separately from simulation settings @pages', async ({
   await expect(foodColor).toHaveValue('#83a51e')
 })
 
+test('board colors render on the field and reset independently @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page)
+  const openStyles = async topic => {
+    await page.getByRole('button', { name: 'Simulation Settings' }).click()
+    await advancedSettings(page, topic)
+  }
+  const stage = page.getByRole('region', { name: 'Simulation field' })
+  const canvas = stage.locator('canvas.world-canvas')
+  await page.getByRole('button', { name: 'View options' }).click()
+  await page.getByRole('button', { name: /^Overhead/ }).click()
+  await openStyles('Board appearance')
+  const food = page.getByLabel('Food color', { exact: true })
+  await food.fill('#d420d4')
+  await advancedSettings(page, 'Board colors')
+  const palette = [
+    ['Playing surface', '#ffffff', '#68b570'],
+    ['Refuge border', '#e5e5e5', '#c89342'],
+    ['Board base', '#aaaaaa', '#614a9c'],
+    ['Backdrop', '#242424', '#202851'],
+    ['Refuge outline', '#6c847c', '#ef198b'],
+  ]
+  for (const [label, original, custom] of palette) {
+    const input = page.getByLabel(label, { exact: true })
+    await expect(input).toHaveValue(original)
+    await input.fill(custom)
+  }
+  await expect(page.getByText('Draft has changes')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Close settings' }).press('Enter')
+  await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Ready')
+  await expect(stage).toHaveCSS('background-color', 'rgb(32, 40, 81)')
+  const painted = { sides: [200, 200, 200, 200], corners: [200, 200, 200, 200], interior: 104 }
+  await expect.poll(() => fieldColors(page, canvas)).toEqual(painted)
+  const switched = await canvas.evaluate(element => {
+    const extension = element.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+    extension?.loseContext()
+    return !!extension
+  })
+  expect(switched).toBe(true)
+  await expect(page.getByText('Canvas view', { exact: true })).toBeVisible()
+  await expect.poll(() => fieldColors(page, canvas)).toEqual(painted)
+
+  await page.setViewportSize({ width: 390, height: 720 })
+  await page.reload()
+  await openStyles('Board colors')
+  for (const [label, , custom] of palette) await expect(page.getByLabel(label, { exact: true })).toHaveValue(custom)
+  await page.getByRole('button', { name: 'Reset board colors' }).press('Enter')
+  for (const [label, original] of palette) await expect(page.getByLabel(label, { exact: true })).toHaveValue(original)
+  await advancedSettings(page, 'Board appearance')
+  await expect(food).toHaveValue('#d420d4')
+})
+
 test('species display colors are independent and saved for the current run @pages', async ({ page }) => {
   await openSimulator(page)
   await startRun(page)

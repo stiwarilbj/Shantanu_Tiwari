@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
+import { boardStyles, defaultBoardColors } from '../board-styles.js'
 import { STATES } from '../engine/simulation.js'
 import { foodSupplyForDay, rulesFor, usesWalkthroughForaging } from '../engine/config.js'
 import { DECISION, tracksForagingDecisions } from '../engine/foraging-decisions.js'
@@ -225,7 +226,8 @@ defineExpose({ select, overhead })
 </script>
 <template>
   <main ref="surface" class="world" :class="{ 'is-following':lab.following, 'is-overhead':camera==='overhead', 'is-replay':replayCanSeek }" tabindex="-1" @keydown="shortcuts">
-    <section class="stage" aria-label="Simulation field">
+    <section class="stage" aria-label="Simulation field" :style="{ '--board-backdrop': boardStyles.backdropColor }"
+      :class="{ 'custom-backdrop': boardStyles.backdropColor !== defaultBoardColors.backdropColor }">
       <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :style-run="lab.run.id" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"

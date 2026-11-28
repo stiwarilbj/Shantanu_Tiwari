@@ -3,6 +3,11 @@ import { reactive, readonly } from 'vue'
 const storageKey = 'evolution-simulator:board-styles'
 export const boardStyleRange = { min: 50, max: 200, step: 5 }
 export const defaultBoardStyles = { blobSize: 115, foodSize: 75, foodColor: '#83a51e' }
+export const defaultBoardColors = {
+  surfaceColor: '#ffffff', refugeColor: '#e5e5e5', baseColor: '#aaaaaa',
+  backdropColor: '#242424', refugeOutlineColor: '#6c847c',
+}
+const colorDefaults = { foodColor: defaultBoardStyles.foodColor, ...defaultBoardColors }
 const validColor = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
 
 function validSize(value) {
@@ -22,7 +27,8 @@ const saved = readStyles()
 const styles = reactive({
   blobSize: validSize(saved.blobSize) ? saved.blobSize : defaultBoardStyles.blobSize,
   foodSize: validSize(saved.foodSize) ? saved.foodSize : defaultBoardStyles.foodSize,
-  foodColor: validColor(saved.foodColor) ? saved.foodColor.toLowerCase() : defaultBoardStyles.foodColor,
+  ...Object.fromEntries(Object.entries(colorDefaults).map(([key, fallback]) =>
+    [key, validColor(saved[key]) ? saved[key].toLowerCase() : fallback])),
 })
 export const boardStyles = readonly(styles)
 const colorKey = (runId, speciesId) => JSON.stringify([runId, speciesId])
@@ -42,7 +48,9 @@ export function setBoardStyles(update) {
   for (const key of ['blobSize', 'foodSize']) {
     if (validSize(update[key])) styles[key] = update[key]
   }
-  if (validColor(update.foodColor)) styles.foodColor = update.foodColor.toLowerCase()
+  for (const key of Object.keys(colorDefaults)) {
+    if (validColor(update[key])) styles[key] = update[key].toLowerCase()
+  }
   saveStyles()
 }
 
