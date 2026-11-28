@@ -531,8 +531,13 @@ function draw(now, revealed = false) {
       const distance = Math.max(close ? 30 : props.tabletop ? 100 : 84, blob.r * 6)
       const lookAhead = clamp((width - 270) / 48, 0, 20)
       if (props.tabletop) {
-        position.set(x-distance*(.87*c+.49*s),Math.max(39,blob.r*3.1),z-distance*(.87*s-.49*c))
-        aim.set(x,Math.max(11,blob.r*1.65),z)
+        // Leave enough of the field in front of the camera when following a blob near a refuge.
+        const limit = FIELD / 2 - (frame.refugeWidth ?? 0) - 60
+        const eyeX = x - distance * (.87*c + .49*s)
+        const eyeZ = z - distance * (.87*s - .49*c)
+        position.set(clamp(eyeX, -limit, limit), Math.max(39, blob.r * 3.1), clamp(eyeZ, -limit, limit))
+        const inset = Math.hypot(eyeX - position.x, eyeZ - position.z)
+        aim.set(x, Math.max(11, blob.r * 1.65) - Math.min(11, inset / 4), z)
       } else {
         position.set(x+distance*(.19*c+.98*s),Math.max(close ? 21 : 32,blob.r*3.1),z+distance*(.19*s-.98*c))
         aim.set(x+c*(close ? 2 : lookAhead),Math.max(close ? 2 : 13,blob.r*1.65),z+s*(close ? 2 : lookAhead))

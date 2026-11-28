@@ -732,6 +732,57 @@ test('Canvas keeps the near side of the tabletop white when zooming @pages', asy
   expect(errors).toEqual([])
 })
 
+test('following a creature at the edge keeps the field below it in both renderers @pages', async ({ page }) => {
+  await page.setViewportSize({ width:1440, height:900 })
+  await page.emulateMedia({ reducedMotion:'reduce' })
+  await openSimulator(page)
+  const replay = page.getByRole('slider', { name:'Replay time' })
+  await replay.fill('0')
+  await page.getByRole('button', { name:'View options' }).click()
+  await page.getByRole('button', { name:'Creatures', exact:true }).click()
+  const details = page.getByRole('complementary', { name:'Creature details' })
+  await details.getByRole('combobox', { name:'Creature', exact:true }).selectOption('4')
+  await details.getByRole('button', { name:'Close creature details' }).click()
+  await expect(page.getByRole('button', { name:'Current creature details · Blue · #4' })).toBeVisible()
+
+  const canvas = page.locator('canvas.world-canvas')
+  const framing = async () => {
+    const screenshot = await canvas.screenshot({ scale:'css' })
+    return page.evaluate(async encoded => {
+      const image = new Image()
+      image.src = 'data:image/png;base64,' + encoded
+      await image.decode()
+      const surface = document.createElement('canvas')
+      surface.width = image.width
+      surface.height = image.height
+      const ctx = surface.getContext('2d')
+      ctx.drawImage(image, 0, 0)
+      const band = y => [.32,.5,.68].map(x => {
+        const pixels = ctx.getImageData(Math.round(x * image.width) - 5, Math.round(y * image.height) - 5, 11, 11).data
+        return Array.from({ length:121 }, (_, i) => pixels[i * 4]).sort((a,b) => a - b)[60]
+      })
+      return { darkAbove:band(.32).every(tone => tone < 55), whiteBelow:band(.84).every(tone => tone > 245) }
+    }, screenshot.toString('base64'))
+  }
+
+  const checkViewports = async () => {
+    for (const viewport of [{ width:1440, height:900 }, { width:390, height:844 }]) {
+      await page.setViewportSize(viewport)
+      await expect.poll(framing).toEqual({ darkAbove:true, whiteBelow:true })
+    }
+  }
+  await expect(page.getByText('Canvas view', { exact:true })).toHaveCount(0)
+  await checkViewports()
+  const lost = await canvas.evaluate(element => {
+    const extension = element.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+    extension?.loseContext()
+    return !!extension
+  })
+  expect(lost).toBe(true)
+  await expect(page.getByText('Canvas view', { exact:true })).toBeVisible()
+  await checkViewports()
+})
+
 test('World suspends its hidden board and restores the current view @pages', async ({ page }) => {
   await page.addInitScript(() => {
     const activity = window.worldBoardActivity = { callbacks:0, measurements:0, paints:0 }
