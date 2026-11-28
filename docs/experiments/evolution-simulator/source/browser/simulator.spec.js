@@ -783,6 +783,88 @@ test('following a creature at the edge keeps the field below it in both renderer
   await checkViewports()
 })
 
+test('the World camera moves with arrow keys while replay controls keep their own shortcuts @pages', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion:'reduce' })
+  await openSimulator(page)
+  const replay = page.getByRole('slider', { name:'Replay time' })
+  await replay.fill('0')
+  const board = page.getByRole('group', { name:'Board camera' })
+  const canvas = board.locator('canvas')
+  const view = page.getByRole('button', { name:'View options' })
+  await view.click()
+  await page.getByRole('button', { name:'Overhead', exact:true }).click()
+  await page.locator('#main-surface').focus()
+  await page.keyboard.press('Tab')
+  await expect(board).toBeFocused()
+  await replay.focus()
+  await canvas.click({ position:{ x:40, y:200 } })
+  await expect(board).toBeFocused()
+
+  const whiteEdges = async () => {
+    const screenshot = await canvas.screenshot({ scale:'css' })
+    return page.evaluate(async encoded => {
+      const image = new Image()
+      image.src = 'data:image/png;base64,' + encoded
+      await image.decode()
+      const surface = document.createElement('canvas')
+      surface.width = image.width
+      surface.height = image.height
+      const ctx = surface.getContext('2d')
+      ctx.drawImage(image, 0, 0)
+      const row = ctx.getImageData(0, Math.floor(image.height / 2), image.width, 1).data
+      const column = ctx.getImageData(Math.floor(image.width / 2), 0, 1, image.height).data
+      function edge(pixels) {
+        for (let i = 0; i < pixels.length - 16; i += 4) {
+          if ([0,4,8,12,16].every(offset => pixels[i + offset] === 255)) return i / 4
+        }
+        return -1
+      }
+      return { x:edge(row), y:edge(column) }
+    }, screenshot.toString('base64'))
+  }
+  const origin = await whiteEdges()
+  expect(origin.x).toBeGreaterThan(10)
+  expect(origin.y).toBeGreaterThan(50)
+  await board.press('ArrowRight')
+  await expect.poll(async () => (await whiteEdges()).x).toBeLessThan(origin.x - 10)
+  await board.press('ArrowLeft')
+  await expect.poll(whiteEdges).toEqual(origin)
+  await board.press('ArrowUp')
+  await expect.poll(async () => (await whiteEdges()).y).toBeGreaterThan(origin.y + 10)
+  await board.press('ArrowDown')
+  await expect.poll(whiteEdges).toEqual(origin)
+
+  await replay.press('ArrowRight')
+  await expect(replay).not.toHaveValue('0')
+  await dayTile(page, 1).press('ArrowRight')
+  await expect(page.locator('.day-tile[data-day="2"]')).toBeFocused()
+  await expect.poll(whiteEdges).toEqual(origin)
+
+  const follow = page.getByRole('button', { name:'Follow creature' })
+  await follow.click()
+  await expect(follow).toHaveAttribute('aria-pressed', 'true')
+  await board.press('ArrowUp')
+  await expect(follow).toHaveAttribute('aria-pressed', 'false')
+  await view.click()
+  await page.getByRole('button', { name:'Fit board' }).click()
+  await view.click()
+  await page.getByRole('button', { name:'Overhead', exact:true }).click()
+  await expect.poll(whiteEdges).toEqual(origin)
+
+  await board.press('ArrowRight')
+  await expect.poll(async () => (await whiteEdges()).x).toBeLessThan(origin.x - 10)
+  const lost = await canvas.evaluate(element => {
+    const extension = element.getContext('webgl2')?.getExtension('WEBGL_lose_context')
+    extension?.loseContext()
+    return !!extension
+  })
+  expect(lost).toBe(true)
+  await expect(page.getByText('Canvas view', { exact:true })).toBeVisible()
+  await expect(board).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect.poll(async () => Math.abs((await whiteEdges()).x - origin.x)).toBeLessThan(3)
+})
+
 test('World suspends its hidden board and restores the current view @pages', async ({ page }) => {
   await page.addInitScript(() => {
     const activity = window.worldBoardActivity = { callbacks:0, measurements:0, paints:0 }

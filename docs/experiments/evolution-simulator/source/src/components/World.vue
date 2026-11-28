@@ -229,7 +229,7 @@ defineExpose({ select, overhead })
       <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
-        @select="select" @fallback="fallback=true"/>
+        @select="select" @stop-follow="lab.following=false" @fallback="fallback=true"/>
       <div class="view-tools">
         <button ref="speciesButton" type="button" class="secondary world-species-button" aria-description="Add or edit blob species" aria-haspopup="dialog"
           :disabled="!lab.canChangeSpecies && !lab.replay" @click="lab.openSpecies()">Species</button>

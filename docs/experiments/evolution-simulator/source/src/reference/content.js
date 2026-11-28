@@ -36,6 +36,7 @@ export const groups = [
         ['Blob color and size', 'Body color shows species by default. Color by speed replaces it with a speed scale. A larger blob usually has a larger Size trait. Open Creature Details for the exact value.'],
         ['Faded or tipped-over blob', 'After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.'],
         ['Camera and selection', 'Drag to rotate the angled view. Scroll or pinch to zoom. Select a blob to follow it, or select empty field to clear the selection. You can also pick a blob by ID in View options → Creatures. Use Fit board if you lose your bearings.'],
+        ['Arrow-key movement', 'Click the World board or Tab to Board camera. Up and Down move forward and back, while Left and Right move sideways. Moving with the keys stops following a blob.'],
         ['Teal ring or red outline', 'When visible, a teal ring marks the selected blob. A red outline marks the blob under the mouse.'],
       ]],
       ['World → Signs and readouts on the board', [

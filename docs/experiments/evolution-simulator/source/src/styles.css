@@ -76,6 +76,7 @@ small{font-size:.84em}
 .world:fullscreen{width:100%;height:100%;background:var(--stage)}
 .stage{position:relative;flex:1;min-height:0;background:var(--stage);isolation:isolate;container-type:size}
 .board{position:absolute;inset:0;overflow:hidden}
+.board:focus-visible{outline-offset:-3px}
 .board canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 .board canvas:active{cursor:grabbing}
 .is-overhead .stage>.board{inset:min(var(--overhead-top,65px),55cqh) 0 min(40px,20cqh)}

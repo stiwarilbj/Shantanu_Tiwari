@@ -13,7 +13,7 @@ const props = defineProps({
   playbackRun: String, liveRate: Number, liveFinished: Boolean,
   active: { type: Boolean, default: true }
 })
-const emit = defineEmits(['select', 'fallback'])
+const emit = defineEmits(['select', 'fallback', 'stop-follow'])
 const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
@@ -28,6 +28,7 @@ overhead.up.set(0, 0, -1)
 overhead.position.set(0, 1000, 0)
 overhead.lookAt(0, 0, 0)
 const target = new THREE.Vector3(), aim = new THREE.Vector3(), position = new THREE.Vector3()
+const pan = new THREE.Vector3()
 const originalPosition = new THREE.Vector3(), originalTarget = new THREE.Vector3()
 const stamp = new THREE.Object3D(), color = new THREE.Color()
 // Sample the original Lab gradient, including its middle tones.
@@ -507,6 +508,35 @@ function resetView() {
   fit()
   camera.position.copy(originalPosition)
   target.copy(originalTarget)
+  overhead.position.set(0, 1000, 0)
+  dirty = true
+}
+
+function moveCamera(event) {
+  if (!props.tabletop || !props.active || !props.frame || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  const { key } = event
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return
+  event.preventDefault()
+
+  const above = props.camera === 'overhead'
+  const center = above ? overhead.position : target
+  const step = above ? FIELD / 20 : clamp(camera.position.distanceTo(target) * .035, 3, 32)
+  if (above) pan.copy(overhead.up)
+  else pan.subVectors(target, camera.position).setY(0).normalize()
+  if (key === 'ArrowLeft' || key === 'ArrowRight') pan.cross(camera.up)
+  if (key === 'ArrowLeft' || key === 'ArrowDown') pan.negate()
+  pan.multiplyScalar(step)
+
+  const edge = FIELD / 2
+  pan.x = clamp(center.x + pan.x, -edge, edge) - center.x
+  pan.z = clamp(center.z + pan.z, -edge, edge) - center.z
+  center.add(pan)
+  if (!above) {
+    camera.position.add(pan)
+    manual = true
+    followed = false
+    if (props.follow) emit('stop-follow')
+  }
   dirty = true
 }
 
@@ -616,7 +646,10 @@ function hit(event) {
   return bodyIds[cast.intersectObject(pickBody)[0]?.instanceId] ?? null
 }
 
-function pointerDown(event) { down = { x:event.clientX,y:event.clientY, id:hit(event) } }
+function pointerDown(event) {
+  if (props.tabletop && event.button === 0 && event.pointerType !== 'touch') host.value.focus({ preventScroll:true })
+  down = { x:event.clientX,y:event.clientY, id:hit(event) }
+}
 function pointerUp(event) {
   if (!down || event.button !== 0) return
   if (Math.hypot(event.clientX-down.x,event.clientY-down.y) <= (event.pointerType === 'touch' ? 10 : 5)) {
@@ -718,7 +751,10 @@ onBeforeUnmount(() => {
 defineExpose({ fit:resetView })
 </script>
 <template>
-  <div ref="host" class="board">
+  <div ref="host" class="board" :tabindex="tabletop ? 0 : undefined" :role="tabletop ? 'group' : undefined"
+    :aria-label="tabletop ? 'Board camera' : undefined"
+    :aria-keyshortcuts="tabletop ? 'ArrowUp ArrowDown ArrowLeft ArrowRight' : undefined"
+    :aria-description="tabletop ? 'Use the arrow keys to move around the field.' : undefined" @keydown.self="moveCamera">
     <svg v-if="followedBlob && layers?.vision" class="vision-mask" :class="{ 'close-vision':props.camera==='close' }" aria-hidden="true">
       <path ref="visionMask" fill-rule="evenodd" transform="translate(42 42)"/>
     </svg>
