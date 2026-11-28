@@ -33,7 +33,7 @@ export const groups = [
         ['White playing surface', 'This is where blobs move, look for plants, and hunt when the rules allow it. The gray sides below the surface and the dark space outside the board are scenery.'],
         ['Refuge border', 'In runs with a refuge strip, the light-gray border on the top surface is home. Blobs that settle there stop moving for the day and are safe from hunting. To trace the boundary, open Layers → More layer options → Show refuges.'],
         ['Green plant pellets', 'Each green dot is a plant a blob can eat if its diet allows it. The dot disappears when eaten. A new supply spawns at dawn, either scattered or in patches, depending on Field layout.'],
-        ['Blob color and size', 'Body color shows species by default. Color by speed replaces it with a speed scale. A larger blob usually has a larger Size trait. Open Creature Details for the exact value.'],
+        ['Blob color and size', 'Body color shows species by default. Color by speed replaces it with a speed scale. Board appearance scales every blob on screen. Open Creature Details for the exact Size trait.'],
         ['Faded or tipped-over blob', 'After a blob dies, it briefly appears faded and can tip over in the angled view. Check Creature Details → Filter creature events → Deaths to see what happened.'],
         ['Camera and selection', 'Drag to rotate the angled view. Scroll or pinch to zoom. Select a blob to follow it, or select empty field to clear the selection. You can also pick a blob by ID in View options → Creatures. Use Fit board if you lose your bearings.'],
         ['Arrow-key movement', 'Click the World board or Tab to Board camera. Up and Down move forward and back, while Left and Right move sideways. Moving with the keys stops following a blob.'],
@@ -294,6 +294,17 @@ export const groups = [
       ['Settings → Advanced → Run & charts → Graph predictions', [
         ['Show predictions', 'Show or hide dashed future values on supported charts and the generation timeline. The chart needs at least three completed days in a row. Predictions use the seed and scheduled rules. Past the run limit, they are labeled If extended.'],
         ['Cycles ahead', 'Choose 1–25 generations to predict. Press Enter or leave the field to save a valid number. This display preference applies immediately.'],
+      ]],
+    ],
+  },
+  {
+    id: 'styles',
+    title: 'Advanced · Styles',
+    sections: [
+      ['Settings → Advanced → Styles → Board appearance', [
+        ['Blob size', 'Scale how large blobs look on the board from 50–200%. The default is 115%. Their Size trait, spotting range, and movement stay the same.'],
+        ['Food size', 'Scale how large food pellets look on the board from 50–200%. The default is 75%. The same rules still decide when a blob can eat.'],
+        ['Reset styles', 'Restore both display sizes. These controls update every board immediately and save your choices in this browser.'],
       ]],
     ],
   },

@@ -2,6 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { boardStyles, defaultBoardStyles } from '../board-styles.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
 import { speciesDisplayColor, starterBlueDisplay } from '../species-colors.js'
@@ -18,10 +19,8 @@ const host = ref(null), cloud = ref(null), visionMask = ref(null)
 const followedBlob = shallowRef(null)
 const hovered = ref(null)
 const stageColor = '#242424'
-const blobDisplayScale = 1.15
+let blobDisplayScale, pelletDisplayScale, pelletHeight, minPelletRadius
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
-const pelletDisplayScale = .75
-const pelletHeight = 2.2 * pelletDisplayScale
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(stageColor)
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
@@ -398,7 +397,7 @@ function draw2d(blobs, frame, view, { min, max }) {
     const q = p(x,0,z), t = p(x,pelletHeight,z)
     if (!inDepthRange(q) || !inDepthRange(t)) continue
     const edge = p(x+2*pelletDisplayScale,pelletHeight,z)
-    const r = clamp(Math.hypot(t.x-edge.x, t.y-edge.y), 1, 8 * pelletDisplayScale)
+    const r = clamp(Math.hypot(t.x-edge.x, t.y-edge.y), minPelletRadius, 8 * pelletDisplayScale)
     plants.push({ plant, q, t, r })
   }
   if (!simple) plants.forEach(({q,r}) => softShadow(q.x+r*.38,q.y+r*.08,r*1.65,r*(overheadView?1.15:.54)))
@@ -734,6 +733,13 @@ watch(() => [props.layers,props.camera,props.follow,props.selected,props.dim,pro
 watch(() => props.camera, () => { manual = false; fit() })
 watch(() => props.quality, () => { if (canvas) fit() })
 watch(() => props.active, updateVisibility, { flush:'post' })
+watch(boardStyles, ({ blobSize, foodSize }) => {
+  blobDisplayScale = blobSize / 100
+  pelletDisplayScale = foodSize / 100
+  pelletHeight = 2.2 * pelletDisplayScale
+  minPelletRadius = foodSize / defaultBoardStyles.foodSize
+  redraw()
+}, { immediate:true })
 onMounted(setupRenderer)
 onBeforeUnmount(() => {
   stopDrawing()

@@ -550,6 +550,9 @@ th{color:var(--muted);font-size:13px}td{font:14px var(--mono)}th:first-child,td:
 .foraging-preview{display:grid;gap:4px;padding:8px 10px;border-left:2px solid var(--teal);background:var(--subtle)}
 .advanced-select{display:flex;justify-content:space-between;align-items:center;gap:6px 14px;flex-wrap:wrap;color:var(--cream)}
 .forecast-cycles input{width:5rem;padding:6px 8px}
+.board-style-scale{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;color:var(--cream)}
+.board-style-scale span{font-family:var(--mono)}
+.board-style-scale input{grid-column:1 / -1;width:100%;min-height:36px;margin:0}
 .advanced-actions{display:flex;gap:8px}
 .advanced-block .number-shell{grid-template-columns:minmax(0,1fr) minmax(60px,32%) 65px}
 .advanced-block .number-shell input{min-width:0}

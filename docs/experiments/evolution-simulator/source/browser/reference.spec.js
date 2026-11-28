@@ -18,6 +18,9 @@ test('opens the controls reference from About and finds an advanced setting', as
   await expect(behavior.getByText('Plant memory (seconds)', { exact: true })).toBeVisible()
   await expect(page.locator('#field-food')).toBeHidden()
 
+  await input.fill('board appearance food size')
+  await expect(page.locator('#styles').getByText('Food size', { exact: true })).toBeVisible()
+
   await input.fill('zzneverfound')
   await expect(page.getByText(/^No matches/)).toBeVisible()
   await page.getByRole('button', { name: 'Clear', exact: true }).press('Enter')

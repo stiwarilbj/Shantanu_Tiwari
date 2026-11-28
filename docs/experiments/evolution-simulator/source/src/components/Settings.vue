@@ -18,6 +18,7 @@ import NumberField from './NumberField.vue'
 import SpeciesFields from './SpeciesFields.vue'
 import StartingTerritories from './StartingTerritories.vue'
 import { forecastPreferences, maxForecastCycles, setForecastPreferences, validForecastCycles } from '../forecast-preferences.js'
+import { boardStyles, boardStyleRange, defaultBoardStyles, setBoardStyles } from '../board-styles.js'
 
 const lab = useLab()
 const draft = lab.draft
@@ -58,8 +59,10 @@ const categories = [
   { label: 'Creature behavior', topics: { movement: 'Movement and energy', foraging: 'Foraging decisions', hunting: 'Hunting', foodWeb: 'Species food web' } },
   { label: 'Life cycle', topics: { reproduction: 'Reproduction', inheritance: 'Inheritance & mutation', aging: 'Aging and lifespan' } },
   { label: 'Run & charts', topics: { duration: 'Day length', predictions: 'Graph predictions' } },
+  { label: 'Styles', topics: { boardStyles: 'Board appearance' } },
 ]
 const category = computed(() => categories.find(item => Object.hasOwn(item.topics, group.value)))
+const styleLabels = { blobSize: 'Blob size', foodSize: 'Food size' }
 const forecastCycles = ref(String(forecastPreferences.cycles))
 const forecastCyclesValid = computed(() => validForecastCycles(Number(forecastCycles.value)))
 function commitForecastCycles(event) {
@@ -512,6 +515,19 @@ onMounted(()=>dialog.value.showModal())
               </label>
               <small v-if="!forecastCyclesValid" id="forecast-error" class="issue">Enter a whole number from 1 to {{ maxForecastCycles }}.</small>
               <p id="forecast-help" class="quiet">Dashed lines preview what this seed and its scheduled rules produce after the last visible generation. Show at least three completed generations in a row to see predictions. Days past the run limit are marked “If extended”.</p>
+            </div>
+            <div v-else-if="group === 'boardStyles'" class="advanced-block">
+              <p id="board-styles-help" class="quiet">Changes how blobs and food look on all boards. Creature traits and feeding rules stay the same. Changes apply immediately and are saved in this browser.</p>
+              <div v-for="(label, key) in styleLabels" :key="key" class="board-style-scale">
+                <label :for="'board-style-' + key">{{ label }}</label>
+                <span aria-hidden="true">{{ boardStyles[key] }}%</span>
+                <input :id="'board-style-' + key" type="range" v-bind="boardStyleRange" :value="boardStyles[key]"
+                  :aria-valuetext="boardStyles[key] + '%'" aria-describedby="board-styles-help"
+                  @input="setBoardStyles({ [key]: $event.target.valueAsNumber })">
+              </div>
+              <div class="advanced-actions">
+                <button type="button" class="secondary" @click="setBoardStyles(defaultBoardStyles)">Reset styles</button>
+              </div>
             </div>
             <div v-else-if="group === 'reproduction'" class="advanced-block">
               <h3>Reproduction</h3>

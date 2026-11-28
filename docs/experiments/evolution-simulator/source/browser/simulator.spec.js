@@ -5468,6 +5468,40 @@ test('advanced forecast length only saves a valid finished edit @pages', async (
   await expect(cycles).toHaveValue('12')
 })
 
+test('board styles persist separately from simulation settings @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page)
+  const run = page.getByRole('button', { name: 'Run options' })
+  const stats = page.locator('.stats .stat-grid')
+  const initialStats = await stats.textContent()
+  const openStyles = async () => {
+    await page.getByRole('button', { name: 'Simulation Settings' }).click()
+    await advancedSettings(page, 'Board appearance')
+  }
+  await openStyles()
+  const blob = page.getByRole('slider', { name: 'Blob size' })
+  const food = page.getByRole('slider', { name: 'Food size' })
+  await expect(blob).toHaveValue('115')
+  await expect(food).toHaveValue('75')
+  await blob.press('ArrowRight')
+  await expect(blob).toHaveAttribute('aria-valuetext', '120%')
+  await food.press('End')
+  await expect(food).toHaveValue('200')
+  await expect(page.getByText('Draft has changes')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Close settings' }).click()
+  await expect(run).toHaveText('Day 1 / 10 · Ready')
+  await expect(stats).toHaveText(initialStats)
+
+  await page.setViewportSize({ width: 390, height: 720 })
+  await page.reload()
+  await openStyles()
+  await expect(blob).toHaveValue('120')
+  await expect(food).toHaveValue('200')
+  await page.getByRole('button', { name: 'Reset styles' }).click()
+  await expect(blob).toHaveValue('115')
+  await expect(food).toHaveValue('75')
+})
+
 test('advanced zero mutation chance disables unused controls without losing their values @pages', async ({ page }) => {
   await openSimulator(page)
   await page.getByRole('button', { name: 'Simulation Settings' }).click()
