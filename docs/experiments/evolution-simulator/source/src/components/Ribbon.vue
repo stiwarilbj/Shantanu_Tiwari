@@ -4,6 +4,7 @@ import { Bookmark, ChartNoAxesCombined, ChevronDown, ChevronLeft, ChevronRight, 
 import { rulesFor } from '../engine/config.js'
 import { runSpecies, speciesWithEdits } from '../engine/species-actions.js'
 import { useLab } from '../store.js'
+import { useOutsideClick } from '../use-outside-click.js'
 import { METRICS, format, metricValue } from '../engine/stats.js'
 import { useForecast } from '../use-forecast.js'
 import ForecastStatus from './ForecastStatus.vue'
@@ -189,6 +190,10 @@ function closeDetail(restore = false) {
   inspection.value = null
   if (restore) trigger?.focus({ preventScroll:true })
 }
+useOutsideClick(() => props.active && !!(panel.value || inspection.value),
+  target => menu.value?.contains(target) || detail.value?.contains(target) || optionsButton.value?.contains(target) ||
+    (inspection.value === lab.viewing && target.closest('[data-metric="population"]')?.closest('[data-day]')?.dataset.day === String(inspection.value)),
+  () => { if (panel.value) closePanel(); else closeDetail() })
 function inspect(day, keyboard = false) {
   if (!rows.value[day-1]) return
   if (inspection.value === day) { closeDetail(keyboard); return }

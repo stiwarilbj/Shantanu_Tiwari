@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { ArrowLeft, Ellipsis, Leaf, Plus, Utensils, Wind } from 'lucide-vue-next'
 import { STATES } from '../engine/simulation.js'
+import { useOutsideClick } from '../use-outside-click.js'
 
 const props = defineProps({ id:Number, state:Number })
 const anchor = ref(), expanded = ref(false)
@@ -9,6 +10,7 @@ const icons = [Ellipsis, Leaf, Utensils, Wind, ArrowLeft, null, Ellipsis, Plus]
 const captions = ['Searching the field', 'Heading for a plant', 'Chasing smaller prey', 'Fleeing a predator',
   'Returning to the edge', 'Resting at the edge', 'Dead', 'Newborn']
 watch(() => props.id, () => { expanded.value = false })
+useOutsideClick(expanded, target => anchor.value?.contains(target), () => { expanded.value = false })
 
 function place(point) {
   if (!anchor.value) return

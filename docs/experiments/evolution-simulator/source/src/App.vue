@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { ChevronDown, X } from 'lucide-vue-next'
 import { useLab } from './store.js'
+import { useOutsideClick } from './use-outside-click.js'
 import { randomSeed, validate } from './engine/config.js'
 import { setupFromLink } from './export.js'
 import { guidedExamples, lessons } from './guide.js'
@@ -103,9 +104,8 @@ const canLive = computed(() => lab.replay && (lab.canEnterLive ||
   lab.batch?.label==='Preparing' && !lab.batch.stopping && lab.completed < lab.run.setup.days))
 const statusText = computed(() => 'Day '+lab.viewing+' / '+lab.run.setup.days+' · '+lab.status)
 function skipToContent() { document.getElementById("main-surface")?.focus() }
-function dismissMenu(event) {
-  if (!event.target.closest('.run-center')) menu.value = false
-}
+useOutsideClick(menu, target => target.closest('.run-menu') || menuButton.value?.contains(target),
+  () => { menu.value = false })
 function escapeMenu(event) {
   if (event.key==='Escape' && menu.value) { menu.value=false; menuButton.value?.focus() }
 }
@@ -326,7 +326,6 @@ onMounted(async () => {
   await lab.init()
   ready.value = true
   window.addEventListener('popstate',handlePopState)
-  document.addEventListener('pointerdown',dismissMenu)
   document.addEventListener('keydown',escapeMenu)
   if (location.hash) {
     await applyAddress(location.hash, location.hash === startingHash)
@@ -337,7 +336,6 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   window.removeEventListener('popstate',handlePopState)
-  document.removeEventListener('pointerdown',dismissMenu)
   document.removeEventListener('keydown',escapeMenu)
 })
 </script>

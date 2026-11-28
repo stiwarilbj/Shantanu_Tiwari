@@ -656,6 +656,89 @@ test('World restores layers for every creature after clearing a selection', asyn
   await expect(selectedOnly).not.toBeChecked()
 })
 
+test('outside clicks dismiss World popups while hover and camera drags leave them open @pages', async ({ page }) => {
+  await openSimulator(page)
+  await startRun(page)
+  const field = page.getByRole('region', { name: 'Simulation field' })
+  const canvas = field.locator('canvas.world-canvas')
+  const bounds = await canvas.boundingBox()
+  const point = { x: Math.floor(bounds.width / 2), y: Math.floor(bounds.height / 2) }
+  const clickBoard = () => canvas.click({ position: point })
+  const layers = page.getByRole('button', { name: 'Layers', exact: true })
+  const extra = page.getByRole('button', { name: 'More layer options' })
+  await layers.click()
+  await canvas.hover({ position: point })
+  await expect(extra).toBeVisible()
+  await page.mouse.down()
+  await page.mouse.move(bounds.x + point.x + 35, bounds.y + point.y, { steps: 4 })
+  await page.mouse.up()
+  await expect(extra).toBeVisible()
+  const energy = page.getByRole('button', { name: 'Energy', exact: true })
+  await energy.click()
+  await expect(energy).toHaveAttribute('aria-pressed', 'true')
+  await extra.click()
+  const refuges = page.getByRole('checkbox', { name: 'Show refuges' })
+  await refuges.check()
+  await expect(refuges).toBeVisible()
+  await clickBoard()
+  await expect(layers).toHaveAttribute('aria-expanded', 'false')
+  await expect(field.getByRole('group', { name: 'Board camera' })).toBeFocused()
+
+  const view = page.getByRole('button', { name: 'View options' })
+  const speed = page.getByRole('button', { name: 'Viewing speed', exact: true })
+  await view.click()
+  await speed.click()
+  await expect(view).toHaveAttribute('aria-expanded', 'false')
+  const faster = page.getByRole('button', { name: '2×', exact: true })
+  await faster.click()
+  await expect(faster).toHaveAttribute('aria-pressed', 'true')
+  await clickBoard()
+  await expect(speed).toHaveAttribute('aria-expanded', 'false')
+
+  for (const name of ['View options', 'Playback actions', 'Run options', 'Generation options']) {
+    const trigger = page.getByRole('button', { name, exact: true })
+    await trigger.click()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    await clickBoard()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  }
+
+  await view.click()
+  await page.getByRole('button', { name: 'Creatures', exact: true }).click()
+  const details = page.getByRole('complementary', { name: 'Creature details' })
+  await expect(details).toBeVisible()
+  await clickBoard()
+  await expect(details).toBeHidden()
+
+  await quickThrough(page, 1)
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  await expect(page.getByRole('button', { name: 'Run options' })).toHaveText('Day 1 / 10 · Replay')
+  const day = dayTile(page, 1)
+  await day.press('i')
+  const readings = page.getByRole('region', { name: 'Day 1 readings' })
+  await readings.getByRole('button', { name: 'Bookmark Day 1' }).click()
+  await expect(readings).toBeVisible()
+  await clickBoard()
+  await expect(readings).toBeHidden()
+  await expect(day).toHaveAccessibleName(/bookmarked/)
+})
+
+test('tapping the board dismisses World popups on a phone', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, hasTouch: true, viewport: { width: 390, height: 844 } })
+  try {
+    const page = await context.newPage()
+    await openSimulator(page)
+    await startRun(page)
+    const layers = page.getByRole('button', { name: 'Layers', exact: true })
+    await layers.tap()
+    await expect(layers).toHaveAttribute('aria-expanded', 'true')
+    await page.locator('canvas.world-canvas').tap()
+    await expect(layers).toHaveAttribute('aria-expanded', 'false')
+  } finally {
+    await context.close()
+  }
+})
+
 test('World continues drawing live playback after losing WebGL', async ({ page }) => {
   const errors = []
   page.on('pageerror', error => errors.push(error.message))

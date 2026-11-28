@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { Aperture, BatteryMedium, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Ellipsis,
   Eye, FastForward, Layers, Pause, Play, Plus, Rabbit, RotateCcw, StepBack, StepForward, Utensils, Video, X } from 'lucide-vue-next'
 import { useLab } from '../store.js'
+import { useOutsideClick } from '../use-outside-click.js'
 import { boardStyles, defaultBoardColors } from '../board-styles.js'
 import { STATES } from '../engine/simulation.js'
 import { foodSupplyForDay, rulesFor, usesWalkthroughForaging } from '../engine/config.js'
@@ -119,6 +120,10 @@ function select(id) {
   eventFilter.value='all'
   if (id != null && camera.value === 'overhead') camera.value = 'board'
 }
+function selectFromBoard(id) {
+  details.value = false
+  select(id)
+}
 function follow() {
   if (lab.following) { lab.following = false; return }
   const candidate = living.value.find(b => b.id===lab.selected) ?? living.value[0]
@@ -126,6 +131,9 @@ function follow() {
   else details.value = true
 }
 function toggle(name) { tool.value = tool.value === name ? null : name }
+useOutsideClick(() => props.active && !!tool.value,
+  target => surface.value?.contains(target) && target.closest('[data-world-tool]'),
+  () => { tool.value = null })
 function closeSpeedControls() {
   if (tool.value !== 'rate') return
   tool.value = null
@@ -231,22 +239,23 @@ defineExpose({ select, overhead })
       <Board ref="board" :active="props.active" :frame="lab.frame" :species="fieldSpecies" :style-run="lab.run.id" :layers="layers" :selected="lab.selected"
         :follow="lab.following" :camera="camera" :scope="lab.scope" :dim="dim" :quality="quality" :speed-range="speedRange" tabletop
         :playback-run="lab.replay ? undefined : lab.run.id" :live-rate="liveRate" :live-finished="!lab.replay && lab.dayEnded"
-        @select="select" @stop-follow="lab.following=false" @fallback="fallback=true"/>
+        @select="selectFromBoard" @stop-follow="lab.following=false" @fallback="fallback=true"/>
       <div class="view-tools">
         <button ref="speciesButton" type="button" class="secondary world-species-button" aria-description="Add or edit blob species" aria-haspopup="dialog"
           :disabled="!lab.canChangeSpecies && !lab.replay" @click="lab.openSpecies()">Species</button>
-        <button class="icon" aria-label="Layers" :aria-expanded="tool==='layers'" @click="toggle('layers')"><Layers :size="23"/></button>
+        <button class="icon" data-world-tool aria-label="Layers" :aria-expanded="tool==='layers' || tool==='layer-options'"
+          @click="tool = tool==='layers' || tool==='layer-options' ? null : 'layers'"><Layers :size="23"/></button>
         <button class="icon" aria-label="Follow creature" :aria-pressed="lab.following" :disabled="lab.loading || !lab.frame" @click="follow"><Video :size="23"/></button>
-        <button class="icon view-menu-button" aria-label="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
+        <button class="icon view-menu-button" data-world-tool aria-label="View options" :aria-expanded="tool==='view'" @click="toggle('view')"><Ellipsis :size="21"/></button>
       </div>
-      <div v-if="tool==='layers'" class="layer-panel pop">
+      <div v-if="tool==='layers'" class="layer-panel pop" data-world-tool>
         <button class="icon" aria-label="Close layers" @click="tool=null"><ChevronUp :size="20"/></button>
         <button v-for="[key,Icon,label,tip] in layerNames" :key="key" class="icon layer" :aria-label="label" :aria-pressed="layers[key]" @click="toggleLayer(key)">
           <component :is="Icon" :size="22"/><span class="layer-name">{{ label }}</span><span class="layer-tip">{{ label }}<small>{{ key==='sense' && layers.cohortSense ? 'Show living creatures in the species filter' : tip }}</small></span>
         </button>
         <button class="icon" aria-label="More layer options" @click="toggle('layer-options')"><ChevronDown :size="17"/></button>
       </div>
-      <div v-if="tool==='view' || tool==='layer-options'" class="pop view-menu">
+      <div v-if="tool==='view' || tool==='layer-options'" class="pop view-menu" data-world-tool>
         <template v-if="tool==='view'">
           <button @click="fit">Fit board</button>
           <button @click="camera='overhead'; lab.following=false; tool=null">Overhead <span v-if="camera==='overhead'">✓</span></button>
@@ -302,14 +311,14 @@ defineExpose({ select, overhead })
       </div>
       <div class="player-actions">
         <button class="quick" :disabled="!!lab.extinctDay && !lab.batch" @click="lab.modal=lab.batch ? 'quick-progress' : 'quick'"><FastForward :size="15" fill="currentColor"/>{{ quickLabel }}</button>
-        <button ref="playbackActions" class="icon" aria-label="Playback actions" @click="toggle('player')"><Ellipsis :size="20"/></button>
-        <button ref="speedButton" type="button" class="rate-trigger" aria-label="Viewing speed" :aria-description="'Current speed '+rateText"
+        <button ref="playbackActions" class="icon" data-world-tool aria-label="Playback actions" :aria-expanded="tool==='player'" @click="toggle('player')"><Ellipsis :size="20"/></button>
+        <button ref="speedButton" type="button" class="rate-trigger" data-world-tool aria-label="Viewing speed" :aria-description="'Current speed '+rateText"
           :aria-expanded="tool==='rate'" :aria-controls="tool==='rate' ? 'speed-controls' : undefined"
           @click="toggle('rate')" @keydown.esc="closeSpeedControls">
           {{ rateText }} <ChevronDown :size="12" aria-hidden="true"/>
         </button>
       </div>
-      <div v-if="tool==='rate'" id="speed-controls" class="pop rate-panel" @keydown.esc.stop="closeSpeedControls">
+      <div v-if="tool==='rate'" id="speed-controls" class="pop rate-panel" data-world-tool @keydown.esc.stop="closeSpeedControls">
         <div class="rate-heading">
           <label for="play-rate">Viewing speed</label>
           <button type="button" class="icon compact" aria-label="Close speed controls" @click="closeSpeedControls"><X :size="16" aria-hidden="true"/></button>
@@ -320,7 +329,7 @@ defineExpose({ select, overhead })
         <input id="play-rate" v-model.number="lab.rate" type="range" min="0" max="12" aria-label="Viewing speed multiplier" :aria-valuetext="rateText">
         <div class="rate-ticks" aria-hidden="true"><span>⅛×</span><span>1×</span><span>8×</span></div>
       </div>
-      <div v-if="tool==='player'" class="pop player-menu">
+      <div v-if="tool==='player'" class="pop player-menu" data-world-tool>
         <button :disabled="!canAdvanceDay" @click="endDay">{{ lab.replay ? 'Go to end' : 'Finish Day' }}</button>
         <button :disabled="!canAdvanceDay" @click="lab.stepOnce(); tool=null">Step one tick</button>
         <button :disabled="!lab.canOpenTraitAdjustment" @click="lab.openTraitAdjustment(); tool=null">Adjust living traits</button>
