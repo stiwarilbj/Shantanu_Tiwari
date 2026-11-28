@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { CircleX, Download, FastForward, Upload } from 'lucide-vue-next'
 import { useLab } from '../store.js'
-import { starter, randomSeed, rulesFor, validate } from '../engine/config.js'
+import { MAX_RUN_DAYS, starter, randomSeed, rulesFor, validate } from '../engine/config.js'
 import { foodWebAt } from '../engine/food-web.js'
 import { runSpecies } from '../engine/species-actions.js'
 import { csv, download, setupLink } from '../export.js'
@@ -11,7 +11,7 @@ import GenerationTable from './GenerationTable.vue'
 
 const lab=useLab()
 const emit=defineEmits(['compare','watch','resume','results','batch-results'])
-const dialog=ref(), mode=ref('additional'), amount=ref(0), target=ref(1), extension=ref(25)
+const dialog=ref(), mode=ref('additional'), amount=ref(10), target=ref(1), extension=ref(25)
 const message=ref(''), search=ref(''), file=ref(), removeId=ref(null), renameId=ref(null), newName=ref('')
 const actionsId=ref(null)
 const end=ref(lab.completed), start=ref(1), exportScope=ref(lab.scope), exportKind=ref('csv'), branchDay=ref(Math.max(1,Math.min(lab.viewing,lab.latestBranchDay)))
@@ -21,23 +21,35 @@ const branchFood = computed({
   set: value => { branchFoodOverride.value = value },
 })
 const startProgress=ref(lab.completed), endProgress=ref(lab.completed), resumeLive=ref(false)
-const remaining=computed(()=>1000-lab.run.setup.days)
+const remaining=computed(()=>MAX_RUN_DAYS-lab.run.setup.days)
 const nextDay = computed(() => lab.completed + 1)
-const base=computed(()=>lab.liveFrame?.duration!=null && lab.liveFrame.time>=lab.liveFrame.duration
-  ? lab.completed : Math.min(nextDay.value,lab.run.setup.days))
-const finish=computed(()=>mode.value==='absolute'?target.value:base.value+amount.value)
+const quickCapacity=computed(()=>Math.max(0,MAX_RUN_DAYS-lab.completed))
+const finish=computed(()=>mode.value==='absolute'?target.value:lab.completed+amount.value)
 const nextDayLabel = computed(() => {
   if (lab.extinctDay) return 'Population extinct'
+  if (lab.completed >= MAX_RUN_DAYS) return 'Generation limit reached'
   if (nextDay.value > lab.run.setup.days) return 'Run complete'
   return `Day ${nextDay.value}`
 })
 const dayRange = (first, last) => first === last ? `Day ${first}` : `Days ${first}–${last}`
+const batchSummary=computed(()=>{
+  const days=lab.run.summaries.filter(day=>day.day>startProgress.value&&day.day<=lab.completed)
+  if(!days.length)return null
+  const total=key=>days.reduce((sum,day)=>sum+(day.rows.all[key]??0),0)
+  return {opening:days[0].rows.all.opening,closing:days.at(-1).rows.all.population,
+    births:total('births'),deaths:total('deaths'),meals:total('plants')+total('hunts')}
+})
 const quickPreview = computed(() => {
   const first = nextDay.value, last = finish.value
+  const extension = last > lab.run.setup.days && last > lab.completed
+    ? ` The run will extend through Day ${last}.`
+    : ''
   if (last <= lab.completed) return `Day ${last} is ready to watch.`
-  if (base.value < first) return `Complete ${dayRange(first, last)}.`
-  if (first === last) return `Finish Day ${first}.`
-  return `Finish Day ${first}, then complete ${dayRange(first + 1, last)}.`
+  const current=lab.liveFrame
+  const unfinished=current?.day===first&&current.time>0&&current.time<current.duration
+  if (!unfinished) return `Complete ${dayRange(first, last)}.${extension}`
+  if (first === last) return `Finish Day ${first}.${extension}`
+  return `Finish Day ${first}, then complete ${dayRange(first + 1, last)}.${extension}`
 })
 const matches=computed(()=>{
   const query=search.value.trim().toLowerCase()
@@ -46,8 +58,9 @@ const matches=computed(()=>{
     .filter(({setup})=>setup.name.toLowerCase().includes(query) || String(setup.seed).includes(query))
     .sort((a,b)=>Number(exactSeed(b))-Number(exactSeed(a)) || b.created-a.created)
 })
-const canSim=computed(()=>Number.isInteger(finish.value)&&finish.value>=1&&finish.value<=(lab.extinctDay ? lab.completed : lab.run.setup.days)&&
-  (mode.value==='absolute'||Number.isInteger(amount.value)&&amount.value>=0))
+const canSim=computed(()=>Number.isInteger(finish.value)&&finish.value>=1&&finish.value<=MAX_RUN_DAYS&&
+  (mode.value==='absolute' ? finish.value<=lab.completed || lab.canQuickSim :
+    Number.isInteger(amount.value)&&amount.value>=1&&amount.value<=quickCapacity.value&&lab.canQuickSim))
 const canExportCsv = computed(() => Number.isInteger(start.value) && Number.isInteger(end.value) &&
   start.value >= 1 && start.value <= end.value && end.value <= lab.completed)
 const exportRowCount = computed(() => {
@@ -64,9 +77,9 @@ watch(()=>lab.modal,key=>{
   if(key==='quick') {
     resumeLive.value=!lab.replay && lab.playing
     if(!lab.replay) lab.stopPlayback()
-    mode.value=lab.targetDay || lab.completed===lab.run.setup.days?'absolute':'additional'
-    amount.value=Math.min(25,Math.max(0,lab.run.setup.days-base.value))
-    target.value=lab.targetDay ?? Math.min(lab.run.setup.days,base.value+amount.value)
+    mode.value=lab.targetDay || quickCapacity.value===0 || lab.extinctDay?'absolute':'additional'
+    amount.value=readQuickCount(quickCapacity.value)
+    target.value=lab.targetDay ?? (quickCapacity.value ? lab.completed+amount.value : lab.completed)
     lab.targetDay=null
   }
   if(key==='quick-progress' && lab.batch) { startProgress.value=lab.batch.start; endProgress.value=lab.batch.target }
@@ -87,7 +100,23 @@ function close() {
 function simulate() {
   if(!canSim.value) return
   if(finish.value<=lab.completed) { const day=finish.value;lab.modal=null;emit('watch',day);return }
-  if(lab.simulate(finish.value)) lab.modal='quick-progress'
+  if(lab.simulate(finish.value)) {
+    lab.modal='quick-progress'
+  }
+}
+function readQuickCount(capacity) {
+  if(!capacity)return 0
+  try {
+    const value=Number(localStorage.getItem('evolution.quick-sim-count'))
+    return Number.isInteger(value)&&value>=1?Math.min(value,capacity):Math.min(10,capacity)
+  } catch { return Math.min(10,capacity) }
+}
+function saveQuickCount() {
+  if(mode.value!=='additional')return
+  try { localStorage.setItem('evolution.quick-sim-count',String(amount.value)) } catch {}
+}
+function rememberQuickCount() {
+  if(Number.isInteger(amount.value)&&amount.value>=1&&amount.value<=quickCapacity.value) saveQuickCount()
 }
 function exportRun() {
   if (exportKind.value === 'setup') setupDownload(lab.run)
@@ -159,17 +188,18 @@ onMounted(()=>dialog.value.showModal())
   <dialog ref="dialog" class="task-dialog" :class="{'wide-dialog':lab.modal==='library','generation-dialog':lab.modal==='table','advanced-stats-dialog':lab.modal==='advanced-stats'}" @cancel.prevent="close" aria-labelledby="dialog-title">
     <header><h2 id="dialog-title">{{ lab.modal==='quick-done' && lab.extinctDay ? 'Population extinct' : titles[lab.modal] }}</h2><button class="icon" aria-label="Close dialog" @click="close"><CircleX :size="23"/></button></header>
     <template v-if="lab.modal==='quick'">
-      <p>Advance the active run without animation.</p>
+      <p>Complete a chosen number of generations without animation.</p>
       <div class="split-options"><button class="secondary" :aria-pressed="mode==='additional'" @click="mode='additional'">Additional generations</button>
         <button class="secondary" :aria-pressed="mode==='absolute'" @click="mode='absolute'">Complete through day</button></div>
       <dl class="pair-readout"><dt>Watching</dt><dd>Day {{ lab.viewing }}</dd><dt>Next day to simulate</dt><dd>{{ nextDayLabel }}</dd><dt>Saved through</dt><dd>Day {{ lab.saved }}</dd></dl>
-      <label v-if="mode==='additional'" class="dialog-field">Additional generations <input v-model.number="amount" type="number" min="0" :max="lab.run.setup.days-base"></label>
-      <label v-else class="dialog-field">Target day <input v-model.number="target" type="number" min="1" :max="lab.run.setup.days"></label>
-      <p v-if="finish>lab.run.setup.days" class="issue">The current limit is Day {{ lab.run.setup.days }}.</p>
-      <p v-else-if="canSim" class="destination">{{ quickPreview }}</p>
+      <label v-if="mode==='additional'" class="dialog-field">Generations to complete <input v-model.number="amount" type="number" min="1" :max="quickCapacity" :disabled="quickCapacity===0" :aria-invalid="!Number.isInteger(amount)||amount<1||amount>quickCapacity" aria-describedby="quick-count-feedback" @change="rememberQuickCount" @keydown.enter.prevent="simulate"></label>
+      <label v-else class="dialog-field">Target day <input v-model.number="target" type="number" min="1" :max="MAX_RUN_DAYS"></label>
+      <p v-if="quickCapacity===0 && mode==='additional'" id="quick-count-feedback" class="issue">The run has reached the 1,000-generation limit.</p>
+      <p v-else-if="mode==='additional' && (!Number.isInteger(amount)||amount<1||amount>quickCapacity)" id="quick-count-feedback" class="quiet">Enter a whole number from 1 to {{ quickCapacity }}.</p>
+      <p v-else-if="finish>MAX_RUN_DAYS" class="issue">The run can go up to Generation {{ MAX_RUN_DAYS }}.</p>
+      <p v-else-if="canSim" id="quick-count-feedback" class="destination">{{ quickPreview }}</p>
       <footer><button class="secondary" @click="close">Cancel</button>
-        <button v-if="finish>lab.run.setup.days && !lab.extinctDay" class="primary" @click="lab.modal='extend'">More Generations</button>
-        <button v-else class="primary" :disabled="!canSim || finish>lab.completed && !lab.workerReady" @click="simulate"><FastForward v-if="finish>lab.completed" :size="16"/>{{ finish<=lab.completed?'Watch Day '+finish:'Simulate' }}</button>
+        <button class="primary" :disabled="!canSim || finish>lab.completed && !lab.workerReady" @click="simulate"><FastForward v-if="mode==='additional'||finish>lab.completed" :size="16"/>{{ mode==='absolute'&&finish<=lab.completed?'Watch Day '+finish:'Simulate' }}</button>
       </footer>
     </template>
     <template v-else-if="['quick-progress','quick-done','quick-stopped'].includes(lab.modal)">
@@ -177,6 +207,12 @@ onMounted(()=>dialog.value.showModal())
       <dl class="pair-readout"><dt>Completed in this batch</dt><dd>{{ Math.max(0,lab.completed-startProgress) }} of {{ Math.max(0,endProgress-startProgress) }}</dd>
         <dt v-if="lab.batch">Computing</dt><dd v-if="lab.batch">Day {{ lab.completed+1 }}</dd>
         <dt>Completed through</dt><dd>Day {{ lab.completed }}</dd><dt>Saved through</dt><dd>Day {{ lab.saved }}</dd></dl>
+      <dl v-if="batchSummary" class="quick-summary" aria-label="Batch results">
+        <dt>Population</dt><dd>{{ batchSummary.opening }} → {{ batchSummary.closing }}</dd>
+        <dt>Births</dt><dd>{{ batchSummary.births }}</dd>
+        <dt>Deaths</dt><dd>{{ batchSummary.deaths }}</dd>
+        <dt>Meals</dt><dd>{{ batchSummary.meals }}</dd>
+      </dl>
       <p v-if="lab.batch?.stopping" class="quiet">Stopping at the next day boundary.</p>
       <p v-if="!lab.batch && lab.extinctDay" class="quiet">The last blobs died on Day {{ lab.extinctDay }}.</p>
       <footer><button class="secondary" @click="close">{{ lab.batch?'Hide progress':'Close' }}</button>

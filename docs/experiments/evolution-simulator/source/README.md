@@ -4,7 +4,7 @@
 
 # Evolution Simulator
 
-Watch blobs look for food, hunt, and have babies. Small changes in speed, size, and sight can affect which blobs survive.
+Watch blobs look for food, hunt, and have babies as small changes in speed, size, and sight affect which ones survive. Quick Sim runs 10 generations by default, remembers a count you change, and reports population, births, deaths, and meals at the end. Use the generation table or Trends to follow development over time.
 
 ## Try it
 

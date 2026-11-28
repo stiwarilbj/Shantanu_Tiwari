@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs hunt, gather food, and pass on traits like size and speed. Use the Species button in World to bring in newcomers or split a living group. In Advanced settings, mix seeds, berries, and mushrooms, then choose which foods each species can eat.
+Watch blobs hunt, gather food, and pass on traits like size and speed. In World, use Quick Sim to run 10 generations by default or enter another count, then review population, births, deaths, and meals or open the generation table and Trends. Use the Species button to bring in newcomers or split a living group, and mix seeds, berries, and mushrooms in Advanced settings.
 
 [Controls and settings reference](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/reference.html)
 

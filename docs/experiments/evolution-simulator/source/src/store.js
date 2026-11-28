@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef, watch } from 'vue'
-import { setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
+import { MAX_RUN_DAYS, setupForNewRun, starter, STEERING_RULE_VERSION, validate, validateRevisions } from './engine/config.js'
 import { dawnForRun, founders, snapshot } from './engine/simulation.js'
 import { validSpeciesHistory } from './engine/species-actions.js'
 import { validTraitAdjustment } from './engine/trait-adjustments.js'
@@ -107,6 +107,8 @@ export const useLab = defineStore('lab', () => {
   const liveDay = computed(() => liveFrame.value?.day ?? completed.value + 1)
   const canEnterLive = computed(() => workerReady.value && !batch.value && !extinctDay.value &&
     completed.value < (run.value?.setup.days ?? 0))
+  const canQuickSim = computed(() => workerReady.value && !batch.value && !extinctDay.value &&
+    !adjustingTraits.value && completed.value < MAX_RUN_DAYS)
   const canChangeSpecies = computed(() => canEnterLive.value && !replay.value && !loading.value &&
     frame.value?.day > completed.value && !dayEnded.value)
   const recordedChangesAhead = computed(() => canChangeSpecies.value && historyAhead(run.value, frame.value))
@@ -338,6 +340,14 @@ export const useLab = defineStore('lab', () => {
       const mayShowReplay = batchViewRequest === request && !loading.value && !replay.value
       batch.value = null
       autoPrepare = false
+      if (data.final) {
+        liveFrame.value = data.final
+        // Keep the board on the actual ending while its replay loads or if replay creation fails.
+        if (mayShowReplay) {
+          frame.value = data.final
+          viewing.value = data.final.day
+        }
+      }
       if (prepare) {
         if (mayShowReplay) void openDay(1)
         if (run.value.setup.days > 1) simulate(run.value.setup.days, 'Preparing')
@@ -773,7 +783,11 @@ export const useLab = defineStore('lab', () => {
   }
 
   function simulate(target, label = 'Quick Sim') {
-    if (!canEnterLive.value || adjustingTraits.value || !Number.isInteger(target) || target <= completed.value || target > run.value.setup.days) return false
+    if (!canQuickSim.value || !Number.isInteger(target) || target <= completed.value || target > MAX_RUN_DAYS) return false
+    if (target > run.value.setup.days) {
+      if (label !== 'Quick Sim') return false
+      extendRunLimit(target)
+    }
     if (!replay.value) stopPlayback()
     batchViewRequest = request
     batch.value = { target, start: completed.value, label, stopping: false }
@@ -797,11 +811,15 @@ export const useLab = defineStore('lab', () => {
     modal.value = 'download'
   }
 
-  function extend(days) {
-    if (!workerReady.value || batch.value || extinctDay.value || days <= run.value.setup.days || days > 1000) return
+  function extendRunLimit(days) {
     run.value = { ...run.value, setup: { ...run.value.setup, days } }
     writer.postMessage({ type: 'extend', days })
     persist()
+  }
+
+  function extend(days) {
+    if (!workerReady.value || batch.value || extinctDay.value || days <= run.value.setup.days || days > MAX_RUN_DAYS) return
+    extendRunLimit(days)
     modal.value = null
     if (run.value.setup.mode === 'prepare') simulate(days, 'Preparing')
   }
@@ -978,7 +996,7 @@ export const useLab = defineStore('lab', () => {
     canChangeSpecies, canAdjustSpecies, recordedChangesAhead, openSpecies, changeSpecies, speciesResult,
     canOpenTraitAdjustment, canAdjustTraits, openTraitAdjustment, adjustTraits, adjustingTraits, traitAdjustmentError,
     error, workerReady, connecting, workerError, retrySimulation, replayDay, replayFailure, cancelReplay, retryReplay,
-    canEnterLive, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
+    canEnterLive, canQuickSim, canMoveNext, selected, following, settings, draft, modal, completed, extinctDay, latestBranchDay, dayEnded, displayDuration, status, init, openDay, goLive, seek, play,
     stopPlayback, toggleThrough, stepOnce, stepReplayFrame, moveDay, simulate, stopBatch, extend, openSettings, closeSettings, draftChanged, resetDraft, evolve, switchRun, rename,
     remove, toggleBookmark, getTrack, checkpointAt, branch, cancelBranch, branchPreparing, prepareOrLive, targetDay, quickForDay, branchFrom, importBranch, preparePair, openDownload, downloadRange }
 })

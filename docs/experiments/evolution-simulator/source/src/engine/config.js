@@ -19,6 +19,7 @@ export const FOOD_WEB_RULE_VERSION = 15
 export const PLANT_FOOD_RULE_VERSION = 16
 export const VERSION = PLANT_FOOD_RULE_VERSION
 export const MAX_SEED = 0xffffffff
+export const MAX_RUN_DAYS = 1000
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
   patchCount: 3,
@@ -193,7 +194,7 @@ export function validate(config) {
     return { setup: 'Choose a setup file with a supported rule version.' }
   }
   if (typeof config.name !== 'string' || !config.name.trim() || config.name.trim().length > 60) errors.name = 'Enter a run name with 1–60 characters.'
-  number('days', 'Days', config.days, 10, 1000)
+  number('days', 'Days', config.days, 10, MAX_RUN_DAYS)
   if (config.version >= SETTLED_RULE_VERSION && !['settled', 'timed'].includes(config.endMode)) errors.endMode = 'Choose when each day ends.'
   if (!endsWhenSettled(config)) {
     number('duration', 'Seconds per day', config.duration / 10, 1, 60, false)

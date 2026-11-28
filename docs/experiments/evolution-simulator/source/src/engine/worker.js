@@ -16,12 +16,13 @@ function current() {
 }
 
 function settle(result) {
-  const day = current().day
+  const state = current()
+  const day = state.day
   checkpoint = result.checkpoint
   committed = day
-  const final = snapshot(partial)
   partial = null
-  emit('commit', { day, ...result, final: busy ? null : final })
+  emit('commit', { day, ...result, final: busy ? null : snapshot(state) })
+  return state
 }
 
 function show() {
@@ -33,6 +34,7 @@ const canAdvance = () => committed < config.days && checkpoint.roster.length > 0
 async function batch(target) {
   busy = true
   stopped = false
+  let lastState
   while (committed < target && canAdvance()) {
     const state = current()
     const rules = rulesFor(config, records, state.day)
@@ -47,13 +49,13 @@ async function batch(target) {
       } while (!result && performance.now() - started < 12)
       if (!result) await pause()
     } while (!result)
-    settle(result)
+    lastState = settle(result)
     await pause()
     if (stopped) break
   }
   busy = false
   show()
-  emit('done', { day: committed, stopped })
+  emit('done', { day: committed, stopped, final: !canAdvance() && lastState ? snapshot(lastState) : null })
 }
 
 async function replay(message) {
