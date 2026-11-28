@@ -20,6 +20,8 @@ const hovered = ref(null)
 const stageColor = '#242424'
 const blobDisplayScale = 1.15
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
+const pelletDisplayScale = .75
+const pelletHeight = 2.2 * pelletDisplayScale
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(stageColor)
 const camera = new THREE.PerspectiveCamera(45, 1, 1, 4500)
@@ -264,8 +266,9 @@ function draw3d(blobs, frame, view, { min, max }) {
   }
   frame.plants.forEach((p, i) => {
     const x = p.x - 250, z = p.y - 250
-    write(pellets, i, '#83A51E', x, 2.2, z, 1)
-    if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8, .045, z + .35, 3.2, 2.3, 1, -Math.PI / 2)
+    write(pellets, i, '#83A51E', x, pelletHeight, z, pelletDisplayScale)
+    if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8 * pelletDisplayScale, .045, z + .35 * pelletDisplayScale,
+      3.2 * pelletDisplayScale, 2.3 * pelletDisplayScale, 1, -Math.PI / 2)
   })
   sight.forEach((b,i)=>write(vision, i, '#E4F5FE', b.x - 250, -.48, b.y - 250, b.sense, b.sense, 1, -Math.PI / 2))
   indicators.forEach((b, i) => {
@@ -392,10 +395,10 @@ function draw2d(blobs, frame, view, { min, max }) {
   const plants = []
   for (const plant of frame.plants) {
     const x = plant.x-250, z = plant.y-250
-    const q = p(x,0,z), t = p(x,2.2,z)
+    const q = p(x,0,z), t = p(x,pelletHeight,z)
     if (!inDepthRange(q) || !inDepthRange(t)) continue
-    const edge = p(x+2,2.2,z)
-    const r = Math.max(1, Math.min(8, Math.hypot(t.x-edge.x, t.y-edge.y)))
+    const edge = p(x+2*pelletDisplayScale,pelletHeight,z)
+    const r = clamp(Math.hypot(t.x-edge.x, t.y-edge.y), 1, 8 * pelletDisplayScale)
     plants.push({ plant, q, t, r })
   }
   if (!simple) plants.forEach(({q,r}) => softShadow(q.x+r*.38,q.y+r*.08,r*1.65,r*(overheadView?1.15:.54)))
