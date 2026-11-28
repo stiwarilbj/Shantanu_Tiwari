@@ -2100,6 +2100,70 @@ test('Food Schedule previews draft ramp and step values and agrees with the repl
   await expect(page.locator('.world-hud')).toContainText('Plants left 176')
 })
 
+test('food types keep independent diets and reconstruct the configured mix on replay @pages', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.Worker = class extends window.Worker {
+      constructor(...args) {
+        super(...args)
+        this.addEventListener('message', ({ data }) => {
+          if (data.type === 'track') {
+            window.replayedFood = data.track.plants.reduce((counts, food) => {
+              counts[food.type] = (counts[food.type] ?? 0) + 1
+              return counts
+            }, {})
+          }
+        })
+      }
+    }
+  })
+  await openSimulator(page)
+  await startRun(page, '10', async () => {
+    await advancedSettings(page, 'Food types')
+    const toggle = page.getByRole('switch', { name: 'Enable food types' })
+    const seeds = page.getByRole('spinbutton', { name: 'Seeds weight' })
+    const berries = page.getByRole('checkbox', { name: 'Berries', exact: true })
+    const mushrooms = page.getByRole('checkbox', { name: 'Mushrooms', exact: true })
+    await expect(toggle).not.toBeChecked()
+    await toggle.press('Space')
+    await seeds.fill('2')
+    await page.getByRole('spinbutton', { name: 'Mushrooms weight' }).fill('0')
+    await expect(page.getByText('33 on Day 1')).toBeVisible()
+    await berries.uncheck()
+    await mushrooms.uncheck()
+    const species = page.getByRole('combobox', { name: 'Species', exact: true })
+    await species.selectOption('orange')
+    await expect(berries).toBeChecked()
+    await page.getByRole('checkbox', { name: 'Seeds', exact: true }).uncheck()
+    await toggle.press('Space')
+    await expect(seeds).toBeHidden()
+    await toggle.press('Space')
+    await expect(seeds).toHaveValue('2')
+    await species.selectOption('blue')
+    await expect(berries).not.toBeChecked()
+    await expect(mushrooms).not.toBeChecked()
+  })
+  await quickThrough(page, 1)
+  await expect(batchStatus(page, 'Saved through')).toHaveText('Day 1')
+  await page.getByRole('button', { name: 'Watch last day' }).click()
+  await expect.poll(() => page.evaluate(() => window.replayedFood)).toEqual({ seeds: 33, berries: 17 })
+
+  await page.setViewportSize({ width: 390, height: 720 })
+  await page.reload()
+  await expect(page.getByRole('slider', { name: 'Replay time' })).toBeVisible()
+  await page.getByRole('button', { name: 'Simulation Settings' }).click()
+  await advancedSettings(page, 'Food types')
+  const settings = page.getByRole('dialog', { name: 'Simulation Settings' })
+  await expect(settings.getByRole('switch', { name: 'Enable food types' })).toBeChecked()
+  const seeds = settings.getByRole('spinbutton', { name: 'Seeds weight' })
+  await expect(seeds).toHaveValue('2')
+  await seeds.fill('101')
+  await expect(seeds).toHaveAccessibleDescription('Enter whole weights from 0 to 100.')
+  await settings.getByRole('button', { name: 'Discard changes' }).press('Enter')
+  await settings.getByRole('button', { name: 'Discard draft' }).press('Enter')
+  await expect(seeds).toHaveValue('2')
+  expect(await settings.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+})
+
 test('food seasons agree on dawn counts in the preview, World, Quick Sim, and Trends @pages', async ({ page }) => {
   await openSimulator(page)
   await startRun(page, '15', async () => {

@@ -267,10 +267,10 @@ test.describe('short touch viewports', () => {
       await expect(mutation).toHaveJSProperty('checked', !checked)
 
       await settings.getByRole('button', { name: 'All categories' }).tap()
-      await expect(categories.getByRole('heading')).toHaveText(['Field & food', 'Creature behavior', 'Life cycle', 'Run & charts'])
+      await expect(categories.getByRole('heading')).toHaveText(['Field & food', 'Creature behavior', 'Life cycle', 'Run & charts', 'Styles'])
       await expect(categories.getByRole('button', { name: 'Inheritance & mutation' })).toBeFocused()
       await expect(categories.getByRole('region', { name: 'Field & food' }).getByRole('button'))
-        .toHaveText(['Plant supply', 'Food seasons', 'Field layout', 'Starting territories'])
+        .toHaveText(['Plant supply', 'Food types', 'Food seasons', 'Field layout', 'Starting territories'])
       const behavior = categories.getByRole('region', { name: 'Creature behavior' })
       await expect(behavior.getByRole('button')).toHaveText(['Movement and energy', 'Foraging decisions', 'Hunting', 'Species food web'])
       await behavior.getByRole('button', { name: 'Foraging decisions' }).tap()

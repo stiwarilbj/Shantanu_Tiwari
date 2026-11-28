@@ -189,6 +189,11 @@ export const groups = [
         ['First peak day in cycle', 'Start the first peak at any day number within the cycle. The season repeats on that schedule.'],
         ['Food cycle', 'Read the forecast plant count against the base schedule for a full cycle, with the preview day marked.'],
       ]],
+      ['Settings → Advanced → Field & food → Food types', [
+        ['Enable food types', 'Turn on seeds, berries, and mushrooms. This starts off. Switching back to one food type keeps your mix and species diets for later.'],
+        ['Food mix', 'Use whole weights from 0 to 100. A weight of zero stops that food from growing. The counts show how the scheduled supply splits at the start of a new run or branch. All three foods give the usual plant meal and energy reward.'],
+        ['Species diets', 'Pick a species and check any foods it can eat. New species can eat all three unless you give them a different diet. The Species food web still decides whether a species can eat plants at all.'],
+      ]],
       ['Settings → Advanced → Field & food → Field layout', [
         ['Food placement', 'Scattered spreads plants across the field. Patches divide the day’s plant supply across clusters.'],
         ['Number of patches', 'Choose 1–8 food clusters.'],

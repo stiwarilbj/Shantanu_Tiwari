@@ -80,7 +80,7 @@ async function replay(message) {
   const rules = rulesFor(setup, records, day), state = dawnForRun(setup, records, day, at, traitAdjustments, speciesActions)
   const startFrame = snapshot(state)
   const opening = structuredClone(startFrame.blobs)
-  const plants = state.plants.map(p => ({ id: p.id, x: p.x, y: p.y }))
+  const plants = state.plants.map(({ eaten, ...plant }) => plant)
   const trackDecisions = tracksForagingDecisions(rules)
   const fields = TRACK_FIELDS + (trackDecisions ? 2 : 0)
   const arrivals = (speciesActions ?? []).filter(action => action.kind === 'introduce' && action.day === day && action.tick > 0)

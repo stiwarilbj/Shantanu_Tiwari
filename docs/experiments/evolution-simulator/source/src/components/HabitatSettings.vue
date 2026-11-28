@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-vue-next'
 import { FOOD_SEASON_FIELDS, foodSupplyForDay, huntingOnDay, rulesFor, usesHabitatRules, validate } from '../engine/config.js'
 import { FIELD } from '../engine/geometry.js'
 import { openingHabitat } from '../engine/habitat.js'
+import { PLANT_FOOD_TYPES } from '../engine/plant-food.js'
 import { format } from '../engine/stats.js'
 import NumberField from './NumberField.vue'
 
@@ -34,7 +35,7 @@ const preview = computed(() => {
   const rules = rulesAt(day)
   const issues = saved ? {} : errors.value
   if (!saved) {
-    const keys = ['seed', 'foodPlacement', 'patchCount', 'patchRadius', 'patchRelocation', 'patchInterval', 'refugePercent']
+    const keys = ['seed', 'foodPlacement', 'patchCount', 'patchRadius', 'patchRelocation', 'patchInterval', 'refugePercent', 'plantFoods']
     const error = supplyIssue.value || issues[keys.find(key => issues[key])]
     if (error) return { text: error }
   }
@@ -87,8 +88,10 @@ watchEffect(() => {
   }
   ctx.fillStyle = '#cbdbbe'
   for (const patch of habitat.patches) circle(patch.x, patch.y, patch.radius)
-  ctx.fillStyle = '#486337'
-  for (const plant of habitat.plants) circle(plant.x, plant.y, 3.5)
+  for (const plant of habitat.plants) {
+    ctx.fillStyle = PLANT_FOOD_TYPES.find(type => type.id === plant.type)?.color ?? '#486337'
+    circle(plant.x, plant.y, 3.5)
+  }
 }, { flush: 'post' })
 
 const validRunLength = computed(() => Number.isInteger(draft.days) && draft.days >= 10 && draft.days <= 1000)

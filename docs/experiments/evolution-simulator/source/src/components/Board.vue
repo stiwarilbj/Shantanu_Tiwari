@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from 
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { boardStyles, defaultBoardColors, defaultBoardStyles } from '../board-styles.js'
+import { PLANT_FOOD_TYPES } from '../engine/plant-food.js'
 import { clamp, FIELD } from '../engine/geometry.js'
 import { createLivePlayback } from '../live-playback.js'
 import { boardSpeciesColor, starterBlueDisplay } from '../species-colors.js'
@@ -21,6 +22,11 @@ const hovered = ref(null)
 let blobDisplayScale, pelletDisplayScale, pelletHeight, minPelletRadius
 const pelletColor = new THREE.Color()
 let pelletHighlight, pelletShade
+const foodPalette = Object.fromEntries(PLANT_FOOD_TYPES.map(({ id, color }) => {
+  const fill = new THREE.Color(color)
+  return [id, { fill, light: '#' + fill.clone().lerp(new THREE.Color('#fff'), .23).getHexString(),
+    shade: '#' + fill.clone().multiplyScalar(.55).getHexString() }]
+}))
 const displayRadius = blob => Math.max(.25, blob.r) * blobDisplayScale
 const scene = new THREE.Scene()
 scene.background = new THREE.Color()
@@ -270,7 +276,7 @@ function draw3d(blobs, frame, view, { min, max }) {
   }
   frame.plants.forEach((p, i) => {
     const x = p.x - 250, z = p.y - 250
-    write(pellets, i, pelletColor, x, pelletHeight, z, pelletDisplayScale)
+    write(pellets, i, foodPalette[p.type]?.fill ?? pelletColor, x, pelletHeight, z, pelletDisplayScale)
     if (!simple) write(shadows, blobs.length + i, '#FFFFFF', x + .8 * pelletDisplayScale, .045, z + .35 * pelletDisplayScale,
       3.2 * pelletDisplayScale, 2.3 * pelletDisplayScale, 1, -Math.PI / 2)
   })
@@ -433,8 +439,9 @@ function draw2d(blobs, frame, view, { min, max }) {
     if (plant) {
       const r = pelletRadius
       const gradient = ctx.createRadialGradient(t.x-r*.3,t.y-r*.4,0,t.x,t.y,r*1.15)
-      gradient.addColorStop(0, pelletHighlight)
-      gradient.addColorStop(1, pelletShade)
+      const palette = foodPalette[plant.type]
+      gradient.addColorStop(0, palette?.light ?? pelletHighlight)
+      gradient.addColorStop(1, palette?.shade ?? pelletShade)
       ellipse(t.x,t.y,r,r,gradient)
       continue
     }

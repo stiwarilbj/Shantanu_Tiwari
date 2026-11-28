@@ -6,7 +6,7 @@ Project Lab is a place to test ideas, learn by doing, play games, and revisit ol
 
 ### [Evolution Simulator](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/)
 
-Watch blobs hunt, gather food, and pass on traits like size and speed. Build a species from a preset, then use the Species button in World to bring in newcomers or split a living group. Give each species its own diet, then use the meal table or replay to see what it ate.
+Watch blobs hunt, gather food, and pass on traits like size and speed. Use the Species button in World to bring in newcomers or split a living group. In Advanced settings, mix seeds, berries, and mushrooms, then choose which foods each species can eat.
 
 [Controls and settings reference](https://stiwarilbj.github.io/Shantanu_Tiwari/experiments/evolution-simulator/reference.html)
 

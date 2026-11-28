@@ -1,6 +1,7 @@
-import { plantsForDay, usesHabitatRules, usesRefugeBorder, usesWalkthroughForaging } from './config.js'
+import { plantsForDay, usesHabitatRules, usesPlantFoods, usesRefugeBorder, usesWalkthroughForaging } from './config.js'
 import { FIELD, REFUGE_WIDTH } from './geometry.js'
 import { random } from './random.js'
+import { assignPlantFoods } from './plant-food.js'
 
 export function openingHabitat(config, day) {
   const custom = usesHabitatRules(config)
@@ -8,12 +9,16 @@ export function openingHabitat(config, day) {
   const margin = refugeWidth ? refugeWidth + 2 : usesWalkthroughForaging(config) ? 0 : 12
   const width = FIELD - 2 * margin
   const count = plantsForDay(config, day)
+  function field(plants, patches) {
+    if (usesPlantFoods(config)) assignPlantFoods(plants, config.plantFoods.weights, config.seed, day)
+    return { refugeWidth, plants, patches }
+  }
   if (!custom || config.foodPlacement === 'scattered') {
     const plants = Array.from({ length: count }, (_, id) => ({
       id, x: margin + width * random(config.seed, 5, day, id, 0),
       y: margin + width * random(config.seed, 5, day, id, 1), eaten: false,
     }))
-    return { refugeWidth, plants, patches: [] }
+    return field(plants, [])
   }
 
   const radius = config.patchRadius
@@ -31,5 +36,5 @@ export function openingHabitat(config, day) {
     const angle = 2 * Math.PI * random(config.seed, 43, day, id, 1)
     return { id, x: center.x + distance * Math.cos(angle), y: center.y + distance * Math.sin(angle), eaten: false }
   })
-  return { refugeWidth, plants, patches }
+  return field(plants, patches)
 }

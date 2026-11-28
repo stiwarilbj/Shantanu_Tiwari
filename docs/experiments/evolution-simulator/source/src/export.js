@@ -1,8 +1,9 @@
 import { DEFAULT_DIET, EMPTY_FOOD_WEB } from './engine/food-web.js'
+import { DEFAULT_PLANT_FOODS, PLANT_FOOD_TYPES } from './engine/plant-food.js'
 import { runSpecies } from './engine/species-actions.js'
 import { DEATH_CAUSES, METRICS } from './engine/stats.js'
 import { ADVANCED_DEFAULTS, AGING_DEFAULTS, FOOD_SEASON_DEFAULTS, FOOD_WEB_RULE_VERSION, FORAGING_DEFAULTS, HABITAT_DEFAULTS, INHERITANCE_DEFAULTS,
-  MUTATION_DEFAULTS, REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
+  MUTATION_DEFAULTS, PLANT_FOOD_RULE_VERSION, REPRODUCTION_DEFAULTS, setupWithRuleDefaults, TERRITORY_DEFAULTS, TERRITORY_EDGES, usesAgingRules, usesFoodSeasonsRules,
   usesForagingDecisionRules, usesOptionalRules, usesReproductionRules, usesTerritoryRules } from './engine/config.js'
 
 function omitDefaults(values, defaults) {
@@ -91,6 +92,31 @@ function unpackFoodWeb(setup) {
   return { ...rest, foodWeb: { ...EMPTY_FOOD_WEB, enabled: enabled === 1, diets } }
 }
 
+function packPlantFoods(foods = DEFAULT_PLANT_FOODS, species) {
+  const weights = foods.weights.every((weight, index) => weight === DEFAULT_PLANT_FOODS.weights[index]) ? null : foods.weights
+  const diets = Object.entries(foods.diets).map(([id, types]) => {
+    const index = species.findIndex(item => item.id === id)
+    const mask = PLANT_FOOD_TYPES.reduce((bits, type, i) => types.includes(type.id) ? bits | (1 << i) : bits, 0)
+    return [index === -1 ? id : index, mask]
+  })
+  return foods.enabled || weights || diets.length ? [Number(foods.enabled), weights, ...diets] : undefined
+}
+
+function unpackPlantFoods({ pf, ...setup }) {
+  if (pf === undefined) return setup
+  if (!Array.isArray(pf)) throw new Error('Invalid food types in setup link.')
+  const [enabled, weights, ...rows] = pf
+  const idOf = value => Number.isInteger(value) ? setup.species[value]?.id : typeof value === 'string' ? value : null
+  if (![0, 1].includes(enabled) || rows.some(row => !Array.isArray(row) || row.length !== 2 || !idOf(row[0]) ||
+    !Number.isInteger(row[1]) || row[1] < 0 || row[1] >= (1 << PLANT_FOOD_TYPES.length))) {
+    throw new Error('Invalid food types in setup link.')
+  }
+  const diets = Object.fromEntries(rows.map(([id, mask]) => [
+    idOf(id), PLANT_FOOD_TYPES.filter((_, index) => mask & (1 << index)).map(type => type.id),
+  ]))
+  return { ...setup, plantFoods: { enabled: enabled === 1, weights: weights ?? DEFAULT_PLANT_FOODS.weights, diets } }
+}
+
 export function setupLink(setup) {
   let compact = setup
   if (usesReproductionRules(setup)) {
@@ -106,6 +132,7 @@ export function setupLink(setup) {
       ...(territories && { territories: undefined, tt: fieldTerritory.length ? fieldTerritory : undefined }),
       ...(usesFoodSeasonsRules(setup) && { foodSeasons: undefined, fs: packSeasons(setup.foodSeasons) }),
       ...(setup.version >= FOOD_WEB_RULE_VERSION && { foodWeb: undefined, fw: packFoodWeb(setup.foodWeb, setup.species) }),
+      ...(setup.version >= PLANT_FOOD_RULE_VERSION && { plantFoods: undefined, pf: packPlantFoods(setup.plantFoods, setup.species) }),
       reproduction: omitDefaults(setup.reproduction, REPRODUCTION_DEFAULTS),
       species: setup.species.map(item => {
         const mutationChance = omitDefaults(item.inheritance?.mutationChance, INHERITANCE_DEFAULTS.mutationChance)
@@ -144,7 +171,8 @@ export function setupFromLink(hash) {
   if (!usesTerritoryRules(setup)) return setupWithRuleDefaults(decoded)
   const withTerritories = { ...unpackTerritory(decoded, true), species: decoded.species.map(item => unpackTerritory(item)) }
   const withSeasons = usesFoodSeasonsRules(setup) ? unpackSeasons(withTerritories) : withTerritories
-  return setupWithRuleDefaults(setup.version >= FOOD_WEB_RULE_VERSION ? unpackFoodWeb(withSeasons) : withSeasons)
+  const withFoodWeb = setup.version >= FOOD_WEB_RULE_VERSION ? unpackFoodWeb(withSeasons) : withSeasons
+  return setupWithRuleDefaults(setup.version >= PLANT_FOOD_RULE_VERSION ? unpackPlantFoods(withFoodWeb) : withFoodWeb)
 }
 
 export function download(name, mime, content) {

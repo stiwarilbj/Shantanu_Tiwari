@@ -1,3 +1,5 @@
+import { DEFAULT_PLANT_FOODS, validPlantFoods } from './plant-food.js'
+
 export const TRAITS = ['speed', 'size', 'sense']
 export const PALETTE = ['#406780', '#F47E18', '#CE6591', '#80A653', '#9B7ACA', '#46A49D', '#D5A84C', '#C76052']
 export const LEGACY_RULE_VERSION = 1
@@ -14,7 +16,8 @@ export const OPTIONAL_RULES_VERSION = 12
 export const PRECISE_THRESHOLDS_RULE_VERSION = 13
 export const FOOD_SEASONS_RULE_VERSION = 14
 export const FOOD_WEB_RULE_VERSION = 15
-export const VERSION = FOOD_WEB_RULE_VERSION
+export const PLANT_FOOD_RULE_VERSION = 16
+export const VERSION = PLANT_FOOD_RULE_VERSION
 export const MAX_SEED = 0xffffffff
 export const HABITAT_DEFAULTS = Object.freeze({
   foodPlacement: 'scattered',
@@ -87,6 +90,7 @@ export const usesRefugeBorder = config => config.version >= REFUGE_RULE_VERSION
 export const usesImprovedSteering = config => config.version >= STEERING_RULE_VERSION && !usesWalkthroughForaging(config)
 export const usesHabitatRules = config => config.version >= HABITAT_RULE_VERSION
 export const usesFoodSeasonsRules = config => config.version >= FOOD_SEASONS_RULE_VERSION
+export const usesPlantFoods = config => config.version >= PLANT_FOOD_RULE_VERSION && config.plantFoods?.enabled === true
 export const usesReproductionRules = config => config.version >= REPRODUCTION_RULE_VERSION
 export const usesAgingRules = config => config.version >= AGING_RULE_VERSION
 export const usesForagingDecisionRules = config => config.version >= FORAGING_DECISION_RULE_VERSION
@@ -103,6 +107,9 @@ export const huntingOnDay = (config, day) => config.predation &&
   (!usesHabitatRules(config) || day >= config.firstHuntingDay)
 
 export function setupWithRuleDefaults(setup) {
+  if (setup.version >= PLANT_FOOD_RULE_VERSION && setup.plantFoods === undefined) {
+    setup = { ...setup, plantFoods: DEFAULT_PLANT_FOODS }
+  }
   if (usesOptionalRules(setup)) setup = { ...setup, advanced: { ...ADVANCED_DEFAULTS, ...setup.advanced } }
   if (usesHabitatRules(setup)) setup = { ...HABITAT_DEFAULTS, ...setup }
   if (usesFoodSeasonsRules(setup)) setup = { ...setup, foodSeasons: { ...FOOD_SEASON_DEFAULTS, ...setup.foodSeasons } }
@@ -173,6 +180,9 @@ export function validate(config) {
   const errors = {}
   if (config?.version >= FOOD_WEB_RULE_VERSION && config.foodWeb !== undefined && !validFoodWeb(config.foodWeb)) {
     errors.foodWeb = 'Check the species diets and food-web switch.'
+  }
+  if (config?.version >= PLANT_FOOD_RULE_VERSION && config.plantFoods !== undefined && !validPlantFoods(config.plantFoods)) {
+    errors.plantFoods = 'Use whole weights from 0 to 100 and give at least one food a positive weight when enabled.'
   }
   const number = (key, name, value, min, max, integer = true) => {
     if (!Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value))) {

@@ -1,5 +1,6 @@
 import { canHunt, clamp, contact, edgePoint, FIELD, Grid, refugeContact, refugeDistance } from './geometry.js'
-import { canEatPlants, usesFoodWeb } from './food-web.js'
+import { canEatPlants, permitsPlantType, usesFoodWeb } from './food-web.js'
+import { usesPlantFoods } from './config.js'
 import { random } from './random.js'
 
 const active = blob => blob.alive && !blob.home
@@ -7,10 +8,10 @@ const distance = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2
 const towards = (a, b) => Math.atan2(b.y - a.y, b.x - a.x)
 const reach = blob => Math.max(1, blob.size / 4)
 
-function nearestPlant(blob, plants, range) {
+function nearestPlant(blob, plants, range, config) {
   let closest, best = range ** 2
   for (const plant of plants.near(blob.x, blob.y, range)) {
-    if (plant.eaten) continue
+    if (plant.eaten || !permitsPlantType(blob, plant, config)) continue
     const d = distance(blob, plant)
     if (d <= best && (d < best || !closest || plant.id < closest.id)) {
       best = d
@@ -35,7 +36,7 @@ function orient(blob, nearby, plants, ctx, config) {
     if (canHunt(blob, other, config) && (!prey || other.speedWorld < prey.speedWorld)) prey = other
   }
   const jitter = (stream, id = 0) => (random(config.seed, stream, ctx.day, ctx.tick, blob.id, id) - 0.5) * Math.PI / 2
-  const food = blob.credits < 2 && canEatPlants(blob, config) ? nearestPlant(blob, plants, blob.sense) : null
+  const food = blob.credits < 2 && canEatPlants(blob, config) ? nearestPlant(blob, plants, blob.sense, config) : null
   const stepsLeft = Math.min(blob.energy / (blob.rate * ctx.stepSeconds), (ctx.limit ?? Infinity) - ctx.tick)
   const reserve = stepsLeft - Math.sqrt(distance(blob, blob.target)) / (blob.speedWorld * ctx.stepSeconds)
   const wantsHome = blob.credits >= 2 || (blob.credits === 1 && reserve <= 10)
@@ -53,7 +54,7 @@ function orient(blob, nearby, plants, ctx, config) {
 }
 
 function hasEligiblePrey(blobs, config) {
-  if (!usesFoodWeb(config) || !config.predation) return false
+  if ((!usesFoodWeb(config) && !usesPlantFoods(config)) || !config.predation) return false
   const largest = new Map(), smallest = new Map()
   for (const blob of blobs) {
     if (!active(blob)) continue
@@ -134,7 +135,7 @@ export function forage(ctx, config, settleHome, kill, eat) {
   }
   for (const blob of blobs) {
     if (!active(blob) || blob.credits >= 2 || !remaining || !canEatPlants(blob, config)) continue
-    const plant = nearestPlant(blob, plants, reach(blob) + blob.speedWorld * seconds)
+    const plant = nearestPlant(blob, plants, reach(blob) + blob.speedWorld * seconds, config)
     if (plant && canReach(blob, plant)) {
       remaining--
       eat(ctx, config, blob, plant, end, 'plant')

@@ -1,4 +1,5 @@
-import { FOOD_WEB_RULE_VERSION, huntingOnDay, rulesFor } from './config.js'
+import { FOOD_WEB_RULE_VERSION, huntingOnDay, rulesFor, usesPlantFoods } from './config.js'
+import { PLANT_FOOD_TYPES, plantDietFor } from './plant-food.js'
 
 export const DEFAULT_DIET = Object.freeze({ plants: true, hunt: 'any', prey: Object.freeze([]) })
 export const EMPTY_FOOD_WEB = Object.freeze({ enabled: false, diets: Object.freeze({}) })
@@ -40,6 +41,8 @@ export function foodWebAt(run, day, tick = Infinity) {
 }
 
 export const canEatPlants = (blob, config) => !usesFoodWeb(config) || dietFor(config.foodWeb, blob.species).plants
+export const permitsPlantType = (blob, plant, config) => !usesPlantFoods(config) ||
+  plantDietFor(config.plantFoods, blob.species).includes(plant.type)
 
 export function permitsPrey(hunter, prey, config) {
   if (!usesFoodWeb(config)) return true
@@ -49,8 +52,14 @@ export function permitsPrey(hunter, prey, config) {
 
 export function encounterResult(config, hunter, prey, day, huntingBlock) {
   if (!hunter?.enabled || (prey && !prey.enabled)) return 'This species is disabled in the setup.'
-  if (!prey) return canEatPlants(hunter, config)
-    ? 'This species can eat plants.' : 'This diet excludes plants.'
+  if (!prey) {
+    if (!canEatPlants(hunter, config)) return 'This diet excludes plants.'
+    if (!usesPlantFoods(config)) return 'This species can eat plants.'
+    const types = PLANT_FOOD_TYPES.filter(type => permitsPlantType(hunter, { type: type.id }, config))
+      .map(type => type.label.toLowerCase())
+    if (!types.length) return 'This species has no plant types selected in Food types.'
+    return 'This species can eat ' + new Intl.ListFormat('en', { type: 'conjunction' }).format(types) + ' when available.'
+  }
   if (config.predation && !huntingOnDay(config, day)) return `Hunting begins on Day ${config.firstHuntingDay}.`
   return huntingBlock(hunter, prey, config) ?? 'This hunt is allowed if the hunter catches the prey.'
 }

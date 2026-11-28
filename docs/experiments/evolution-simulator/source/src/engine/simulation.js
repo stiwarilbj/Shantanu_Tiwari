@@ -1,7 +1,7 @@
 import { advancedRuleEnabled, endsWhenSettled, huntingOnDay, INHERITANCE_DEFAULTS, REPRODUCTION_DEFAULTS, TRAITS,
   rulesFor, usesImprovedSteering, usesReproductionRules, usesStandardDeviation, usesWalkthroughForaging } from './config.js'
 import { random, normal, shuffle } from './random.js'
-import { canEatPlants, foodWebAfter } from './food-web.js'
+import { canEatPlants, foodWebAfter, permitsPlantType } from './food-web.js'
 import { summaries } from './stats.js'
 import { forage } from './foraging.js'
 import { improvedIntent, steer } from './steering.js'
@@ -230,6 +230,7 @@ function eat(ctx, config, blob, target, time, type) {
   const extra = { target: target.id, beforeEnergy }
   if (type === 'plant') {
     target.eaten = true
+    if (target.type) extra.foodType = target.type
     if (blob.steering?.plant?.id === target.id) blob.steering.plant = null
     if (advancedRuleEnabled(config, 'mealRefills')) blob.energy = Math.min(blob.capacity, blob.energy + config.plantReward)
   } else {
@@ -278,7 +279,8 @@ function intent(blob, ctx, config, plantGrid, blobGrid) {
     blob.state = 3
     return Math.atan2(blob.y - threat.y, blob.x - threat.x)
   }
-  const food = nearest(blob, plantGrid.near(blob.x, blob.y, blob.sense), plant => !plant.eaten)
+  const food = canEatPlants(blob, config) ? nearest(blob, plantGrid.near(blob.x, blob.y, blob.sense),
+    plant => !plant.eaten && permitsPlantType(blob, plant, config)) : null
   const foodTime = food ? Math.hypot(food.x - blob.x, food.y - blob.y) / blob.speedWorld : Infinity
   let prey = null
   for (const other of nearby) {
@@ -384,7 +386,7 @@ function tick(ctx, config) {
     const endX = path.x + path.dx, endY = path.y + path.dy
     if (canEatPlants(b, config)) {
       for (const plant of plantGrid.near(path.x, path.y, b.r + 2, endX, endY)) {
-        push(contact(path, plant, b.r + 2), 1, path, plant)
+        if (permitsPlantType(b, plant, config)) push(contact(path, plant, b.r + 2), 1, path, plant)
       }
     }
     if (!config.predation) continue

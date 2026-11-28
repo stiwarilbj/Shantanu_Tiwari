@@ -1,4 +1,4 @@
-import { canEatPlants } from './food-web.js'
+import { canEatPlants, permitsPlantType } from './food-web.js'
 import { FIELD, canHunt, clamp, contact, pathOf, refugeContact, turn } from './geometry.js'
 import { FORAGING_DEFAULTS } from './config.js'
 import { canPursuePrey, DECISION, keepsMeal, mealFitsBudget, remembersPlant, returnReserve,
@@ -119,7 +119,7 @@ function escapeHeading(blob, threat, threats, home, seconds, width) {
 function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budget, settings) {
   let best, current
   let lostMeal = DECISION.searching
-  function score(kind, id, x, y, travelTime, reach, turning, remembered = false) {
+  function score(kind, id, x, y, travelTime, reach, turning, remembered = false, foodType) {
     const dx = x - blob.x, dy = y - blob.y
     const dist = Math.hypot(dx, dy)
     const heading = dist ? Math.atan2(dy, dx) : blob.angle
@@ -130,7 +130,7 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
     const back = Math.min(...SIDES.map(side => homeTime(mealX, mealY, heading, blob.speedWorld,
       homePoint(side, mealX, mealY, width))))
     if (!mealFitsBudget(time, back, budget)) return
-    const meal = { kind, id, x, y, heading, time, remembered }
+    const meal = { kind, id, x, y, heading, time, remembered, foodType }
     if (memory.kind === kind && memory.id === id) current = meal
     if (!best || time < best.time || (time === best.time &&
         (kind === best.kind ? id < best.id : kind === 'plant'))) best = meal
@@ -139,7 +139,7 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
   for (const plant of visiblePlants) {
     const reach = blob.r + 2
     score('plant', plant.id, plant.x, plant.y,
-      Math.max(0, Math.hypot(plant.x - blob.x, plant.y - blob.y) - reach) / blob.speedWorld, reach)
+      Math.max(0, Math.hypot(plant.x - blob.x, plant.y - blob.y) - reach) / blob.speedWorld, reach, undefined, false, plant.type)
   }
   const known = memory.plant
   if (known) {
@@ -181,7 +181,7 @@ function findMeal(blob, memory, visiblePlants, nearby, config, now, width, budge
   }
   const meal = current && keepsMeal(current.time, best.time, settings.switchSavings, config.version) ? current : best
   if (meal?.kind === 'plant' && !meal.remembered) {
-    memory.plant = { id: meal.id, x: meal.x, y: meal.y, time: now }
+    memory.plant = { id: meal.id, x: meal.x, y: meal.y, time: now, ...(meal.foodType && { type: meal.foodType }) }
   }
   if (blob.foragingSettings) {
     if (!meal) blob.foragingDecision = lostMeal
@@ -248,8 +248,11 @@ export function improvedIntent(blob, ctx, config, plantGrid, blobGrid, timeLeft)
   }
   if (!blob.returning) {
     const plantsAllowed = canEatPlants(blob, config)
-    if (!plantsAllowed) memory.plant = null
-    const plants = plantsAllowed ? [...plantGrid.near(blob.x, blob.y, blob.sense)].filter(visible) : []
+    if (memory.plant && (!plantsAllowed || !permitsPlantType(blob, memory.plant, config))) {
+      memory.plant = null
+    }
+    const plants = plantsAllowed ? [...plantGrid.near(blob.x, blob.y, blob.sense)]
+      .filter(plant => visible(plant) && permitsPlantType(blob, plant, config)) : []
     const meal = findMeal(blob, memory, plants, nearby, config, now, ctx.refugeWidth, left - reserve, settings)
     if (meal) {
       memory.kind = meal.kind
